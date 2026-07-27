@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
 import sys
 import tempfile
 import tomllib
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -132,6 +134,58 @@ class NativeInstallTests(unittest.TestCase):
             (agents / "plan-verifier.toml").write_bytes(payload)
             with self.assertRaisesRegex(InstallAbort, "installed_role_drift"):
                 self.run_install(home)
+
+    def test_dry_run_names_canonical_role_upgrades_without_writes(self) -> None:
+        previous = ROOT / "install" / "previous" / "v1.3.0" / "agents"
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            agents = home / "agents"
+            agents.mkdir(parents=True)
+            for role in installer.ROLES:
+                source = ROOT / "templates" / "agents" / f"{role}.toml"
+                prior = previous / f"{role}.toml"
+                (agents / f"{role}.toml").write_bytes(
+                    prior.read_bytes() if prior.exists() else source.read_bytes()
+                )
+            before = {
+                path.relative_to(home): path.read_bytes()
+                for path in home.rglob("*")
+                if path.is_file()
+            }
+            state = home.with_name(f"{home.name}.pilotfish-install-state.json")
+            pending = state.with_suffix(".json.pending")
+            self.assertFalse(state.exists())
+            self.assertFalse(pending.exists())
+
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = install(
+                    source_root=ROOT, codex_home=home, dry_run=True, check_codex=False
+                )
+            stdout = buffer.getvalue()
+
+            self.assertEqual(code, 0)
+            self.assertIn("note: upgraded canonical role plan-verifier", stdout)
+            self.assertIn("note: upgraded canonical role security-reviewer", stdout)
+            self.assertIn("would change", stdout)
+            after = {
+                path.relative_to(home): path.read_bytes()
+                for path in home.rglob("*")
+                if path.is_file()
+            }
+            self.assertEqual(after, before)
+            self.assertFalse(state.exists())
+            self.assertFalse(pending.exists())
+
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            agents = home / "agents"
+            agents.mkdir(parents=True)
+            (agents / "plan-verifier.toml").write_bytes(
+                (previous / "plan-verifier.toml").read_bytes() + b"# custom\n"
+            )
+            with self.assertRaisesRegex(InstallAbort, "installed_role_drift"):
+                install(source_root=ROOT, codex_home=home, dry_run=True, check_codex=False)
 
     def test_two_nonempty_policy_files_abort_before_write(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

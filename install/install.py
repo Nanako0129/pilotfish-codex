@@ -492,6 +492,8 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
         for path in inventory
     }
     if dry_run:
+        for note in notes:
+            print(f"note: {note}")
         print("would change" if writes else "already up to date; nothing to change")
         return 0
     if writes:
