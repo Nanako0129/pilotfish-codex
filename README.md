@@ -48,6 +48,21 @@ and `READY` never authorizes writes.
 
 See [Plan readiness](./docs/design.md#plan-readiness) for the design boundary.
 
+## Continuation across user input
+
+The main-session policy keeps an unfinished objective active across decision
+replies, steering, status questions, and pause or resume unless new input
+clearly supersedes it. Before asking the user to decide, Codex records the
+current phase, blocker, and resume point; after the answer, it resumes the same
+work within the existing authorization and scope instead of silently stopping.
+
+This is behavioral prompt policy, not deterministic Codex App or runtime
+enforcement. Offline tests lock the contract text but do not prove live model
+compliance.
+
+See [Continuation liveness](./docs/design.md#continuation-liveness) for the
+design boundary.
+
 ## Install
 
 The scripted route checks the exact CLI version, plans all writes, creates

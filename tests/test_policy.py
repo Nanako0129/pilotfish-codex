@@ -114,6 +114,38 @@ class PolicyTests(unittest.TestCase):
         ):
             self.assertIn(phrase, policy)
 
+    def test_policy_preserves_unfinished_objective_across_user_input(self) -> None:
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = " ".join(policy.split())
+        for phrase in (
+            "unfinished root objective remains active across turns",
+            "user decision replies",
+            "steering or corrections",
+            "status or explanation requests",
+            "pause or resume",
+            "new input does not clearly supersede it",
+            "Contextually clear replacement intent may replace the objective",
+            "no explicit cancellation phrase is required",
+            "replacement intent is materially ambiguous",
+            "ask one concise clarification instead of silently abandoning it",
+            "Before pausing for user input",
+            "current phase or slice",
+            "pending decision or blocker",
+            "exact resume point",
+            "Treat a plausible reply to that pending decision as its resolution",
+            "continue from the resume point in the same turn",
+            "within existing authorization and scope",
+            "resume the remaining work",
+            "resume useful in-scope work in the same turn",
+            "Do not issue a normal final response",
+            "active objective remains incomplete",
+            "explicitly emit `PAUSED_NEEDS_USER`",
+            "does not expand approval, security, destructive-action",
+            "external-action, or scope boundaries",
+        ):
+            self.assertIn(phrase, policy)
+        self.assertNotIn("only when explicitly cancelled or replaced", policy)
+
     def test_policy_schedules_native_parallel_calls_back_to_back(self) -> None:
         policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
         policy = " ".join(policy.split())

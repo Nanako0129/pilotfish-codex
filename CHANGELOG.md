@@ -16,6 +16,9 @@ are noted only as source references.
 - Replace active dispatch mode selection and role matrices with one native-only
   verifier. Historical adapter evidence remains archival and excluded from the
   native gate.
+- Add offline policy assertions for main-session continuation after decisions,
+  steering, status questions, and pauses unless new input clearly supersedes
+  the unfinished objective. This is prompt policy, not live runtime proof.
 
 ## v1.3.1 — 2026-07-23
 

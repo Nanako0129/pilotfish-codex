@@ -49,6 +49,26 @@ it and returns the unresolved choices to the user. This does not make the unit
 ready or reset shared prerequisites. Security-sensitive units complete
 read-only security review before their first readiness pass.
 
+### Continuation liveness
+
+User input does not necessarily replace the task already in progress. The
+main-session policy therefore keeps an unfinished root objective active when a
+message answers a pending decision, steers or corrects the work, asks for
+status or explanation, or resumes a pause. Contextually clear replacement
+intent may supersede it without a literal cancellation phrase.
+
+Before pausing, the main session exposes the objective, current phase or slice,
+pending blocker or decision, and exact resume point. A decision response binds
+to that point; status and explanation requests are answered before useful
+in-scope work resumes. An incomplete objective cannot end with a normal final:
+the session must continue or return `PAUSED_NEEDS_USER` with the blocker,
+question, and resume point.
+
+This is a prompt-level liveness contract. It neither persists task state outside
+the conversation nor changes Codex App, app-server, approval, security, or
+scope behavior. Static assertions prevent accidental policy removal; they are
+not behavioral proof that a live model or host always complies.
+
 The verifier is post-hoc evidence classification, not a pre-execution cancel
 hook. Native proof requires observed V2 selection, one `spawn_agent` with exact
 typed arguments, call/activity correlation, and child `turn_context.model` and

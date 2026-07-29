@@ -79,6 +79,28 @@ continuation remains allowed. Do not resubmit a substantially unchanged Plan.
 
 `READY` is readiness only, never user approval or write authorization.
 
+#### Continuation across user input
+
+An unfinished root objective remains active across turns, user decision replies,
+steering or corrections, status or explanation requests, and pause or resume
+when the new input does not clearly supersede it. Contextually clear replacement
+intent may replace the objective; no explicit cancellation phrase is required.
+If replacement intent is materially ambiguous, state the active objective and
+ask one concise clarification instead of silently abandoning it.
+
+Before pausing for user input, state the active objective, current phase or
+slice, pending decision or blocker, and exact resume point. Treat a plausible
+reply to that pending decision as its resolution, then continue from the resume
+point in the same turn within existing authorization and scope. Incorporate
+steering or corrections and then resume the remaining work; answer status or
+explanation requests and then resume useful in-scope work in the same turn.
+
+Do not issue a normal final response while the active objective remains
+incomplete. Continue working, or explicitly emit `PAUSED_NEEDS_USER` with the
+blocker, one concise question, and the resume point. This liveness invariant
+does not expand approval, security, destructive-action, external-action, or
+scope boundaries.
+
 Before every agent call, identify the phase and apply a dispatch brake. Do not
 fan out when workers would repeatedly depend on evolving shared evidence, write
 ownership overlaps, no clear synthesis or integration owner exists, or
