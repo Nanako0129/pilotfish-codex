@@ -137,20 +137,27 @@ class PolicyTests(unittest.TestCase):
             "within existing authorization and scope",
             "If the reply is ambiguous, preserve the pause",
             "ask one concise clarification",
+            "without treating them as decision resolution",
+            "resume only work not gated by the unresolved decision",
+            "otherwise remain paused at the recorded resume point",
             "resume the remaining work",
-            "resume useful in-scope work in the same turn",
+            "unless a pending decision or user-requested pause still gates it",
             "Do not issue a normal final response",
             "active objective remains incomplete",
             "explicitly emit `PAUSED_NEEDS_USER`",
             "If the user explicitly requests a pause",
             "honor it without inventing a blocker or question",
             "active objective, current phase or slice, and exact resume point",
+            "pause remains in force through status or explanation requests",
+            "until the user explicitly asks to resume",
+            "new input clearly supersedes the objective",
             "does not expand approval, security, destructive-action",
             "external-action, or scope boundaries",
         ):
             self.assertIn(phrase, policy)
         self.assertNotIn("only when explicitly cancelled or replaced", policy)
         self.assertNotIn("Treat a plausible reply", policy)
+        self.assertNotIn("resume useful in-scope work in the same turn", policy)
 
     def test_policy_schedules_native_parallel_calls_back_to_back(self) -> None:
         policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()

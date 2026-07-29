@@ -61,11 +61,13 @@ Before pausing, the main session exposes the objective, current phase or slice,
 pending blocker or decision, and exact resume point. A decision response binds
 to that point only when it resolves the decision unambiguously; otherwise the
 pause remains and the session asks one concise clarification. Status and
-explanation requests are answered before useful in-scope work resumes. An
-incomplete objective cannot end with a normal final: the session must continue
-or return `PAUSED_NEEDS_USER` with the blocker, question, and resume point. A
-user-requested pause instead records the objective, phase, and resume point
-without inventing a blocker or question.
+explanation requests resume only work not gated by the unresolved decision;
+otherwise the session remains paused. An incomplete objective cannot end with a
+normal final: the session must continue or return `PAUSED_NEEDS_USER` with the
+blocker, question, and resume point. A user-requested pause instead records the
+objective, phase, and resume point without inventing a blocker or question. It
+remains active through status or explanation requests until the user explicitly
+resumes or clearly replaces the objective.
 
 This is a prompt-level liveness contract. It neither persists task state outside
 the conversation nor changes Codex App, app-server, approval, security, or

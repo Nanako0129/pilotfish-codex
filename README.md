@@ -55,8 +55,10 @@ replies, steering, status questions, and pause or resume unless new input
 clearly supersedes it. Before asking the user to decide, Codex records the
 current phase, blocker, and resume point; after an unambiguous answer, it resumes
 the same work within the existing authorization and scope instead of silently
-stopping. An explicit user-requested pause keeps the resume point without
-inventing a blocker or question.
+stopping. Status or explanation requests cannot restart work gated by an
+unresolved decision. An explicit user-requested pause keeps the resume point
+without inventing a blocker or question and stays active until the user resumes
+or clearly replaces the objective.
 
 This is behavioral prompt policy, not deterministic Codex App or runtime
 enforcement. Offline tests lock the contract text but do not prove live model

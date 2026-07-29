@@ -93,16 +93,20 @@ slice, pending decision or blocker, and exact resume point. Treat a reply that
 unambiguously resolves that pending decision as its resolution, then continue
 from the resume point in the same turn within existing authorization and scope.
 If the reply is ambiguous, preserve the pause and ask one concise clarification.
-Incorporate steering or corrections and then resume the remaining work; answer
-status or explanation requests and then resume useful in-scope work in the same
-turn.
+Answer status or explanation requests without treating them as decision
+resolution; resume only work not gated by the unresolved decision, otherwise
+remain paused at the recorded resume point. Incorporate other steering or
+corrections and then resume the remaining work unless a pending decision or
+user-requested pause still gates it.
 
 Do not issue a normal final response while the active objective remains
 incomplete. Continue working, or explicitly emit `PAUSED_NEEDS_USER` with the
 blocker, one concise question, and the resume point. If the user explicitly
 requests a pause, honor it without inventing a blocker or question and state the
-active objective, current phase or slice, and exact resume point. This liveness
-invariant does not expand approval, security, destructive-action,
+active objective, current phase or slice, and exact resume point. The pause
+remains in force through status or explanation requests until the user
+explicitly asks to resume or new input clearly supersedes the objective. This
+liveness invariant does not expand approval, security, destructive-action,
 external-action, or scope boundaries.
 
 Before every agent call, identify the phase and apply a dispatch brake. Do not
