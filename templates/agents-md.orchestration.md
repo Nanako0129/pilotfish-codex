@@ -150,8 +150,9 @@ implementation is claim-relevant even when the brief did not name the affected
 flow. P0 freezes the affected slice and pauses for user direction; automatic
 work is containment only. Fix P1 within approved scope or pause and ask. An
 introduced P2 regression remains blocking and must be fixed within approved
-scope or paused; fix other bounded P2 findings inside explicit acceptance,
-otherwise defer them with a reason and narrow the final claim. A documented
+scope or paused; fix other bounded P2 findings only inside explicit acceptance
+and approved scope, otherwise defer them with a reason and narrow the final
+claim. A documented
 regrade may use the verifier's cited evidence when it establishes different
 impact. Never silently reject, defer, downgrade, or call a blocker fixed
 without contrary evidence or a successful recheck of the original
@@ -160,13 +161,17 @@ failure. Report or defer P3/P4 without a dedicated fix-reverify loop. Retry
 prerequisite, or environment materially changes; otherwise pause the affected
 slice.
 
-#### Long autonomous runs
+#### Verification recovery and long autonomous runs
+
+The recovery budget and severity rules below apply to every verification run;
+`AUTO`/`ASK` clauses apply only to likely long autonomous work.
 
 Before likely long autonomous work, announce `AUTO` or `ASK` for the current
 task. Sleeping, eating, or leaving the agent alone is not authority to continue:
-offer the modes and wait. Explicit “continue while I am away” selects `AUTO`
-and must be announced. `/goal` preserves the objective only; it selects neither
-mode nor broader authority.
+offer the modes and wait. A headless likely-long run without an explicit mode
+emits `PAUSED_NEEDS_USER` and exits. Explicit “continue while I am away” selects
+`AUTO` and must be announced. `/goal` preserves the objective only; it selects
+neither mode nor broader authority.
 
 `AUTO` permits only reversible work in approved scope and main-session P2
 adjudication. It grants no new version-control, publish, install, credential,
@@ -183,12 +188,15 @@ A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
 Automatic containment is limited to agent-owned work or evidence, never an
 external action. Blocking P1/P2 recovery shares at most five meaningful
 fix-reverify passes: rounds 1-2 are normal and rounds 3-5 are recovery. Every
-next pass requires a material change to the stable verification identity:
-candidate, claim, acceptance, contract, available evidence or prerequisites, or
-environment. Fingerprint the complete tested candidate from committed head,
-tracked and staged diff, and untracked input paths plus content; a
-tested-artifact digest may replace that input fingerprint. Never reverify the
-same complete identity. After five unsuccessful or still-blocking passes, mark
+next pass requires a material change to candidate, claim, acceptance, contract,
+external evidence or prerequisites, or environment; the immediately preceding
+verifier's verdict or output alone is not new evidence. Fingerprint the complete
+tested candidate from committed head, tracked and staged diff, untracked input
+paths plus content, and each input submodule's HEAD plus recursive working-tree
+content. Include a tested-artifact digest when applicable; it may replace the
+source fingerprint only when that artifact is explicitly the sole deliverable.
+Never reverify the same complete identity. After five unsuccessful or
+still-blocking passes, mark
 the slice `PAUSED_VERIFICATION`, block its dependents, and continue unrelated
 approved safe slices only when the risk is not cross-cutting. A blocking P2
 counts against that shared budget and joins the next coherent

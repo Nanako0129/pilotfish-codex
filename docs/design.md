@@ -76,11 +76,13 @@ reversible scope and P2 adjudication, not new version-control, publish, install,
 credential, destructive, external, scope, or spending authority. `ASK` uses
 Codex `request_user_input` only when exposed, otherwise pauses the turn.
 
-Blocking P1/P2 recovery shares five materially changed passes: two normal and
-three recovery. Verification identity includes the complete tested candidate,
-claim, acceptance, contract, available evidence or prerequisites, and
-environment. The candidate fingerprint covers committed head, tracked and
-staged diff, and untracked input paths plus content, or a tested-artifact digest.
+Every verification run shares five materially changed P1/P2 recovery passes:
+two normal and three recovery. Verification identity includes the complete
+tested candidate, claim, acceptance, contract, external evidence or
+prerequisites, and environment; a prior verifier's own output is not a change.
+The candidate fingerprint covers committed head, tracked and staged diff,
+untracked input paths plus content, and dirty submodule content. Artifact
+digests complement source identity unless the artifact is the sole deliverable.
 A fifth failure pauses only that slice and its dependents when risk is not
 cross-cutting, so unrelated approved safe slices can continue.
 
