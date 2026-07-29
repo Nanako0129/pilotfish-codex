@@ -172,11 +172,12 @@ class PolicyTests(unittest.TestCase):
     def test_policy_owns_outcome_disposition(self) -> None:
         policy = " ".join((ROOT / "templates" / "agents-md.orchestration.md").read_text().split())
         self.assertRegex(policy, r"Final disposition remains in the main session")
-        self.assertRegex(policy, r"Fix P0/P1 within approved scope or pause and ask")
-        self.assertRegex(
+        self.assertIn("P0 freezes the affected slice", policy)
+        self.assertIn("Fix P1 within approved scope or pause and ask", policy)
+        self.assertIn(
+            "Never silently reject, defer, downgrade, or call a blocker fixed "
+            "without contrary evidence or a successful recheck of the original failure",
             policy,
-            r"never silently reject, defer, downgrade, or call one fixed without "
-            r"contrary evidence or a successful recheck of the original failure",
         )
 
     def test_policy_bounds_verification_recovery_and_user_pause(self) -> None:
@@ -202,9 +203,9 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertRegex(
             policy,
-            r"Every next pass requires a material .* change.*"
+            r"Every next pass requires a material .* acceptance, contract.* change.*"
             r"candidate-state fingerprint.*"
-            r"never reverify the same fingerprint/claim/environment",
+            r"never reverify the same fingerprint/claim/acceptance/environment",
         )
         self.assertRegex(
             policy,

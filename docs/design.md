@@ -58,11 +58,13 @@ requires a reproducible P0-P2 blocker. The verifier reads and runs checks but
 never plans, edits, fixes, delegates, or exposes raw secrets.
 
 The main session adjudicates reproducibility, scope, claim relevance, priority,
-and confidence. P0/P1 must be fixed or paused for user direction; bounded
-in-acceptance P2 is fixed, while other P2 and P3/P4 are reported with a narrowed
-claim when necessary. Regressions caused by the reviewed implementation remain
-claim-relevant even when the brief omitted the affected flow. An inconclusive
-gate is retried once only after its prerequisite materially changes.
+and confidence. P0 freezes the affected slice; P1 is fixed or paused for user
+direction. Regressions caused by the reviewed implementation remain
+claim-relevant even when the brief omitted the affected flow, and an introduced
+P2 regression must be fixed or paused rather than hidden by a narrowed claim.
+Other bounded in-acceptance P2 is fixed, while lower-priority findings may be
+reported with a narrowed claim. An inconclusive gate is retried once only after
+its prerequisite materially changes.
 
 ### Long autonomous runs
 
@@ -73,10 +75,10 @@ credential, destructive, external, scope, or spending authority. `ASK` uses
 Codex `request_user_input` only when exposed, otherwise pauses the turn.
 
 Blocking P1/P2 recovery shares five materially changed passes: two normal and
-three recovery. Candidate identity includes the committed head plus working-tree
-diff or tested-artifact digest. A fifth failure pauses only that slice and its
-dependents when risk is not cross-cutting, so unrelated approved safe slices can
-continue.
+three recovery. Verification identity includes acceptance, while candidate
+identity includes the committed head plus working-tree diff or tested-artifact
+digest. A fifth failure pauses only that slice and its dependents when risk is
+not cross-cutting, so unrelated approved safe slices can continue.
 
 The verifier is post-hoc evidence classification, not a pre-execution cancel
 hook. Native proof requires observed V2 selection, one `spawn_agent` with exact

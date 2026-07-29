@@ -219,6 +219,12 @@ class NativeInstallTests(unittest.TestCase):
             with self.assertRaisesRegex(InstallAbort, "installed_role_drift"):
                 self.run_install(home)
 
+        runbook = (ROOT / "install" / "AGENT-INSTALL.md").read_text()
+        self.assertIn(
+            "released canonical\nv1.3.1 `verifier`",
+            runbook,
+        )
+
     def test_two_nonempty_policy_files_abort_before_write(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"

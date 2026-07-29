@@ -147,11 +147,13 @@ Final disposition remains in the main session. Re-evaluate every reported issue
 for reproducibility, whether it was introduced and is in scope, relevance to
 the exact claim, priority, and confidence. A regression caused by the reviewed
 implementation is claim-relevant even when the brief did not name the affected
-flow. Fix P0/P1 within approved scope or
-pause and ask; never silently reject, defer, downgrade, or call one fixed
-without contrary evidence or a successful recheck of the original failure.
-Fix a bounded P2 inside explicit acceptance; otherwise defer it with a reason
-and narrow the final claim. Report or defer P3/P4 without a
+flow. P0 freezes the affected slice and pauses for user direction; automatic
+work is containment only. Fix P1 within approved scope or pause and ask. An
+introduced P2 regression remains blocking and must be fixed within approved
+scope or paused; fix other bounded P2 findings inside explicit acceptance,
+otherwise defer them with a reason and narrow the final claim. Never silently
+reject, defer, downgrade, or call a blocker fixed without contrary evidence or
+a successful recheck of the original failure. Report or defer P3/P4 without a
 dedicated fix-reverify loop. Retry `INCONCLUSIVE` once only after a material
 prerequisite change; otherwise pause the affected slice.
 
@@ -177,11 +179,12 @@ affected slice. The main session asks, never a child.
 A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
 Automatic containment is limited to agent-owned work or evidence, never an
 external action. Blocking P1/P2 recovery shares at most five meaningful
-fix-reverify passes per stable slice and claim: rounds 1-2 are normal and rounds
-3-5 are recovery. Every next pass requires a material implementation, claim,
-contract, evidence, or environment change. Track a candidate-state fingerprint
-containing the committed head plus working-tree diff or tested-artifact digest;
-never reverify the same fingerprint/claim/environment. After five, mark the
+fix-reverify passes per stable slice, claim, and acceptance: rounds 1-2 are
+normal and rounds 3-5 are recovery. Every next pass requires a material
+implementation, claim, acceptance, contract, evidence, or environment change.
+Track a candidate-state fingerprint containing the committed head plus
+working-tree diff or tested-artifact digest; never reverify the same
+fingerprint/claim/acceptance/environment. After five, mark the
 slice `PAUSED_VERIFICATION`, block its dependents, and continue unrelated
 approved safe slices only when the risk is not cross-cutting. A blocking P2
 counts against that shared budget and joins the next coherent
