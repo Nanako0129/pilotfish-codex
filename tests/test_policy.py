@@ -152,8 +152,6 @@ class PolicyTests(unittest.TestCase):
             "surface the blockers and options to the user",
             "substantially unchanged Plan",
             "findings and dispositions into the Plan",
-            "two consecutive `REFUTED` verdicts for that claim",
-            "stop automatic fix-and-reverify",
         ):
             self.assertIn(phrase, normalized_policy)
         self.assertNotIn("Plan epoch", policy)
@@ -170,6 +168,47 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("READY", outcome)
         self.assertNotIn("REVISE", outcome)
         self.assertIn("first plan-verifier review", security)
+
+    def test_policy_owns_outcome_disposition(self) -> None:
+        policy = " ".join((ROOT / "templates" / "agents-md.orchestration.md").read_text().split())
+        self.assertRegex(policy, r"Final disposition remains in the main session")
+        self.assertRegex(policy, r"Fix P0/P1 within approved scope or pause and ask")
+        self.assertRegex(
+            policy,
+            r"never silently reject, defer, downgrade, or call one fixed without "
+            r"contrary evidence or a successful recheck of the original failure",
+        )
+
+    def test_policy_bounds_verification_recovery_and_user_pause(self) -> None:
+        policy = " ".join((ROOT / "templates" / "agents-md.orchestration.md").read_text().split())
+        self.assertRegex(
+            policy,
+            r"use Codex `request_user_input` only when that tool is exposed in the current mode",
+        )
+        self.assertRegex(
+            policy,
+            r"Otherwise end the turn with `PAUSED_NEEDS_USER`, one concise question, "
+            r"choices, and a recommendation",
+        )
+        self.assertRegex(
+            policy,
+            r"Headless or noninteractive execution emits `PAUSED_NEEDS_USER` and exits",
+        )
+        self.assertRegex(
+            policy,
+            r"at most five meaningful fix-reverify passes.*"
+            r"rounds 1-2 are normal and rounds 3-5 are recovery",
+        )
+        self.assertRegex(
+            policy,
+            r"Every next pass requires a material .* change; never reverify the same "
+            r"head/claim/environment",
+        )
+        self.assertRegex(
+            policy,
+            r"After five, mark the slice `PAUSED_VERIFICATION`, block its dependents, "
+            r"and continue unrelated approved safe slices",
+        )
 
 
 if __name__ == "__main__":

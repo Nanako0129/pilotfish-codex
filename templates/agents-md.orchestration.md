@@ -20,7 +20,7 @@ Complete small, local, already-stable work directly.
 | `security-reviewer` | Pre-approval read-only security evidence |
 | `mech-executor` | Fully specified mechanical implementation |
 | `executor` | Bounded implementation requiring local judgment |
-| `verifier` | Completed-work challenge; `CONFIRMED` or `REFUTED` |
+| `verifier` | Calibrated completed-work falsification; `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE` |
 | `security-executor` | Approved security-sensitive implementation |
 
 #### Decision cues
@@ -59,7 +59,7 @@ this lifecycle:
 | Plan | The main session synthesizes one Plan. Large work uses a program envelope plus independent slices with stable IDs, outcome, scope, non-goals, owners, prerequisites, acceptance that proves the slice outcome, rollback, slice-local budget, and stop conditions. | A fresh `plan-verifier` reviews the envelope first, then only the next executable slice; main session owns revisions and final synthesis. |
 | Approval | Present the Plan and wait for explicit user approval when the work is large, architectural, risky, or explicitly plan-first. | Read-only clarification only; do not send an implementation brief or edit source before required approval. |
 | Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
-| Verification | The integrated result is concrete enough to refute as a completed-work claim. | A fresh `verifier` returns only `CONFIRMED` or `REFUTED`. |
+| Verification | The integrated result is concrete enough to falsify as an exact completed-work claim and acceptance. | A fresh `verifier` returns `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`. |
 
 A `plan-verifier` brief requests exactly bare `READY` or structured `REVISE`
 with `Blocker:`, `Evidence:`, `Minimum revision:`, and `Acceptance check:`
@@ -134,6 +134,60 @@ operations, or work that could block later integration. Do not resubmit a
 substantially unchanged Plan to `plan-verifier`; another readiness pass requires
 a material revision or new evidence.
 
+Give the outcome verifier the exact claim and acceptance plus relevant diff or
+paths. Ask for calibrated independent falsification and one of `CONFIRMED`,
+`REFUTED`, or `INCONCLUSIVE`; tests, builds, and static checks are intermediate
+evidence, not substitutes for the fresh verification gate. `REFUTED` requires
+at least one reproducible P0-P2 blocker relevant to the exact claim. P3/P4 are
+non-blocking advisories. Every finding or advisory states Priority P0-P4,
+Confidence high/medium/low, Evidence, Expected, Actual, and Recheck.
+`INCONCLUSIVE` states the reason, missing evidence, and retry condition.
+
+Final disposition remains in the main session. Re-evaluate every reported issue
+for reproducibility, whether it was introduced and is in scope, relevance to
+the exact claim, priority, and confidence. Fix P0/P1 within approved scope or
+pause and ask; never silently reject, defer, downgrade, or call one fixed
+without contrary evidence or a successful recheck of the original failure.
+Fix a bounded P2 inside explicit acceptance; otherwise defer it with a reason
+and narrow the final claim. Report or defer P3/P4 without a
+dedicated fix-reverify loop. Retry `INCONCLUSIVE` once only after a material
+prerequisite change; otherwise pause the affected slice.
+
+#### Long autonomous runs
+
+Before likely long autonomous work, announce `AUTO` or `ASK` for the current
+task. Sleeping, eating, or leaving the agent alone is not authority to continue:
+offer the modes and wait. Explicit “continue while I am away” selects `AUTO`
+and must be announced. `/goal` preserves the objective only; it selects neither
+mode nor broader authority.
+
+`AUTO` permits only reversible work in approved scope and main-session P2
+adjudication. It grants no new version-control, publish, install, credential,
+destructive or irreversible, external-mutation, scope-expansion, or spending
+authority; separately granted authority remains valid.
+
+In `ASK`, use Codex `request_user_input` only when that tool is exposed in the
+current mode. Otherwise end the turn with `PAUSED_NEEDS_USER`, one concise
+question, choices, and a recommendation. Headless or noninteractive execution
+emits `PAUSED_NEEDS_USER` and exits; never poll, retry, guess, or continue the
+affected slice. The main session asks, never a child.
+
+A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
+Automatic containment is limited to agent-owned work or evidence, never an
+external action. P1 recovery permits at most five meaningful fix-reverify
+passes per stable slice and claim: rounds 1-2 are normal and rounds 3-5 are
+recovery. Every next pass requires a material implementation, claim, contract,
+evidence, or environment change; never reverify the same
+head/claim/environment. After five, mark the slice `PAUSED_VERIFICATION`, block
+its dependents, and continue unrelated approved safe slices only when the risk
+is not cross-cutting. P2 joins the next coherent integration-boundary
+verification; P3/P4 get no dedicated loop.
+
+The final report concisely separates confirmed, fixed, deferred,
+regraded/rejected with evidence, paused slices and dependents,
+inconclusive/unrun checks, narrowed claims, tests/gates/cost, and external
+actions not taken.
+
 Model routing is owned by the named agent definitions. Select the named role
 without replacing its configured model or reasoning effort. Use an ad-hoc model
 override only for a truly ad-hoc agent with no matching role definition.
@@ -184,11 +238,6 @@ orchestrator can run and collect the result before resuming the agent.
 
 Never swap `plan-verifier` and `verifier`. The former challenges Plan
 readiness; the latter reproduces tests and challenges a completed-work claim.
-Neither role writes the Plan or fixes findings. After a concrete `REFUTED`,
-materially fix the same claim before using a fresh verifier. After two
-consecutive `REFUTED` verdicts for that claim, stop automatic fix-and-reverify
-cycling and surface the failures and options to the user; the cap is not
-`CONFIRMED`, and user-directed continuation remains allowed. Do not reverify a
-substantially unchanged implementation. Final judgment remains in the main
-session.
+Neither role writes the Plan or fixes findings. Final judgment remains in the
+main session.
 <!-- pilotfish-codex:end -->

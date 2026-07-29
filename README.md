@@ -48,6 +48,19 @@ and `READY` never authorizes writes.
 
 See [Plan readiness](./docs/design.md#plan-readiness) for the design boundary.
 
+## Outcome verification
+
+Fresh outcome verification receives the exact claim and acceptance and returns
+`CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`. `REFUTED` requires a reproducible
+P0-P2 claim blocker; lower-priority advisories remain non-blocking. The verifier
+is read-and-run only, while the main session owns finding disposition and fixes.
+
+For likely long work, the main session announces `AUTO` or `ASK`. `AUTO` adds no
+version-control, publish, install, credential, destructive, external, scope, or
+spending authority. P1 recovery permits five materially changed passes before
+pausing that slice and its dependents; unrelated approved safe slices may
+continue.
+
 ## Install
 
 The scripted route checks the exact CLI version, plans all writes, creates

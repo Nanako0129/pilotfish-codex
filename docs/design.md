@@ -49,6 +49,32 @@ it and returns the unresolved choices to the user. This does not make the unit
 ready or reset shared prerequisites. Security-sensitive units complete
 read-only security review before their first readiness pass.
 
+### Outcome verification
+
+A fresh verifier receives the exact completed-work claim and acceptance. It
+independently falsifies that claim and returns `CONFIRMED`, `REFUTED`, or
+`INCONCLUSIVE`; P3/P4 advisories do not block confirmation, while `REFUTED`
+requires a reproducible P0-P2 blocker. The verifier reads and runs checks but
+never plans, edits, fixes, delegates, or exposes raw secrets.
+
+The main session adjudicates reproducibility, scope, claim relevance, priority,
+and confidence. P0/P1 must be fixed or paused for user direction; bounded
+in-acceptance P2 is fixed, while other P2 and P3/P4 are reported with a narrowed
+claim when necessary. An inconclusive gate is retried once only after its
+prerequisite materially changes.
+
+### Long autonomous runs
+
+Before likely long work, the main session announces `AUTO` or `ASK`; absence is
+not authority, and `/goal` preserves only the objective. `AUTO` covers approved,
+reversible scope and P2 adjudication, not new version-control, publish, install,
+credential, destructive, external, scope, or spending authority. `ASK` uses
+Codex `request_user_input` only when exposed, otherwise pauses the turn.
+
+P1 recovery is limited to five materially changed passes: two normal and three
+recovery. A fifth failure pauses only that slice and its dependents when risk is
+not cross-cutting, so unrelated approved safe slices can continue.
+
 The verifier is post-hoc evidence classification, not a pre-execution cancel
 hook. Native proof requires observed V2 selection, one `spawn_agent` with exact
 typed arguments, call/activity correlation, and child `turn_context.model` and

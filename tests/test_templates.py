@@ -80,6 +80,42 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertIn("must not silently substitute an untyped child", policy)
         self.assertNotIn("retry as an untyped child", policy)
 
+    def test_verifier_uses_calibrated_outcomes(self) -> None:
+        with (ROOT / "templates" / "agents" / "verifier.toml").open("rb") as handle:
+            verifier = tomllib.load(handle)
+        description = verifier["description"]
+        instructions = " ".join(verifier["developer_instructions"].split())
+        self.assertCountEqual(
+            [verdict for verdict in ("CONFIRMED", "REFUTED", "INCONCLUSIVE") if verdict in description],
+            ("CONFIRMED", "REFUTED", "INCONCLUSIVE"),
+        )
+        self.assertRegex(
+            instructions,
+            r"REFUTED — at least one reproducible P0-P2 finding blocks the exact claim",
+        )
+        self.assertRegex(
+            instructions,
+            r"Priority measures .* user or system impact, not .* central to the exact claim.*"
+            r"failed acceptance .* bounded or recoverable .* P2 unless .* P0 or high-impact P1.*"
+            r"P1 = reproducible high-impact security or correctness failure",
+        )
+        self.assertRegex(
+            instructions,
+            r"P3/P4 are non-blocking advisories and cannot by themselves produce REFUTED",
+        )
+        self.assertRegex(
+            instructions,
+            r"Priority P0-P4, Confidence high/medium/low, Evidence, Expected, Actual, and Recheck",
+        )
+        self.assertRegex(
+            instructions,
+            r"INCONCLUSIVE .* State the reason, missing evidence, and retry condition",
+        )
+        self.assertNotRegex(
+            instructions.lower(),
+            r"assume (?:it|the change) is broken|do not trust|finding[- ]volume pressure",
+        )
+
     def test_runbook_is_native_only(self) -> None:
         runbook = (ROOT / "install" / "AGENT-INSTALL.md").read_text()
         self.assertIn("exactly Codex `0.145.0`", runbook)
