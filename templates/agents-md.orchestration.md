@@ -145,7 +145,9 @@ Confidence high/medium/low, Evidence, Expected, Actual, and Recheck.
 
 Final disposition remains in the main session. Re-evaluate every reported issue
 for reproducibility, whether it was introduced and is in scope, relevance to
-the exact claim, priority, and confidence. Fix P0/P1 within approved scope or
+the exact claim, priority, and confidence. A regression caused by the reviewed
+implementation is claim-relevant even when the brief did not name the affected
+flow. Fix P0/P1 within approved scope or
 pause and ask; never silently reject, defer, downgrade, or call one fixed
 without contrary evidence or a successful recheck of the original failure.
 Fix a bounded P2 inside explicit acceptance; otherwise defer it with a reason
@@ -174,14 +176,16 @@ affected slice. The main session asks, never a child.
 
 A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
 Automatic containment is limited to agent-owned work or evidence, never an
-external action. P1 recovery permits at most five meaningful fix-reverify
-passes per stable slice and claim: rounds 1-2 are normal and rounds 3-5 are
-recovery. Every next pass requires a material implementation, claim, contract,
-evidence, or environment change; never reverify the same
-head/claim/environment. After five, mark the slice `PAUSED_VERIFICATION`, block
-its dependents, and continue unrelated approved safe slices only when the risk
-is not cross-cutting. P2 joins the next coherent integration-boundary
-verification; P3/P4 get no dedicated loop.
+external action. Blocking P1/P2 recovery shares at most five meaningful
+fix-reverify passes per stable slice and claim: rounds 1-2 are normal and rounds
+3-5 are recovery. Every next pass requires a material implementation, claim,
+contract, evidence, or environment change. Track a candidate-state fingerprint
+containing the committed head plus working-tree diff or tested-artifact digest;
+never reverify the same fingerprint/claim/environment. After five, mark the
+slice `PAUSED_VERIFICATION`, block its dependents, and continue unrelated
+approved safe slices only when the risk is not cross-cutting. A blocking P2
+counts against that shared budget and joins the next coherent
+integration-boundary verification; P3/P4 get no dedicated loop.
 
 The final report concisely separates confirmed, fixed, deferred,
 regraded/rejected with evidence, paused slices and dependents,

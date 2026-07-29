@@ -196,13 +196,15 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertRegex(
             policy,
-            r"at most five meaningful fix-reverify passes.*"
+            r"Blocking P1/P2 recovery shares at most five meaningful "
+            r"fix-reverify passes.*"
             r"rounds 1-2 are normal and rounds 3-5 are recovery",
         )
         self.assertRegex(
             policy,
-            r"Every next pass requires a material .* change; never reverify the same "
-            r"head/claim/environment",
+            r"Every next pass requires a material .* change.*"
+            r"candidate-state fingerprint.*"
+            r"never reverify the same fingerprint/claim/environment",
         )
         self.assertRegex(
             policy,

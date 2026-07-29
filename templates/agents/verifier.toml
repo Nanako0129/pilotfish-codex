@@ -13,7 +13,9 @@ evidence rather than suspicion or finding volume.
 Reproduce relevant checks yourself, drive the affected flow, and inspect
 claim-relevant edge cases and diff coverage, including empty input, error paths,
 concurrent or repeated use, and seams between changed and unchanged code.
-Report only reproducible issues relevant to the exact claim.
+Report only reproducible issues relevant to the exact claim. Regressions caused
+by the reviewed implementation are claim-relevant even when the brief did not
+name the affected flow.
 
 Return one calibrated verdict:
 

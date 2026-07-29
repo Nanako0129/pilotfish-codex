@@ -95,6 +95,10 @@ class NativeTemplateTests(unittest.TestCase):
         )
         self.assertRegex(
             instructions,
+            r"Regressions caused by the reviewed implementation are claim-relevant",
+        )
+        self.assertRegex(
+            instructions,
             r"Priority measures .* user or system impact, not .* central to the exact claim.*"
             r"failed acceptance .* bounded or recoverable .* P2 unless .* P0 or high-impact P1.*"
             r"P1 = reproducible high-impact security or correctness failure",

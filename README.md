@@ -57,9 +57,9 @@ is read-and-run only, while the main session owns finding disposition and fixes.
 
 For likely long work, the main session announces `AUTO` or `ASK`. `AUTO` adds no
 version-control, publish, install, credential, destructive, external, scope, or
-spending authority. P1 recovery permits five materially changed passes before
-pausing that slice and its dependents; unrelated approved safe slices may
-continue.
+spending authority. Blocking P1/P2 recovery shares five materially changed
+passes before pausing that slice and its dependents; unrelated approved safe
+slices may continue.
 
 ## Install
 
