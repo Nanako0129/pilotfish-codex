@@ -151,11 +151,14 @@ flow. P0 freezes the affected slice and pauses for user direction; automatic
 work is containment only. Fix P1 within approved scope or pause and ask. An
 introduced P2 regression remains blocking and must be fixed within approved
 scope or paused; fix other bounded P2 findings inside explicit acceptance,
-otherwise defer them with a reason and narrow the final claim. Never silently
-reject, defer, downgrade, or call a blocker fixed without contrary evidence or
-a successful recheck of the original failure. Report or defer P3/P4 without a
-dedicated fix-reverify loop. Retry `INCONCLUSIVE` once only after a material
-prerequisite change; otherwise pause the affected slice.
+otherwise defer them with a reason and narrow the final claim. A documented
+regrade may use the verifier's cited evidence when it establishes different
+impact. Never silently reject, defer, downgrade, or call a blocker fixed
+without contrary evidence or a successful recheck of the original
+failure. Report or defer P3/P4 without a dedicated fix-reverify loop. Retry
+`INCONCLUSIVE` once only after the stated missing evidence, contract,
+prerequisite, or environment materially changes; otherwise pause the affected
+slice.
 
 #### Long autonomous runs
 
@@ -185,11 +188,11 @@ candidate, claim, acceptance, contract, available evidence or prerequisites, or
 environment. Fingerprint the complete tested candidate from committed head,
 tracked and staged diff, and untracked input paths plus content; a
 tested-artifact digest may replace that input fingerprint. Never reverify the
-same complete identity. After five, mark the slice `PAUSED_VERIFICATION`, block
-its dependents, and continue unrelated approved safe slices only when the risk
-is not cross-cutting. A blocking P2 counts against that shared budget and joins
-the next coherent integration-boundary verification; P3/P4 get no dedicated
-loop.
+same complete identity. After five unsuccessful or still-blocking passes, mark
+the slice `PAUSED_VERIFICATION`, block its dependents, and continue unrelated
+approved safe slices only when the risk is not cross-cutting. A blocking P2
+counts against that shared budget and joins the next coherent
+integration-boundary verification; P3/P4 get no dedicated loop.
 
 The final report concisely separates confirmed, fixed, deferred,
 regraded/rejected with evidence, paused slices and dependents,

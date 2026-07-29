@@ -179,6 +179,14 @@ class PolicyTests(unittest.TestCase):
             "without contrary evidence or a successful recheck of the original failure",
             policy,
         )
+        self.assertIn(
+            "A documented regrade may use the verifier's cited evidence",
+            policy,
+        )
+        self.assertIn(
+            "stated missing evidence, contract, prerequisite, or environment",
+            policy,
+        )
 
     def test_policy_bounds_verification_recovery_and_user_pause(self) -> None:
         policy = " ".join((ROOT / "templates" / "agents-md.orchestration.md").read_text().split())
@@ -209,7 +217,8 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertRegex(
             policy,
-            r"After five, mark the slice `PAUSED_VERIFICATION`, block its dependents, "
+            r"After five unsuccessful or still-blocking passes, mark the slice "
+            r"`PAUSED_VERIFICATION`, block its dependents, "
             r"and continue unrelated approved safe slices",
         )
 

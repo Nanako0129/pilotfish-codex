@@ -54,8 +54,10 @@ read-only security review before their first readiness pass.
 A fresh verifier receives the exact completed-work claim and acceptance. It
 independently falsifies that claim and returns `CONFIRMED`, `REFUTED`, or
 `INCONCLUSIVE`; P3/P4 advisories do not block confirmation, while `REFUTED`
-requires a reproducible P0-P2 blocker. The verifier reads and runs checks but
-never plans, edits, fixes, delegates, or exposes raw secrets.
+requires a reproducible P0-P2 blocker. A known blocker takes precedence over
+missing evidence for another condition; otherwise any unevaluated required
+condition is `INCONCLUSIVE`. The verifier reads and runs checks but never plans,
+edits, fixes, delegates, or exposes raw secrets.
 
 The main session adjudicates reproducibility, scope, claim relevance, priority,
 and confidence. P0 freezes the affected slice; P1 is fixed or paused for user

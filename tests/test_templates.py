@@ -112,6 +112,11 @@ class NativeTemplateTests(unittest.TestCase):
         )
         self.assertRegex(
             instructions,
+            r"REFUTED takes precedence when a reproducible P0-P2 blocker coexists.*"
+            r"unevaluated required acceptance condition makes the verdict INCONCLUSIVE",
+        )
+        self.assertRegex(
+            instructions,
             r"Priority measures .* user or system impact, not .* central to the exact claim.*"
             r"failed acceptance .* bounded or recoverable .* P2 unless .* P0 or high-impact P1.*"
             r"P1 = any reproducible\s+high-impact user or system failure that does not meet P0",
