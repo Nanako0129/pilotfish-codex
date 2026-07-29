@@ -203,9 +203,9 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertRegex(
             policy,
-            r"Every next pass requires a material .* acceptance, contract.* change.*"
-            r"candidate-state fingerprint.*"
-            r"never reverify the same fingerprint/claim/acceptance/environment",
+            r"stable verification identity.*available evidence or prerequisites.*"
+            r"tracked and staged diff.*untracked input paths plus content.*"
+            r"Never reverify the same complete identity",
         )
         self.assertRegex(
             policy,

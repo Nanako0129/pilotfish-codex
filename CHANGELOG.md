@@ -5,7 +5,7 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
-## Unreleased — native Codex `rust-v0.145.0` migration
+## v1.3.2 — 2026-07-29
 
 - Replace the active adapter configuration with the exact native Multi-Agent V2
   table and total concurrency of four.
@@ -16,6 +16,9 @@ are noted only as source references.
 - Replace active dispatch mode selection and role matrices with one native-only
   verifier. Historical adapter evidence remains archival and excluded from the
   native gate.
+- Calibrate outcome verification with three verdicts, P0-P4 priority,
+  five bounded recovery passes, complete candidate/evidence identity, and
+  explicit long-run `AUTO` / `ASK` handling.
 
 ## v1.3.1 — 2026-07-23
 

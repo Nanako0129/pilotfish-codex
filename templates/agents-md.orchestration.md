@@ -1,5 +1,5 @@
 <!-- pilotfish-codex:begin -->
-<!-- pilotfish-codex v1.3.1 -->
+<!-- pilotfish-codex v1.3.2 -->
 <!-- markdownlint-disable-next-line MD041 -->
 ### Orchestration
 
@@ -179,16 +179,17 @@ affected slice. The main session asks, never a child.
 A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
 Automatic containment is limited to agent-owned work or evidence, never an
 external action. Blocking P1/P2 recovery shares at most five meaningful
-fix-reverify passes per stable slice, claim, and acceptance: rounds 1-2 are
-normal and rounds 3-5 are recovery. Every next pass requires a material
-implementation, claim, acceptance, contract, evidence, or environment change.
-Track a candidate-state fingerprint containing the committed head plus
-working-tree diff or tested-artifact digest; never reverify the same
-fingerprint/claim/acceptance/environment. After five, mark the
-slice `PAUSED_VERIFICATION`, block its dependents, and continue unrelated
-approved safe slices only when the risk is not cross-cutting. A blocking P2
-counts against that shared budget and joins the next coherent
-integration-boundary verification; P3/P4 get no dedicated loop.
+fix-reverify passes: rounds 1-2 are normal and rounds 3-5 are recovery. Every
+next pass requires a material change to the stable verification identity:
+candidate, claim, acceptance, contract, available evidence or prerequisites, or
+environment. Fingerprint the complete tested candidate from committed head,
+tracked and staged diff, and untracked input paths plus content; a
+tested-artifact digest may replace that input fingerprint. Never reverify the
+same complete identity. After five, mark the slice `PAUSED_VERIFICATION`, block
+its dependents, and continue unrelated approved safe slices only when the risk
+is not cross-cutting. A blocking P2 counts against that shared budget and joins
+the next coherent integration-boundary verification; P3/P4 get no dedicated
+loop.
 
 The final report concisely separates confirmed, fixed, deferred,
 regraded/rejected with evidence, paused slices and dependents,

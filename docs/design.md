@@ -75,10 +75,12 @@ credential, destructive, external, scope, or spending authority. `ASK` uses
 Codex `request_user_input` only when exposed, otherwise pauses the turn.
 
 Blocking P1/P2 recovery shares five materially changed passes: two normal and
-three recovery. Verification identity includes acceptance, while candidate
-identity includes the committed head plus working-tree diff or tested-artifact
-digest. A fifth failure pauses only that slice and its dependents when risk is
-not cross-cutting, so unrelated approved safe slices can continue.
+three recovery. Verification identity includes the complete tested candidate,
+claim, acceptance, contract, available evidence or prerequisites, and
+environment. The candidate fingerprint covers committed head, tracked and
+staged diff, and untracked input paths plus content, or a tested-artifact digest.
+A fifth failure pauses only that slice and its dependents when risk is not
+cross-cutting, so unrelated approved safe slices can continue.
 
 The verifier is post-hoc evidence classification, not a pre-execution cancel
 hook. Native proof requires observed V2 selection, one `spawn_agent` with exact

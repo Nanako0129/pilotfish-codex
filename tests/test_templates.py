@@ -103,13 +103,18 @@ class NativeTemplateTests(unittest.TestCase):
         )
         self.assertRegex(
             instructions,
-            r"any reproducible high-impact user or system failure",
+            r"any reproducible high-impact user or system failure that does not meet P0",
+        )
+        self.assertRegex(
+            instructions,
+            r"sufficient for every required acceptance condition.*"
+            r"List each condition.*evidence and result",
         )
         self.assertRegex(
             instructions,
             r"Priority measures .* user or system impact, not .* central to the exact claim.*"
             r"failed acceptance .* bounded or recoverable .* P2 unless .* P0 or high-impact P1.*"
-            r"P1 = any reproducible\s+high-impact user or system failure",
+            r"P1 = any reproducible\s+high-impact user or system failure that does not meet P0",
         )
         self.assertRegex(
             instructions,
