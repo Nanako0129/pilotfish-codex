@@ -62,6 +62,25 @@ spending authority. Normal recovery is one targeted recheck of the original
 failure plus a bounded regression; five materially changed passes are only an
 emergency ceiling for high-risk P1/P2 recovery.
 
+## Continuation across user input
+
+The main-session policy keeps an unfinished objective active across decision
+replies, steering, status questions, and pause or resume unless new input
+clearly supersedes it. Before asking the user to decide, Codex records the
+current phase, blocker, and resume point; after an unambiguous answer, it resumes
+the same work within the existing authorization and scope instead of silently
+stopping. Status or explanation requests cannot restart work gated by an
+unresolved decision. An explicit user-requested pause keeps the resume point
+without inventing a blocker or question and stays active until the user resumes
+or clearly replaces the objective.
+
+This is behavioral prompt policy, not deterministic Codex App or runtime
+enforcement. Offline tests lock the contract text but do not prove live model
+compliance.
+
+See [Continuation liveness](./docs/design.md#continuation-liveness) for the
+design boundary.
+
 ## Install
 
 The scripted route checks the exact CLI version, plans all writes, creates

@@ -95,6 +95,36 @@ recommendation. Do not resubmit a substantially unchanged Plan.
 
 `READY` is readiness only, never user approval or write authorization.
 
+#### Continuation across user input
+
+An unfinished root objective remains active across turns, user decision replies,
+steering or corrections, status or explanation requests, and pause or resume
+when the new input does not clearly supersede it. Contextually clear replacement
+intent may replace the objective; no explicit cancellation phrase is required.
+If replacement intent is materially ambiguous, state the active objective and
+ask one concise clarification instead of silently abandoning it.
+
+Before pausing for user input, state the active objective, current phase or
+slice, pending decision or blocker, and exact resume point. Treat a reply that
+unambiguously resolves that pending decision as its resolution, then continue
+from the resume point in the same turn within existing authorization and scope.
+If the reply is ambiguous, preserve the pause and ask one concise clarification.
+Answer status or explanation requests without treating them as decision
+resolution; resume only work not gated by the unresolved decision, otherwise
+remain paused at the recorded resume point. Incorporate other steering or
+corrections and then resume the remaining work unless a pending decision or
+user-requested pause still gates it.
+
+Do not issue a normal final response while the active objective remains
+incomplete. Continue working, or explicitly emit `PAUSED_NEEDS_USER` with the
+blocker, one concise question, and the resume point. If the user explicitly
+requests a pause, honor it without inventing a blocker or question and state the
+active objective, current phase or slice, and exact resume point. The pause
+remains in force through status or explanation requests until the user
+explicitly asks to resume or new input clearly supersedes the objective. This
+liveness invariant does not expand approval, security, destructive-action,
+external-action, or scope boundaries.
+
 Before every agent call, identify the phase and apply a dispatch brake. Do not
 fan out when workers would repeatedly depend on evolving shared evidence, write
 ownership overlaps, no clear synthesis or integration owner exists, or

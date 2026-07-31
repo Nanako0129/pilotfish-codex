@@ -20,6 +20,9 @@ are noted only as source references.
   risk-triggered review, main-session `FIX` / `DEFER` / `REJECT` disposition,
   targeted rechecks, a five-pass high-risk emergency ceiling, complete
   candidate/evidence identity, and explicit long-run `AUTO` / `ASK` handling.
+- Add offline policy assertions for main-session continuation after decisions,
+  steering, status questions, and pauses unless new input clearly supersedes
+  the unfinished objective. This is prompt policy, not live runtime proof.
 
 ## v1.3.1 — 2026-07-23
 
