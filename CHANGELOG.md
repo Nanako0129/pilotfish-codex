@@ -9,6 +9,8 @@ are noted only as source references.
 
 - Route `security-executor` through Sol at `xhigh` instead of `max`, including a
   fail-closed canonical upgrade from the v1.3.2 role payload.
+- Permit the exact released v1.3.1 `plan-verifier` payload to upgrade to the
+  calibrated contract without weakening custom-role drift checks.
 
 ## v1.3.2 — 2026-07-29
 

@@ -187,12 +187,11 @@ class NativeInstallTests(unittest.TestCase):
             with self.assertRaisesRegex(InstallAbort, "installed_role_drift"):
                 install(source_root=ROOT, codex_home=home, dry_run=True, check_codex=False)
 
-    def test_release_pinned_v131_verifier_upgrades_but_custom_bytes_abort(self) -> None:
-        previous = (
-            ROOT / "install" / "previous" / "v1.3.1" / "agents" / "verifier.toml"
-        )
-        digest = hashlib.sha256(previous.read_bytes()).hexdigest()
-        self.assertIn(digest, installer.CANONICAL_ROLE_UPGRADE_DIGESTS["verifier"])
+    def test_release_pinned_v131_roles_upgrade_but_custom_bytes_abort(self) -> None:
+        previous = ROOT / "install" / "previous" / "v1.3.1" / "agents"
+        for role in ("plan-verifier", "verifier"):
+            digest = hashlib.sha256((previous / f"{role}.toml").read_bytes()).hexdigest()
+            self.assertIn(digest, installer.CANONICAL_ROLE_UPGRADE_DIGESTS[role])
 
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"
@@ -201,27 +200,31 @@ class NativeInstallTests(unittest.TestCase):
             for role in installer.ROLES:
                 source = ROOT / "templates" / "agents" / f"{role}.toml"
                 (agents / f"{role}.toml").write_bytes(source.read_bytes())
-            (agents / "verifier.toml").write_bytes(previous.read_bytes())
+            for role in ("plan-verifier", "verifier"):
+                (agents / f"{role}.toml").write_bytes(
+                    (previous / f"{role}.toml").read_bytes()
+                )
 
             self.assertEqual(self.run_install(home), 0)
-            self.assertEqual(
-                (agents / "verifier.toml").read_bytes(),
-                (ROOT / "templates" / "agents" / "verifier.toml").read_bytes(),
-            )
+            for role in ("plan-verifier", "verifier"):
+                self.assertEqual(
+                    (agents / f"{role}.toml").read_bytes(),
+                    (ROOT / "templates" / "agents" / f"{role}.toml").read_bytes(),
+                )
 
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"
             agents = home / "agents"
             agents.mkdir(parents=True)
-            (agents / "verifier.toml").write_bytes(
-                previous.read_bytes() + b"# custom\n"
+            (agents / "plan-verifier.toml").write_bytes(
+                (previous / "plan-verifier.toml").read_bytes() + b"# custom\n"
             )
             with self.assertRaisesRegex(InstallAbort, "installed_role_drift"):
                 self.run_install(home)
 
         runbook = (ROOT / "install" / "AGENT-INSTALL.md").read_text()
         self.assertIn(
-            "released canonical\nv1.3.1 `verifier`",
+            "released canonical\nv1.3.1 `plan-verifier` and `verifier`",
             runbook,
         )
 
