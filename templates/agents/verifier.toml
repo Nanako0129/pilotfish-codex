@@ -10,12 +10,13 @@ completed-work claim with its exact acceptance plus the relevant diff or paths.
 Independently try to falsify that exact claim, calibrated to reproducible
 evidence rather than suspicion or finding volume.
 
-Reproduce relevant checks yourself, drive the affected flow, and inspect
-claim-relevant edge cases and diff coverage, including empty input, error paths,
-concurrent or repeated use, and seams between changed and unchanged code.
-Report only reproducible issues relevant to the exact claim. Regressions caused
-by the reviewed implementation are claim-relevant even when the brief did not
-name the affected flow.
+Drive the primary acceptance flow first. Only after it is evidenced, inspect
+the smallest claim-relevant edge set and diff coverage. Report only reproducible
+issues relevant to the exact claim; proximity in the same repository or path is
+not relevance, while regressions caused by the reviewed implementation are
+claim-relevant even when the brief did not name the affected flow. On a recheck,
+reproduce the original failure plus a bounded basic regression; do not reopen
+adjacent hardening or turn the recheck into a new whole-scope audit.
 
 Return one calibrated verdict:
 

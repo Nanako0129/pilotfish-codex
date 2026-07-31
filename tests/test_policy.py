@@ -38,8 +38,8 @@ class PolicyTests(unittest.TestCase):
             "pre-approval security evidence to `security-reviewer`",
             "fully specified mechanical repetition to `mech-executor`",
             "approved, bounded implementation requiring judgment to `executor`",
-            "non-trivial implementation",
-            "fresh `verifier` for an independent refutation pass",
+            "risk-triggered implementation",
+            "fresh `verifier` for one independent refutation pass",
         ):
             self.assertIn(phrase, policy)
 
@@ -105,6 +105,8 @@ class PolicyTests(unittest.TestCase):
         for phrase in (
             "smallest coherent integration boundary",
             "complete claim can be independently refuted",
+            "Independent review is risk-triggered",
+            "primary user-visible flow",
             "Verify earlier for security changes",
             "serialization or other data boundaries",
             "irreversible operations",
@@ -135,6 +137,7 @@ class PolicyTests(unittest.TestCase):
         outcome = (AGENTS / "verifier.toml").read_text()
         security = (AGENTS / "security-reviewer.toml").read_text()
         normalized_policy = " ".join(policy.split())
+        normalized_plan = " ".join(plan.split())
 
         for phrase in (
             "program envelope",
@@ -149,7 +152,9 @@ class PolicyTests(unittest.TestCase):
             "Acceptance check:",
             "use a fresh `plan-verifier`",
             "two automatic `REVISE` verdicts for the same unit",
-            "surface the blockers and options to the user",
+            "disposition every blocker as `FIX`, `DEFER`, or `REJECT`",
+            "Ask the user only for unresolved P0/P1",
+            "not merely to authorize another review round",
             "substantially unchanged Plan",
             "findings and dispositions into the Plan",
         ):
@@ -157,28 +162,35 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("Plan epoch", policy)
         self.assertNotIn("format-recovery", policy)
 
-        self.assertIn("Return exactly one form", plan)
-        self.assertIn("explicit outcome, scope and non-goals", plan)
-        self.assertIn("acceptance that proves the slice outcome", plan)
-        self.assertIn("a slice-local budget", plan)
-        self.assertIn("slice-local stop conditions", plan)
-        self.assertIn("completed security-reviewer findings", plan)
-        self.assertNotIn("CONFIRMED", plan)
-        self.assertNotIn("REFUTED", plan)
+        self.assertIn("Return exactly one form", normalized_plan)
+        self.assertIn("explicit outcome, scope and non-goals", normalized_plan)
+        self.assertIn("acceptance that proves the slice outcome", normalized_plan)
+        self.assertIn("a slice-local budget", normalized_plan)
+        self.assertIn("slice-local stop conditions", normalized_plan)
+        self.assertIn("completed security-reviewer findings", normalized_plan)
+        self.assertIn("every currently known blocker in the same pass", normalized_plan)
+        self.assertIn("Do not use REVISE for P3/P4 advice", normalized_plan)
+        self.assertIn("P2 = material bounded or recoverable", normalized_plan)
+        self.assertNotIn("CONFIRMED", normalized_plan)
+        self.assertNotIn("REFUTED", normalized_plan)
         self.assertNotIn("READY", outcome)
         self.assertNotIn("REVISE", outcome)
         self.assertIn("first plan-verifier review", security)
 
     def test_policy_owns_outcome_disposition(self) -> None:
         policy = " ".join((ROOT / "templates" / "agents-md.orchestration.md").read_text().split())
-        self.assertRegex(policy, r"Final disposition remains in the main session")
-        self.assertIn("P0 freezes the affected slice", policy)
-        self.assertIn("Fix P1 within approved scope or pause and ask", policy)
         self.assertIn(
-            "Never silently reject, defer, downgrade, or call a blocker fixed "
-            "without contrary evidence or a successful recheck of the original failure",
+            "Role verdicts are evidence, not implementation or scope authority",
             policy,
         )
+        self.assertIn("label it `FIX`, `DEFER`, or `REJECT`", policy)
+        self.assertIn(
+            "documented deferral or evidence-backed rejection is an addressed finding",
+            policy,
+        )
+        self.assertIn("P0 freezes the affected slice", policy)
+        self.assertIn("Fix P1 within approved scope or pause and ask", policy)
+        self.assertIn("sharing a repository or path with the change does not make it claim-relevant", policy)
         self.assertIn(
             "A documented regrade may use the verifier's cited evidence",
             policy,
@@ -206,10 +218,12 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertRegex(
             policy,
-            r"recovery budget and severity rules below apply to every verification run.*"
-            r"Blocking P1/P2 recovery shares at most five meaningful "
+            r"five-pass budget below is an emergency ceiling for high-risk recovery, "
+            r"not a quota.*"
+            r"Default recovery is one targeted recheck.*"
+            r"High-risk, claim-critical P1/P2 recovery may use at most five meaningful "
             r"fix-reverify passes.*"
-            r"rounds 1-2 are normal and rounds 3-5 are recovery",
+            r"rounds 3-5 are emergency recovery",
         )
         self.assertRegex(
             policy,
@@ -224,6 +238,9 @@ class PolicyTests(unittest.TestCase):
             "headless likely-long run without an explicit mode",
             policy,
         )
+        self.assertIn("not a new adjacent-hardening audit", policy)
+        self.assertIn("next pass would only search adjacent risk", policy)
+        self.assertIn("batch-disposition every current-head finding", policy)
         self.assertRegex(
             policy,
             r"After five unsuccessful or still-blocking passes, mark the slice "

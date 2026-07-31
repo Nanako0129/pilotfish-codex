@@ -60,7 +60,7 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertIn("two or more reconnaissance surfaces are independent", policy)
         self.assertIn("bounded implementation requiring judgment to `executor`", policy)
         self.assertIn("approved security-sensitive implementation to `security-executor`", policy)
-        self.assertIn("After a non-trivial implementation", policy)
+        self.assertIn("After a risk-triggered implementation", policy)
         self.assertIn("dispatch exactly one `mech-executor`", policy)
         self.assertIn("choose delegation by net benefit", policy)
         self.assertIn("stable, complete one-shot brief, not a numeric trigger", policy)
@@ -95,7 +95,7 @@ class NativeTemplateTests(unittest.TestCase):
         )
         self.assertRegex(
             instructions,
-            r"Regressions caused by the reviewed implementation are claim-relevant",
+            r"regressions caused by the reviewed implementation are claim-relevant",
         )
         self.assertRegex(
             instructions,
@@ -125,6 +125,8 @@ class NativeTemplateTests(unittest.TestCase):
             instructions,
             r"P3/P4 are non-blocking advisories and cannot by themselves produce REFUTED",
         )
+        self.assertIn("Drive the primary acceptance flow first", instructions)
+        self.assertIn("do not reopen adjacent hardening", instructions)
         self.assertRegex(
             instructions,
             r"Priority P0-P4, Confidence high/medium/low, Evidence, Expected, Actual, and Recheck",

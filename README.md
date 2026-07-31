@@ -40,26 +40,27 @@ Claude-specific `Explore` compatibility override is not installed.
 ## Plan readiness
 
 Large Plans use one program envelope followed by independently approvable
-execution slices. Review the envelope, then only the next executable slice.
-`READY` is bare; `REVISE` identifies the blocker, evidence, minimum revision,
-and acceptance check. After two automatic revisions for one unit, stop and ask
-the user. Security-sensitive units complete read-only security review first,
-and `READY` never authorizes writes.
+execution slices. Independent review is triggered by concrete security,
+irreversible or external, data, release, or cross-component acceptance risk,
+not by file count or “non-trivial” alone. `REVISE` returns all known P0-P2
+blockers in one pass. After two automatic revisions, the main session stops
+resubmitting, dispositions each blocker as `FIX`, `DEFER`, or `REJECT`, and
+asks only for unresolved high-impact or product and authority decisions.
 
 See [Plan readiness](./docs/design.md#plan-readiness) for the design boundary.
 
 ## Outcome verification
 
-Fresh outcome verification receives the exact claim and acceptance and returns
+Risk-triggered outcome verification follows primary-flow acceptance and returns
 `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`. `REFUTED` requires a reproducible
 P0-P2 claim blocker; lower-priority advisories remain non-blocking. The verifier
 is read-and-run only, while the main session owns finding disposition and fixes.
 
 For likely long work, the main session announces `AUTO` or `ASK`. `AUTO` adds no
 version-control, publish, install, credential, destructive, external, scope, or
-spending authority. Blocking P1/P2 recovery shares five materially changed
-passes before pausing that slice and its dependents; unrelated approved safe
-slices may continue.
+spending authority. Normal recovery is one targeted recheck of the original
+failure plus a bounded regression; five materially changed passes are only an
+emergency ceiling for high-risk P1/P2 recovery.
 
 ## Install
 

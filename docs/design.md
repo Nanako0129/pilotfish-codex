@@ -39,28 +39,30 @@ and child model, reasoning-effort, service-tier, and context overrides.
 ### Plan readiness
 
 Large work keeps shared constraints in a program envelope and splits only
-independent execution slices. A fresh `plan-verifier` reviews the envelope,
-then the next executable slice. Bare `READY` opens the approval gate;
-structured `REVISE` carries blocker evidence and the smallest observable
-closure check.
+independent execution slices. Concrete security, irreversible or external,
+data, release, or cross-component acceptance risk triggers a fresh
+`plan-verifier`; file count or “non-trivial” alone does not. `REVISE` returns
+all known P0-P2 blockers in one pass; P3/P4 and adjacent hardening do not block.
 
-After two automatic revisions for one unit, the main session stops resubmitting
-it and returns the unresolved choices to the user. This does not make the unit
-ready or reset shared prerequisites. Security-sensitive units complete
-read-only security review before their first readiness pass.
+After two automatic revisions for one unit, the main session stops resubmitting,
+dispositions every blocker as `FIX`, `DEFER`, or `REJECT`, and narrows, splits,
+or continues independent slices. User input is reserved for unresolved P0/P1,
+product or authority choices, or an original scope that can no longer be met.
 
 ### Outcome verification
 
-A fresh verifier receives the exact completed-work claim and acceptance. It
-independently falsifies that claim and returns `CONFIRMED`, `REFUTED`, or
-`INCONCLUSIVE`; P3/P4 advisories do not block confirmation, while `REFUTED`
+A risk-triggered fresh verifier receives the exact completed-work claim and
+acceptance after the primary flow has been exercised. It returns `CONFIRMED`,
+`REFUTED`, or `INCONCLUSIVE`; P3/P4 advisories do not block confirmation, while `REFUTED`
 requires a reproducible P0-P2 blocker. A known blocker takes precedence over
 missing evidence for another condition; otherwise any unevaluated required
 condition is `INCONCLUSIVE`. The verifier reads and runs checks but never plans,
 edits, fixes, delegates, or exposes raw secrets.
 
-The main session adjudicates reproducibility, scope, claim relevance, priority,
-and confidence. P0 freezes the affected slice; P1 is fixed or paused for user
+Role verdicts are evidence, not implementation or scope authority. The main
+session records `FIX`, `DEFER`, or `REJECT` after adjudicating reproducibility,
+scope, claim relevance, priority, and confidence. P0 freezes the affected
+slice; P1 is fixed or paused for user
 direction. Regressions caused by the reviewed implementation remain
 claim-relevant even when the brief omitted the affected flow, and an introduced
 P2 regression must be fixed or paused rather than hidden by a narrowed claim.
@@ -76,15 +78,18 @@ reversible scope and P2 adjudication, not new version-control, publish, install,
 credential, destructive, external, scope, or spending authority. `ASK` uses
 Codex `request_user_input` only when exposed, otherwise pauses the turn.
 
-Every verification run shares five materially changed P1/P2 recovery passes:
-two normal and three recovery. Verification identity includes the complete
+Normal recovery is one targeted recheck of the original reproduction plus a
+bounded basic regression. Five materially changed P1/P2 passes remain an
+emergency ceiling for high-risk, claim-critical recovery, not a quota.
+Verification identity includes the complete
 tested candidate, claim, acceptance, contract, external evidence or
 prerequisites, and environment; a prior verifier's own output is not a change.
 The candidate fingerprint covers committed head, tracked and staged diff,
 untracked input paths plus content, and dirty submodule content. Artifact
 digests complement source identity unless the artifact is the sole deliverable.
 A fifth failure pauses only that slice and its dependents when risk is not
-cross-cutting, so unrelated approved safe slices can continue.
+cross-cutting; recovery stops earlier when another pass would only search
+adjacent risk.
 
 The verifier is post-hoc evidence classification, not a pre-execution cancel
 hook. Native proof requires observed V2 selection, one `spawn_agent` with exact
