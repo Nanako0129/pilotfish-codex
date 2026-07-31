@@ -27,6 +27,21 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertEqual({path.stem for path in agents.glob("*.toml")}, ROLES)
         self.assertEqual(validate_dir(agents, expected_names=ROLES), [])
 
+    def test_security_executor_uses_sol_xhigh(self) -> None:
+        agents = ROOT / "templates" / "agents"
+        with (agents / "security-executor.toml").open("rb") as handle:
+            security_executor = tomllib.load(handle)
+        with (agents / "executor.toml").open("rb") as handle:
+            executor = tomllib.load(handle)
+        self.assertEqual(
+            (security_executor["model"], security_executor["model_reasoning_effort"]),
+            ("gpt-5.6-sol", "xhigh"),
+        )
+        self.assertEqual(
+            (executor["model"], executor["model_reasoning_effort"]),
+            ("gpt-5.6-luna", "max"),
+        )
+
     def test_rejects_forced_adapter_keys_and_duplicate_names(self) -> None:
         config = {"features": {"multi_agent": True, "multi_agent_v2": {"enabled": True, "max_concurrent_threads_per_session": 4, "tool_namespace": "agents"}}}
         errors, _ = validate_multi_agent_v2_config(config)

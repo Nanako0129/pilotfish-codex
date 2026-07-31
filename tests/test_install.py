@@ -225,6 +225,59 @@ class NativeInstallTests(unittest.TestCase):
             runbook,
         )
 
+    def test_release_pinned_v132_security_executor_upgrades(self) -> None:
+        previous = (
+            ROOT
+            / "install"
+            / "previous"
+            / "v1.3.2"
+            / "agents"
+            / "security-executor.toml"
+        )
+        digest = hashlib.sha256(previous.read_bytes()).hexdigest()
+        self.assertIn(
+            digest,
+            installer.CANONICAL_ROLE_UPGRADE_DIGESTS["security-executor"],
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            agents = home / "agents"
+            agents.mkdir(parents=True)
+            for role in installer.ROLES:
+                source = ROOT / "templates" / "agents" / f"{role}.toml"
+                (agents / f"{role}.toml").write_bytes(source.read_bytes())
+            (agents / "security-executor.toml").write_bytes(previous.read_bytes())
+
+            self.assertEqual(self.run_install(home), 0)
+            installed = agents / "security-executor.toml"
+            self.assertEqual(
+                installed.read_bytes(),
+                (ROOT / "templates" / "agents" / "security-executor.toml").read_bytes(),
+            )
+            state = json.loads(
+                home.with_name(f"{home.name}.pilotfish-install-state.json").read_text()
+            )
+            self.assertEqual(
+                state["target_fingerprints"]["agents/security-executor.toml"],
+                hashlib.sha256(installed.read_bytes()).hexdigest(),
+            )
+            self.assertEqual(
+                state["original_targets"]["agents/security-executor.toml"]["sha256"],
+                digest,
+            )
+            self.assertEqual(self.run_install(home), 0)
+
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            agents = home / "agents"
+            agents.mkdir(parents=True)
+            (agents / "security-executor.toml").write_bytes(
+                previous.read_bytes() + b"# custom\n"
+            )
+            with self.assertRaisesRegex(InstallAbort, "installed_role_drift"):
+                self.run_install(home)
+
     def test_two_nonempty_policy_files_abort_before_write(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"

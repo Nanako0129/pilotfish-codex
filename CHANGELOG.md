@@ -5,6 +5,11 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
+## Unreleased
+
+- Route `security-executor` through Sol at `xhigh` instead of `max`, including a
+  fail-closed canonical upgrade from the v1.3.2 role payload.
+
 ## v1.3.2 — 2026-07-29
 
 - Replace the active adapter configuration with the exact native Multi-Agent V2
