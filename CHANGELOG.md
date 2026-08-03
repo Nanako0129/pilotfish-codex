@@ -5,7 +5,7 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
-## Unreleased
+## v1.3.3 — 2026-08-03
 
 - Route the main session through Luna at `medium`, escalate Plan mode to Luna
   `xhigh`, and use Terra for general plan/outcome reasoning at `xhigh`.
