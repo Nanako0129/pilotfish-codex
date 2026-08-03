@@ -143,10 +143,17 @@ def merge_config_text(text: str, *, owned_legacy: frozenset[str] = frozenset()) 
     lines = text.splitlines(keepends=True)
     nl = _newline(text)
     notes: list[str] = []
+    missing_root_defaults = []
     if "model" not in config:
+        missing_root_defaults.append(('model = "gpt-5.6-luna"', "set model = gpt-5.6-luna"))
+    if "model_reasoning_effort" not in config:
+        missing_root_defaults.append(("model_reasoning_effort = \"medium\"", "set model_reasoning_effort = medium"))
+    if "plan_mode_reasoning_effort" not in config:
+        missing_root_defaults.append(("plan_mode_reasoning_effort = \"xhigh\"", "set plan_mode_reasoning_effort = xhigh"))
+    if missing_root_defaults:
         index = next((i for i, line in enumerate(lines) if line.lstrip().startswith("[")), len(lines))
-        lines[index:index] = [f'model = "gpt-5.6-sol"{nl}']
-        notes.append("set model = gpt-5.6-sol")
+        lines[index:index] = [f"{line}{nl}" for line, _ in missing_root_defaults]
+        notes.extend(note for _, note in missing_root_defaults)
     if isinstance(v2, bool):
         # Scalar true must be removed before the explicit table can exist.
         lines = [line for line in lines if not re.match(r"^\s*(?:features\.)?multi_agent_v2\s*=", line)]

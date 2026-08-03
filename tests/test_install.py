@@ -24,9 +24,23 @@ class NativeConfigMergeTests(unittest.TestCase):
     def test_empty_config_renders_exact_native_table(self) -> None:
         rendered, _ = merge_config_text("")
         data = tomllib.loads(rendered)
+        self.assertEqual(data["model"], "gpt-5.6-luna")
+        self.assertEqual(data["model_reasoning_effort"], "medium")
+        self.assertEqual(data["plan_mode_reasoning_effort"], "xhigh")
         self.assertEqual(data["features"]["multi_agent_v2"], {"enabled": True, "max_concurrent_threads_per_session": 4})
         self.assertNotIn("agents", data)
         self.assertNotIn("multi_agent", data["features"])
+
+    def test_existing_root_model_and_effort_are_preserved(self) -> None:
+        rendered, _ = merge_config_text(
+            'model = "custom-model"\n'
+            'model_reasoning_effort = "high"\n'
+            'plan_mode_reasoning_effort = "max"\n'
+        )
+        data = tomllib.loads(rendered)
+        self.assertEqual(data["model"], "custom-model")
+        self.assertEqual(data["model_reasoning_effort"], "high")
+        self.assertEqual(data["plan_mode_reasoning_effort"], "max")
 
     def test_scalar_true_is_converted_and_false_aborts(self) -> None:
         rendered, _ = merge_config_text("[features]\nmulti_agent_v2 = true\n")

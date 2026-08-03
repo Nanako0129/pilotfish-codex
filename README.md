@@ -37,6 +37,11 @@ Role TOMLs own their model and reasoning effort. The global policy owns typed
 role delegation, approval boundaries, and fresh-context verification. The
 Claude-specific `Explore` compatibility override is not installed.
 
+The default root session uses Luna at `medium`; Plan mode escalates Luna to
+`xhigh`. General Plan and outcome review use Terra at `xhigh`, while security
+review and execution stay on Sol at `high`. Mechanical roles retain their
+existing Luna low/medium bindings.
+
 ## Plan readiness
 
 Large Plans use one program envelope followed by independently approvable

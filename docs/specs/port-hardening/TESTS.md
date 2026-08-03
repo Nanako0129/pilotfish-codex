@@ -21,8 +21,8 @@ tests or the static validator added in `48e291f`.
   the Codex `WebSearchMode` enum (`disabled`, `cached`, `indexed`, `live`,
   `custom`). `security-reviewer` shall be `live`.
 - **AC-S5**: Every agent's `model_reasoning_effort` shall be one of
-  `low`, `medium`, `high`, `max`. (Static string check; actual acceptance is
-  model-catalog-dependent at runtime — noted, not asserted here.)
+  `low`, `medium`, `high`, `xhigh`, `max`. (Static string check; actual
+  acceptance is model-catalog-dependent at runtime — noted, not asserted here.)
 - **AC-S6**: The leaf-only property shall be asserted structurally:
   `config.snippet.toml` sets `agents.max_depth = 1`, and every role's
   `developer_instructions` states it cannot delegate / spawn further subagents.

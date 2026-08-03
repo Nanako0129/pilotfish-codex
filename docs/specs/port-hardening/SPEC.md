@@ -42,9 +42,10 @@ Verified in an isolated `CODEX_HOME`, not assumed:
   no CLI that statically validates `agents/*.toml`, so unknown keys or bad enum
   values in an agent file are **not** caught by the installer's stated Step 4
   command.
-- `model_reasoning_effort = "max"` cannot be validated statically; acceptance is
-  model-catalog-dependent and the placeholder `gpt-5.6-*` names are not in any
-  local catalog. This is a runtime boundary, not a static one.
+- `model_reasoning_effort = "xhigh"` and `"max"` cannot be validated
+  statically; acceptance is model-catalog-dependent and the placeholder
+  `gpt-5.6-*` names are not in any local catalog. This is a runtime boundary,
+  not a static one.
 
 ## Completed outcomes
 
