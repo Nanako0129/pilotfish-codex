@@ -57,8 +57,10 @@ is converted to the native table. Inline and dotted V2 forms that cannot be
 rewritten without collateral edits abort. Existing V2 totals in `1..8` normalize
 to `4`; zero, values above eight, or malformed values abort before writes.
 
-Release-pinned canonical v1.3.0 role bytes may upgrade to their packaged v1.3.1
-replacements. Any other same-name role difference remains
+Release-pinned canonical v1.3.0 `plan-verifier` and `security-reviewer` bytes
+may upgrade to their packaged v1.3.1 replacements. The released canonical
+v1.3.1 `plan-verifier` and `verifier` may likewise upgrade to their packaged
+calibrated contracts. Any other same-name role difference remains
 `installed_role_drift` and requires explicit operator resolution.
 
 ## Install and offline validation

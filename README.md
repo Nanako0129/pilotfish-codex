@@ -40,13 +40,46 @@ Claude-specific `Explore` compatibility override is not installed.
 ## Plan readiness
 
 Large Plans use one program envelope followed by independently approvable
-execution slices. Review the envelope, then only the next executable slice.
-`READY` is bare; `REVISE` identifies the blocker, evidence, minimum revision,
-and acceptance check. After two automatic revisions for one unit, stop and ask
-the user. Security-sensitive units complete read-only security review first,
-and `READY` never authorizes writes.
+execution slices. Independent review is triggered by concrete security,
+irreversible or external, data, release, or cross-component acceptance risk,
+not by file count or “non-trivial” alone. `REVISE` returns all known P0-P2
+blockers in one pass. After two automatic revisions, the main session stops
+resubmitting, dispositions each blocker as `FIX`, `DEFER`, or `REJECT`, and
+asks only for unresolved high-impact or product and authority decisions.
 
 See [Plan readiness](./docs/design.md#plan-readiness) for the design boundary.
+
+## Outcome verification
+
+Risk-triggered outcome verification follows primary-flow acceptance and returns
+`CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`. `REFUTED` requires a reproducible
+P0-P2 claim blocker; lower-priority advisories remain non-blocking. The verifier
+is read-and-run only, while the main session owns finding disposition and fixes.
+
+For likely long work, the main session announces `AUTO` or `ASK`. `AUTO` adds no
+version-control, publish, install, credential, destructive, external, scope, or
+spending authority. Normal recovery is one targeted recheck of the original
+failure plus a bounded regression; five materially changed passes are only an
+emergency ceiling for high-risk P1/P2 recovery.
+
+## Continuation across user input
+
+The main-session policy keeps an unfinished objective active across decision
+replies, steering, status questions, and pause or resume unless new input
+clearly supersedes it. Before asking the user to decide, Codex records the
+current phase, blocker, and resume point; after an unambiguous answer, it resumes
+the same work within the existing authorization and scope instead of silently
+stopping. Status or explanation requests cannot restart work gated by an
+unresolved decision. An explicit user-requested pause keeps the resume point
+without inventing a blocker or question and stays active until the user resumes
+or clearly replaces the objective.
+
+This is behavioral prompt policy, not deterministic Codex App or runtime
+enforcement. Offline tests lock the contract text but do not prove live model
+compliance.
+
+See [Continuation liveness](./docs/design.md#continuation-liveness) for the
+design boundary.
 
 ## Install
 

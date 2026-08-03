@@ -38,9 +38,16 @@ LEGACY_PATHS = frozenset({
 CANONICAL_ROLE_UPGRADE_DIGESTS = {
     "plan-verifier": frozenset({
         "c552938705065c826da9a3cbaf09c2fbbaa9fde4adb1f691a59b694d8468f541",
+        "e29dff16ee22d8dcf60f214c7226eba52e9c1d5fca475d47ca750c8850a32852",
     }),
     "security-reviewer": frozenset({
         "94d7de12d1cb197c98e83c2f78d402cf3fb393e860feee1e146f5b6294075d27",
+    }),
+    "security-executor": frozenset({
+        "90568cf473e0e8025bfbd2a22a9c46d4db6d6b4ed0d344c975f4116365da9ce0",
+    }),
+    "verifier": frozenset({
+        "9478638b7456b6e4120ecd5a59408431d886c87ae1a7391aade61bc84d722e2e",
     }),
 }
 

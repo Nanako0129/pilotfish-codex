@@ -5,7 +5,14 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
-## Unreleased — native Codex `rust-v0.145.0` migration
+## Unreleased
+
+- Route `security-executor` through Sol at `xhigh` instead of `max`, including a
+  fail-closed canonical upgrade from the v1.3.2 role payload.
+- Permit the exact released v1.3.1 `plan-verifier` payload to upgrade to the
+  calibrated contract without weakening custom-role drift checks.
+
+## v1.3.2 — 2026-07-29
 
 - Replace the active adapter configuration with the exact native Multi-Agent V2
   table and total concurrency of four.
@@ -16,6 +23,13 @@ are noted only as source references.
 - Replace active dispatch mode selection and role matrices with one native-only
   verifier. Historical adapter evidence remains archival and excluded from the
   native gate.
+- Calibrate outcome verification with three verdicts, P0-P4 priority,
+  risk-triggered review, main-session `FIX` / `DEFER` / `REJECT` disposition,
+  targeted rechecks, a five-pass high-risk emergency ceiling, complete
+  candidate/evidence identity, and explicit long-run `AUTO` / `ASK` handling.
+- Add offline policy assertions for main-session continuation after decisions,
+  steering, status questions, and pauses unless new input clearly supersedes
+  the unfinished objective. This is prompt policy, not live runtime proof.
 
 ## v1.3.1 — 2026-07-23
 

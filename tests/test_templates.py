@@ -27,6 +27,21 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertEqual({path.stem for path in agents.glob("*.toml")}, ROLES)
         self.assertEqual(validate_dir(agents, expected_names=ROLES), [])
 
+    def test_security_executor_uses_sol_xhigh(self) -> None:
+        agents = ROOT / "templates" / "agents"
+        with (agents / "security-executor.toml").open("rb") as handle:
+            security_executor = tomllib.load(handle)
+        with (agents / "executor.toml").open("rb") as handle:
+            executor = tomllib.load(handle)
+        self.assertEqual(
+            (security_executor["model"], security_executor["model_reasoning_effort"]),
+            ("gpt-5.6-sol", "xhigh"),
+        )
+        self.assertEqual(
+            (executor["model"], executor["model_reasoning_effort"]),
+            ("gpt-5.6-luna", "max"),
+        )
+
     def test_rejects_forced_adapter_keys_and_duplicate_names(self) -> None:
         config = {"features": {"multi_agent": True, "multi_agent_v2": {"enabled": True, "max_concurrent_threads_per_session": 4, "tool_namespace": "agents"}}}
         errors, _ = validate_multi_agent_v2_config(config)
@@ -60,7 +75,7 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertIn("two or more reconnaissance surfaces are independent", policy)
         self.assertIn("bounded implementation requiring judgment to `executor`", policy)
         self.assertIn("approved security-sensitive implementation to `security-executor`", policy)
-        self.assertIn("After a non-trivial implementation", policy)
+        self.assertIn("After a risk-triggered implementation", policy)
         self.assertIn("dispatch exactly one `mech-executor`", policy)
         self.assertIn("choose delegation by net benefit", policy)
         self.assertIn("stable, complete one-shot brief, not a numeric trigger", policy)
@@ -79,6 +94,66 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertIn("No untyped fallback is permitted", policy)
         self.assertIn("must not silently substitute an untyped child", policy)
         self.assertNotIn("retry as an untyped child", policy)
+
+    def test_verifier_uses_calibrated_outcomes(self) -> None:
+        with (ROOT / "templates" / "agents" / "verifier.toml").open("rb") as handle:
+            verifier = tomllib.load(handle)
+        description = verifier["description"]
+        instructions = " ".join(verifier["developer_instructions"].split())
+        self.assertCountEqual(
+            [verdict for verdict in ("CONFIRMED", "REFUTED", "INCONCLUSIVE") if verdict in description],
+            ("CONFIRMED", "REFUTED", "INCONCLUSIVE"),
+        )
+        self.assertRegex(
+            instructions,
+            r"REFUTED — at least one reproducible P0-P2 finding blocks the exact claim",
+        )
+        self.assertRegex(
+            instructions,
+            r"regressions caused by the reviewed implementation are claim-relevant",
+        )
+        self.assertRegex(
+            instructions,
+            r"For every finding or advisory under any verdict",
+        )
+        self.assertRegex(
+            instructions,
+            r"any reproducible high-impact user or system failure that does not meet P0",
+        )
+        self.assertRegex(
+            instructions,
+            r"sufficient for every required acceptance condition.*"
+            r"List each condition.*evidence and result",
+        )
+        self.assertRegex(
+            instructions,
+            r"REFUTED takes precedence when a reproducible P0-P2 blocker coexists.*"
+            r"unevaluated required acceptance condition makes the verdict INCONCLUSIVE",
+        )
+        self.assertRegex(
+            instructions,
+            r"Priority measures .* user or system impact, not .* central to the exact claim.*"
+            r"failed acceptance .* bounded or recoverable .* P2 unless .* P0 or high-impact P1.*"
+            r"P1 = any reproducible\s+high-impact user or system failure that does not meet P0",
+        )
+        self.assertRegex(
+            instructions,
+            r"P3/P4 are non-blocking advisories and cannot by themselves produce REFUTED",
+        )
+        self.assertIn("Drive the primary acceptance flow first", instructions)
+        self.assertIn("do not reopen adjacent hardening", instructions)
+        self.assertRegex(
+            instructions,
+            r"Priority P0-P4, Confidence high/medium/low, Evidence, Expected, Actual, and Recheck",
+        )
+        self.assertRegex(
+            instructions,
+            r"INCONCLUSIVE .* State the reason, missing evidence, and retry condition",
+        )
+        self.assertNotRegex(
+            instructions.lower(),
+            r"assume (?:it|the change) is broken|do not trust|finding[- ]volume pressure",
+        )
 
     def test_runbook_is_native_only(self) -> None:
         runbook = (ROOT / "install" / "AGENT-INSTALL.md").read_text()

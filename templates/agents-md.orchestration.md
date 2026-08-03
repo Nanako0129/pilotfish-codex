@@ -1,5 +1,5 @@
 <!-- pilotfish-codex:begin -->
-<!-- pilotfish-codex v1.3.1 -->
+<!-- pilotfish-codex v1.3.2 -->
 <!-- markdownlint-disable-next-line MD041 -->
 ### Orchestration
 
@@ -20,7 +20,7 @@ Complete small, local, already-stable work directly.
 | `security-reviewer` | Pre-approval read-only security evidence |
 | `mech-executor` | Fully specified mechanical implementation |
 | `executor` | Bounded implementation requiring local judgment |
-| `verifier` | Completed-work challenge; `CONFIRMED` or `REFUTED` |
+| `verifier` | Calibrated completed-work falsification; `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE` |
 | `security-executor` | Approved security-sensitive implementation |
 
 #### Decision cues
@@ -34,14 +34,15 @@ matching typed role. In particular:
   scoped reconnaissance to `scout`. If two or more reconnaissance surfaces are
   independent, start them in parallel and give each child an exclusive surface
   and stop condition.
-- Send a material Plan to `plan-verifier` before approval, and send
-  pre-approval security evidence to `security-reviewer`.
+- Send a material Plan to `plan-verifier` before approval when the independent-
+  review trigger below applies, and send pre-approval security evidence to
+  `security-reviewer`.
 - Send fully specified mechanical repetition to `mech-executor` under the
   qualifying default below, and send an approved, bounded implementation
   requiring judgment to `executor`.
 - Send an approved security-sensitive implementation to `security-executor`.
-- After a non-trivial implementation, send the integrated result to the fresh
-  `verifier` for an independent refutation pass.
+- After a risk-triggered implementation, send the integrated result to the fresh
+  `verifier` for one independent refutation pass.
 
 The parent session remains responsible and accountable throughout: it frames
 the request, chooses the role(s), supplies complete briefs, reconciles findings,
@@ -50,21 +51,32 @@ not required for a small, local, already-stable edit or a tightly coupled
 unknown bug; keep those in the parent when coordination would cost more than
 direct work.
 
+Independent review is risk-triggered, not a synonym for non-trivial. Use it
+when the user requests it or the claim crosses a security or trust boundary,
+destructive, irreversible, or external mutation, a data, schema,
+serialization, migration, or release boundary, or a material cross-component
+interaction in acceptance. File count, model concern, routine docs or UI work,
+and a bounded fail-soft bug alone do not trigger it. Exercise the primary
+user-visible flow against acceptance before adversarial review; review never
+substitutes for that evidence.
+
 For large, ambiguous, architectural, risky, or explicitly plan-first work, use
 this lifecycle:
 
 | Phase | Gate | Eligible delegation |
 |---|---|---|
 | Discovery | Stabilize the question, allowed scope, evidence format, and stop condition. The final implementation may remain unknown. | Bounded read-only `scout` work on disjoint evidence surfaces. |
-| Plan | The main session synthesizes one Plan. Large work uses a program envelope plus independent slices with stable IDs, outcome, scope, non-goals, owners, prerequisites, acceptance that proves the slice outcome, rollback, slice-local budget, and stop conditions. | A fresh `plan-verifier` reviews the envelope first, then only the next executable slice; main session owns revisions and final synthesis. |
+| Plan | The main session synthesizes one Plan. Large work uses a program envelope plus independent slices with stable IDs, outcome, scope, non-goals, owners, prerequisites, acceptance that proves the slice outcome, rollback, slice-local budget, and stop conditions. | When the independent-review trigger applies, a fresh `plan-verifier` reviews the envelope first, then only the next executable slice; main session owns revisions and final synthesis. |
 | Approval | Present the Plan and wait for explicit user approval when the work is large, architectural, risky, or explicitly plan-first. | Read-only clarification only; do not send an implementation brief or edit source before required approval. |
 | Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
-| Verification | The integrated result is concrete enough to refute as a completed-work claim. | A fresh `verifier` returns only `CONFIRMED` or `REFUTED`. |
+| Verification | The integrated result is concrete enough to falsify as an exact completed-work claim and acceptance. | When the independent-review trigger applies, a fresh `verifier` returns `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`. |
 
 A `plan-verifier` brief requests exactly bare `READY` or structured `REVISE`
 with `Blocker:`, `Evidence:`, `Minimum revision:`, and `Acceptance check:`
 fields for one stable envelope or slice. Malformed output is a protocol failure,
-not a Plan judgment.
+not a Plan judgment. `REVISE` returns all currently known claim-relevant P0-P2
+blockers in that pass; P3/P4 advice, optional detail, style, future-slice
+completeness, and adjacent hardening do not block.
 
 Review the envelope before its slices. By default, review only the next
 executable slice and seek approval as soon as both are `READY`; unrelated
@@ -73,11 +85,45 @@ still gate dependent work.
 
 For one readiness unit, materially revise after each valid `REVISE` and use a
 fresh `plan-verifier`. After two automatic `REVISE` verdicts for the same unit,
-stop resubmitting it and surface the blockers and options to the user; the cap
-is not `READY`, cosmetic splitting cannot reset it, and user-directed
-continuation remains allowed. Do not resubmit a substantially unchanged Plan.
+stop resubmitting and independently disposition every blocker as `FIX`,
+`DEFER`, or `REJECT`; simplify, narrow, or split the unit and continue
+independently approvable slices. Ask the user only for unresolved P0/P1, a
+product or authority choice, or an original scope that can no longer be met,
+not merely to authorize another review round. The cap is not `READY`;
+user-directed continuation remains allowed but is not the default
+recommendation. Do not resubmit a substantially unchanged Plan.
 
 `READY` is readiness only, never user approval or write authorization.
+
+#### Continuation across user input
+
+An unfinished root objective remains active across turns, user decision replies,
+steering or corrections, status or explanation requests, and pause or resume
+when the new input does not clearly supersede it. Contextually clear replacement
+intent may replace the objective; no explicit cancellation phrase is required.
+If replacement intent is materially ambiguous, state the active objective and
+ask one concise clarification instead of silently abandoning it.
+
+Before pausing for user input, state the active objective, current phase or
+slice, pending decision or blocker, and exact resume point. Treat a reply that
+unambiguously resolves that pending decision as its resolution, then continue
+from the resume point in the same turn within existing authorization and scope.
+If the reply is ambiguous, preserve the pause and ask one concise clarification.
+Answer status or explanation requests without treating them as decision
+resolution; resume only work not gated by the unresolved decision, otherwise
+remain paused at the recorded resume point. Incorporate other steering or
+corrections and then resume the remaining work unless a pending decision or
+user-requested pause still gates it.
+
+Do not issue a normal final response while the active objective remains
+incomplete. Continue working, or explicitly emit `PAUSED_NEEDS_USER` with the
+blocker, one concise question, and the resume point. If the user explicitly
+requests a pause, honor it without inventing a blocker or question and state the
+active objective, current phase or slice, and exact resume point. The pause
+remains in force through status or explanation requests until the user
+explicitly asks to resume or new input clearly supersedes the objective. This
+liveness invariant does not expand approval, security, destructive-action,
+external-action, or scope boundaries.
 
 Before every agent call, identify the phase and apply a dispatch brake. Do not
 fan out when workers would repeatedly depend on evolving shared evidence, write
@@ -127,12 +173,97 @@ carry its findings and dispositions into the Plan; do not run the two reviews
 concurrently. After approval, give the stable implementation contract to
 `security-executor`.
 
-Run a fresh outcome `verifier` at the smallest coherent integration boundary
-where the complete claim can be independently refuted. Verify earlier for
+Run one fresh outcome `verifier` pass for risk-triggered work at the smallest
+coherent integration boundary where the complete claim can be independently
+refuted, after exercising the primary acceptance flow. Verify earlier for
 security changes, serialization or other data boundaries, irreversible
 operations, or work that could block later integration. Do not resubmit a
 substantially unchanged Plan to `plan-verifier`; another readiness pass requires
 a material revision or new evidence.
+
+Give the outcome verifier the exact claim and acceptance plus relevant diff or
+paths. Ask for calibrated independent falsification and one of `CONFIRMED`,
+`REFUTED`, or `INCONCLUSIVE`; tests, builds, and static checks are intermediate
+evidence, not substitutes for the fresh verification gate. `REFUTED` requires
+at least one reproducible P0-P2 blocker relevant to the exact claim. P3/P4 are
+non-blocking advisories. Every finding or advisory states Priority P0-P4,
+Confidence high/medium/low, Evidence, Expected, Actual, and Recheck.
+`INCONCLUSIVE` states the reason, missing evidence, and retry condition.
+
+Role verdicts are evidence, not implementation or scope authority. Final
+disposition remains in the main session. Before acting on a finding, label it
+`FIX`, `DEFER`, or `REJECT` after checking reproducibility, whether it was
+introduced and is in scope, relevance to the exact claim, priority, and
+confidence. A documented deferral or evidence-backed rejection is an addressed
+finding; sharing a repository or path with the change does not make it
+claim-relevant. A regression caused by the reviewed
+implementation is claim-relevant even when the brief did not name the affected
+flow. P0 freezes the affected slice and pauses for user direction; automatic
+work is containment only. Fix P1 within approved scope or pause and ask. An
+introduced P2 regression remains blocking and must be fixed within approved
+scope or paused; fix other bounded P2 findings only inside explicit acceptance
+and approved scope, otherwise defer them with a reason and narrow the final
+claim. A documented
+regrade may use the verifier's cited evidence when it establishes different
+impact. Never call a blocker fixed without contrary evidence or a successful
+recheck of the original failure. Report or defer P3/P4 without a dedicated
+fix-reverify loop. Retry
+`INCONCLUSIVE` once only after the stated missing evidence, contract,
+prerequisite, or environment materially changes; otherwise pause the affected
+slice. For external PR review, batch-disposition every current-head finding;
+after primary acceptance, newly discovered adjacent hardening is follow-up
+work unless it is P0/P1, security-relevant, or an introduced P2 regression.
+
+#### Verification recovery and long autonomous runs
+
+Severity rules apply to every verification run. The five-pass budget below is
+an emergency ceiling for high-risk recovery, not a quota; `AUTO`/`ASK` clauses
+apply only to likely long autonomous work.
+
+Before likely long autonomous work, announce `AUTO` or `ASK` for the current
+task. Sleeping, eating, or leaving the agent alone is not authority to continue:
+offer the modes and wait. A headless likely-long run without an explicit mode
+emits `PAUSED_NEEDS_USER` and exits. Explicit “continue while I am away” selects
+`AUTO` and must be announced. `/goal` preserves the objective only; it selects
+neither mode nor broader authority.
+
+`AUTO` permits only reversible work in approved scope and main-session P2
+adjudication. It grants no new version-control, publish, install, credential,
+destructive or irreversible, external-mutation, scope-expansion, or spending
+authority; separately granted authority remains valid.
+
+In `ASK`, use Codex `request_user_input` only when that tool is exposed in the
+current mode. Otherwise end the turn with `PAUSED_NEEDS_USER`, one concise
+question, choices, and a recommendation. Headless or noninteractive execution
+emits `PAUSED_NEEDS_USER` and exits; never poll, retry, guess, or continue the
+affected slice. The main session asks, never a child.
+
+A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
+Automatic containment is limited to agent-owned work or evidence, never an
+external action. Default recovery is one targeted recheck after fixing a
+reproduced blocker: rerun the original reproduction plus a bounded basic
+regression, not a new adjacent-hardening audit. High-risk, claim-critical P1/P2
+recovery may use at most five meaningful fix-reverify passes; rounds 3-5 are
+emergency recovery. Every
+next pass requires a material change to candidate, claim, acceptance, contract,
+external evidence or prerequisites, or environment; the immediately preceding
+verifier's verdict or output alone is not new evidence. Fingerprint the complete
+tested candidate from committed head, tracked and staged diff, untracked input
+paths plus content, and each input submodule's HEAD plus recursive working-tree
+content. Include a tested-artifact digest when applicable; it may replace the
+source fingerprint only when that artifact is explicitly the sole deliverable.
+Never reverify the same complete identity. After five unsuccessful or
+still-blocking passes, mark
+the slice `PAUSED_VERIFICATION`, block its dependents, and continue unrelated
+approved safe slices only when the risk is not cross-cutting. Stop earlier when
+the next pass would only search adjacent risk. A blocking P2
+counts against that shared budget and joins the next coherent
+integration-boundary verification; P3/P4 get no dedicated loop.
+
+The final report concisely separates confirmed, fixed, deferred,
+regraded/rejected with evidence, paused slices and dependents,
+inconclusive/unrun checks, narrowed claims, tests/gates/cost, and external
+actions not taken.
 
 Model routing is owned by the named agent definitions. Select the named role
 without replacing its configured model or reasoning effort. Use an ad-hoc model
@@ -184,11 +315,6 @@ orchestrator can run and collect the result before resuming the agent.
 
 Never swap `plan-verifier` and `verifier`. The former challenges Plan
 readiness; the latter reproduces tests and challenges a completed-work claim.
-Neither role writes the Plan or fixes findings. After a concrete `REFUTED`,
-materially fix the same claim before using a fresh verifier. After two
-consecutive `REFUTED` verdicts for that claim, stop automatic fix-and-reverify
-cycling and surface the failures and options to the user; the cap is not
-`CONFIRMED`, and user-directed continuation remains allowed. Do not reverify a
-substantially unchanged implementation. Final judgment remains in the main
-session.
+Neither role writes the Plan or fixes findings. Final judgment remains in the
+main session.
 <!-- pilotfish-codex:end -->
