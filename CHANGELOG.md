@@ -5,10 +5,12 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
-## Unreleased
+## v1.3.3 — 2026-08-03
 
-- Route `security-executor` through Sol at `xhigh` instead of `max`, including a
-  fail-closed canonical upgrade from the v1.3.2 role payload.
+- Route the main session through Luna at `medium`, escalate Plan mode to Luna
+  `xhigh`, and use Terra for general plan/outcome reasoning at `xhigh`.
+- Cap `security-executor` at Sol `high`, including a fail-closed canonical
+  upgrade from the v1.3.2 role payload.
 - Permit the exact released v1.3.1 `plan-verifier` payload to upgrade to the
   calibrated contract without weakening custom-role drift checks.
 

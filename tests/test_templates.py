@@ -15,6 +15,9 @@ class NativeTemplateTests(unittest.TestCase):
     def test_exact_v2_table_has_no_adapter_transport(self) -> None:
         with (ROOT / "templates" / "config.snippet.toml").open("rb") as handle:
             config = tomllib.load(handle)
+        self.assertEqual(config["model"], "gpt-5.6-luna")
+        self.assertEqual(config["model_reasoning_effort"], "medium")
+        self.assertEqual(config["plan_mode_reasoning_effort"], "xhigh")
         self.assertEqual(config["features"]["multi_agent_v2"], {"enabled": True, "max_concurrent_threads_per_session": 4})
         self.assertNotIn("multi_agent", config["features"])
         self.assertNotIn("agents", config)
@@ -27,15 +30,27 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertEqual({path.stem for path in agents.glob("*.toml")}, ROLES)
         self.assertEqual(validate_dir(agents, expected_names=ROLES), [])
 
-    def test_security_executor_uses_sol_xhigh(self) -> None:
+    def test_model_routing_matches_cost_policy(self) -> None:
         agents = ROOT / "templates" / "agents"
+        with (agents / "plan-verifier.toml").open("rb") as handle:
+            plan_verifier = tomllib.load(handle)
+        with (agents / "verifier.toml").open("rb") as handle:
+            verifier = tomllib.load(handle)
         with (agents / "security-executor.toml").open("rb") as handle:
             security_executor = tomllib.load(handle)
         with (agents / "executor.toml").open("rb") as handle:
             executor = tomllib.load(handle)
         self.assertEqual(
+            (plan_verifier["model"], plan_verifier["model_reasoning_effort"]),
+            ("gpt-5.6-terra", "xhigh"),
+        )
+        self.assertEqual(
+            (verifier["model"], verifier["model_reasoning_effort"]),
+            ("gpt-5.6-terra", "high"),
+        )
+        self.assertEqual(
             (security_executor["model"], security_executor["model_reasoning_effort"]),
-            ("gpt-5.6-sol", "xhigh"),
+            ("gpt-5.6-sol", "high"),
         )
         self.assertEqual(
             (executor["model"], executor["model_reasoning_effort"]),
