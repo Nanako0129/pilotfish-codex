@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 540" role="img" aria-labelledby="title desc">
+  <title id="title">Pilotfish-Codex v1.3.3 routing evidence</title>
+  <desc id="desc">A clean routing map showing model allocation and a verified evidence snapshot for release v1.3.3.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" class="arrow"/>
+    </marker>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .fg { fill: #152238; }
+      .muted { fill: #66758a; }
+      .line { stroke: #d8e0ea; }
+      .route { stroke: #a8b5c5; }
+      .blue { fill: #3f6fe5; }
+      .purple { fill: #7954c6; }
+      .amber { fill: #cf8427; }
+      .green { fill: #26986d; }
+      .soft-blue { fill: #eaf0ff; stroke: #b9cbfa; }
+      .soft-purple { fill: #f1ecff; stroke: #d3c2f4; }
+      .soft-amber { fill: #fff3e2; stroke: #efd2a5; }
+      .soft-green { fill: #e7f7ef; stroke: #b8e3ce; }
+      .kicker { font: 600 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 1.8px; }
+      .title { font: 600 28px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .section { font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 1.2px; }
+      .label { font: 500 17px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .small { font: 400 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .stat { font: 600 42px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .value { font: 600 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .check { font: 600 18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #101827; }
+        .fg { fill: #f3f6fb; }
+        .muted { fill: #a6b3c5; }
+        .line { stroke: #314054; }
+        .route { stroke: #708198; }
+        .soft-blue { fill: #1b2d59; stroke: #4768af; }
+        .soft-purple { fill: #302347; stroke: #6d55a2; }
+        .soft-amber { fill: #49341d; stroke: #9d743f; }
+        .soft-green { fill: #1b4233; stroke: #438f6d; }
+      }
+    </style>
+  </defs>
+
+  <rect width="1200" height="540" class="bg"/>
+
+  <text x="44" y="42" class="kicker muted">PILOTFISH-CODEX / TRANSPORT PROBE</text>
+  <text x="44" y="82" class="title fg">Dispatch transport probe</text>
+  <text x="44" y="108" class="small muted">v1.3.2 → v1.3.3 · verifier role · n=3 each · Codex 0.145.0</text>
+
+  <line x1="44" y1="134" x2="1156" y2="134" class="line"/>
+  <text x="44" y="168" class="section muted">01 / ROUTING MAP</text>
+  <text x="810" y="168" class="section muted">02 / OBSERVED DELTA</text>
+  <text x="1138" y="192" text-anchor="end" class="small muted">v1.3.2 → v1.3.3</text>
+  <line x1="778" y1="154" x2="778" y2="462" class="line"/>
+
+  <rect x="54" y="245" width="206" height="76" rx="10" class="soft-blue"/>
+  <circle cx="80" cy="271" r="7" class="blue"/>
+  <text x="98" y="277" class="label fg">Root session</text>
+  <text x="80" y="302" class="small muted">Luna · medium</text>
+
+  <path d="M260 283 H318" fill="none" stroke-width="2" class="route" marker-end="url(#arrow)"/>
+  <path d="M318 202 V364" fill="none" stroke-width="2" class="route"/>
+
+  <path d="M318 202 H350" fill="none" stroke-width="2" class="route" marker-end="url(#arrow)"/>
+  <rect x="358" y="183" width="374" height="42" rx="8" class="soft-blue"/>
+  <circle cx="380" cy="204" r="6" class="blue"/>
+  <text x="399" y="210" class="label fg">Plan mode</text>
+  <text x="706" y="210" text-anchor="end" class="value muted">Luna / xhigh</text>
+
+  <path d="M318 256 H350" fill="none" stroke-width="2" class="route" marker-end="url(#arrow)"/>
+  <rect x="358" y="237" width="374" height="42" rx="8" class="soft-purple"/>
+  <circle cx="380" cy="258" r="6" class="purple"/>
+  <text x="399" y="264" class="label fg">Plan &amp; outcome review</text>
+  <text x="706" y="264" text-anchor="end" class="value muted">Terra / high–xhigh</text>
+
+  <path d="M318 310 H350" fill="none" stroke-width="2" class="route" marker-end="url(#arrow)"/>
+  <rect x="358" y="291" width="374" height="42" rx="8" class="soft-amber"/>
+  <circle cx="380" cy="312" r="6" class="amber"/>
+  <text x="399" y="318" class="label fg">Security roles</text>
+  <text x="706" y="318" text-anchor="end" class="value muted">Sol / high</text>
+
+  <path d="M318 364 H350" fill="none" stroke-width="2" class="route" marker-end="url(#arrow)"/>
+  <rect x="358" y="345" width="374" height="42" rx="8" class="soft-green"/>
+  <circle cx="380" cy="366" r="6" class="green"/>
+  <text x="399" y="372" class="label fg">Mechanical roles</text>
+  <text x="706" y="372" text-anchor="end" class="value muted">Luna / low–max</text>
+
+  <text x="54" y="430" class="small muted">One root session, four bounded model lanes, no adapter fallback.</text>
+
+  <text x="810" y="220" class="label fg">Child IO tokens</text>
+  <text x="810" y="242" class="small muted">22,250 → 22,252 · +0.01%</text>
+  <line x1="810" y1="260" x2="1138" y2="260" class="line"/>
+
+  <text x="810" y="294" class="label fg">Child TTFT</text>
+  <text x="810" y="316" class="small muted">4.14s → 2.83s · −31.6%</text>
+  <line x1="810" y1="334" x2="1138" y2="334" class="line"/>
+
+  <text x="810" y="368" class="label fg">Child total latency</text>
+  <text x="810" y="390" class="small muted">4.53s → 2.97s · −34.6%</text>
+  <line x1="810" y1="408" x2="1138" y2="408" class="line"/>
+
+  <text x="810" y="442" class="label fg">Completion tail</text>
+  <text x="810" y="464" class="small muted">0.39s → 0.13s · −66.5%</text>
+
+  <line x1="44" y1="474" x2="1156" y2="474" class="line"/>
+  <text x="44" y="505" class="small muted">Parent end-to-end: 10.71s → 9.38s (−12.4%). All six routes returned NATIVE_OK.</text>
+  <text x="1156" y="505" text-anchor="end" class="kicker muted">Miyago · 2026</text>
+</svg>

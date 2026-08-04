@@ -17,6 +17,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "install"))
 import install as installer  # noqa: E402
+import stage_smoke_home  # noqa: E402
 from install import InstallAbort, install, merge_config_text, parse_codex_version  # noqa: E402
 
 
@@ -27,9 +28,8 @@ class NativeConfigMergeTests(unittest.TestCase):
         self.assertEqual(data["model"], "gpt-5.6-luna")
         self.assertEqual(data["model_reasoning_effort"], "medium")
         self.assertEqual(data["plan_mode_reasoning_effort"], "xhigh")
-        self.assertEqual(data["features"]["multi_agent_v2"], {"enabled": True, "max_concurrent_threads_per_session": 4})
-        self.assertNotIn("agents", data)
-        self.assertNotIn("multi_agent", data["features"])
+        self.assertEqual(data["agents"], {"enabled": True, "max_concurrent_threads_per_session": 3})
+        self.assertNotIn("multi_agent_v2", data.get("features", {}))
 
     def test_existing_root_model_and_effort_are_preserved(self) -> None:
         rendered, _ = merge_config_text(
@@ -42,40 +42,51 @@ class NativeConfigMergeTests(unittest.TestCase):
         self.assertEqual(data["model_reasoning_effort"], "high")
         self.assertEqual(data["plan_mode_reasoning_effort"], "max")
 
-    def test_scalar_true_is_converted_and_false_aborts(self) -> None:
-        rendered, _ = merge_config_text("[features]\nmulti_agent_v2 = true\n")
-        self.assertTrue(tomllib.loads(rendered)["features"]["multi_agent_v2"]["enabled"])
-        for text in ("[features]\nmulti_agent_v2 = false\n", "[features.multi_agent_v2]\nenabled = false\n"):
+    def test_legacy_v2_requires_provenance_and_disabled_aborts(self) -> None:
+        old = "[features.multi_agent_v2]\nenabled = true\nmax_concurrent_threads_per_session = 4\n"
+        with self.assertRaisesRegex(InstallAbort, "provenance"):
+            merge_config_text(old)
+        migrated, _ = merge_config_text(old, migration_proven=True)
+        self.assertEqual(tomllib.loads(migrated)["agents"], {"enabled": True, "max_concurrent_threads_per_session": 3})
+        for text in ("[features]\nmulti_agent_v2 = false\n", "[features.multi_agent_v2]\nenabled = false\n", "[features]\nmulti_agent_v2 = true\n"):
             with self.subTest(text=text):
                 with self.assertRaises(InstallAbort):
                     merge_config_text(text)
 
-    def test_normalizes_managed_domain_and_rejects_conflicts(self) -> None:
-        rendered, _ = merge_config_text("[features.multi_agent_v2]\nenabled = true\nmax_concurrent_threads_per_session = 8\n")
-        self.assertEqual(tomllib.loads(rendered)["features"]["multi_agent_v2"]["max_concurrent_threads_per_session"], 4)
-        for value in (0, 9, '"4"'):
+    def test_normalizes_child_domain_and_rejects_conflicts(self) -> None:
+        for value in (0, 8, 9, '"4"'):
             with self.subTest(value=value):
                 with self.assertRaises(InstallAbort):
-                    merge_config_text(f"[features.multi_agent_v2]\nenabled = true\nmax_concurrent_threads_per_session = {value}\n")
+                    merge_config_text(f"[agents]\nenabled = true\nmax_concurrent_threads_per_session = {value}\n")
         with self.assertRaises(InstallAbort):
-            merge_config_text("[agents]\nmax_concurrent_threads_per_session = 2\n")
+            merge_config_text("[agents]\nenabled = true\nmax_concurrent_threads_per_session = 2\n")
+
+    def test_agents_table_is_exact_and_rejects_legacy_or_unknown_keys(self) -> None:
+        for text in (
+            "[agents]\nenabled = true\nmax_concurrent_threads_per_session = 3\nmax_depth = 1\n",
+            "[agents]\nenabled = true\nmax_concurrent_threads_per_session = 3\ncustom = true\n",
+            "[agents]\nenabled = false\nmax_concurrent_threads_per_session = 3\n",
+            "[agents]\nenabled = \"true\"\nmax_concurrent_threads_per_session = 3\n",
+        ):
+            with self.subTest(text=text):
+                with self.assertRaises(InstallAbort):
+                    merge_config_text(text)
 
     def test_unowned_legacy_key_is_preserved(self) -> None:
-        original = "[features]\nmulti_agent = true\n\n[features.multi_agent_v2]\nenabled = true\n"
-        rendered, notes = merge_config_text(original)
-        self.assertTrue(tomllib.loads(rendered)["features"]["multi_agent"])
-        self.assertIn("legacy_key_unowned: preserved features.multi_agent", notes)
+        original = "custom = true\n"
+        rendered, _ = merge_config_text(original)
+        self.assertTrue(tomllib.loads(rendered)["custom"])
 
     def test_owned_legacy_key_is_removed(self) -> None:
-        original = "[features]\nmulti_agent = true\n\n[features.multi_agent_v2]\nenabled = true\ntool_namespace = \"agents\"\n"
-        rendered, _ = merge_config_text(original, owned_legacy=frozenset({"features.multi_agent", "features.multi_agent_v2.tool_namespace"}))
+        original = "[features]\nmulti_agent = true\n"
+        rendered, _ = merge_config_text(original, owned_legacy=frozenset({"features.multi_agent"}))
         data = tomllib.loads(rendered)
         self.assertNotIn("multi_agent", data["features"])
-        self.assertNotIn("tool_namespace", data["features"]["multi_agent_v2"])
+        self.assertEqual(data["agents"]["max_concurrent_threads_per_session"], 3)
 
     def test_exact_version_parser(self) -> None:
-        self.assertEqual(parse_codex_version("codex 0.145.0"), (0, 145, 0))
-        for output in ("0.145.0-beta", "0.145.0 0.145.1", "none"):
+        self.assertEqual(parse_codex_version("codex 0.146.0"), (0, 146, 0))
+        for output in ("0.146.0-beta", "0.146.0 0.146.1", "none"):
             with self.subTest(output=output):
                 self.assertIsNone(parse_codex_version(output))
 
@@ -84,22 +95,261 @@ class NativeInstallTests(unittest.TestCase):
     def run_install(self, home: Path, **kwargs: object) -> int:
         return install(source_root=ROOT, codex_home=home, dry_run=False, check_codex=False, **kwargs)
 
+    def _legacy_home(self, home: Path) -> Path:
+        self.assertEqual(self.run_install(home), 0)
+        config = home / "config.toml"
+        legacy = (
+            'model = "gpt-5.6-luna"\nmodel_reasoning_effort = "medium"\n'
+            'plan_mode_reasoning_effort = "xhigh"\n\n'
+            '[features.multi_agent_v2]\nenabled = true\n'
+            'max_concurrent_threads_per_session = 4\n'
+        )
+        config.write_text(legacy)
+        state_path = home.with_name(f"{home.name}.pilotfish-install-state.json")
+        state = json.loads(state_path.read_text())
+        state["target_fingerprints"]["config.toml"] = hashlib.sha256(legacy.encode()).hexdigest()
+        state["original_targets"]["config.toml"] = {
+            "present": True,
+            "sha256": hashlib.sha256(legacy.encode()).hexdigest(),
+            "bytes_b64": installer.base64.b64encode(legacy.encode()).decode(),
+        }
+        state_path.write_text(json.dumps(state, sort_keys=True) + "\n")
+        return state_path
+
+    def test_exact_legacy_v2_migration_and_dry_run_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            state_path = self._legacy_home(home)
+            before = (home / "config.toml").read_bytes()
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(install(source_root=ROOT, codex_home=home, dry_run=True, check_codex=False), 0)
+            self.assertIn("would change primary: config.toml", output.getvalue())
+            self.assertIn(f"allowed transaction artifact: {state_path.name}.pending", output.getvalue())
+            self.assertEqual((home / "config.toml").read_bytes(), before)
+            self.assertEqual(self.run_install(home), 0)
+            data = tomllib.loads((home / "config.toml").read_text())
+            self.assertEqual(data["agents"], {"enabled": True, "max_concurrent_threads_per_session": 3})
+
+    def test_legacy_v2_migration_allows_canonical_security_reviewer_upgrade(self) -> None:
+        previous = ROOT / "install" / "previous" / "v1.3.0" / "agents" / "security-reviewer.toml"
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            state_path = self._legacy_home(home)
+            target = home / "agents" / "security-reviewer.toml"
+            target.write_bytes(previous.read_bytes())
+            state = json.loads(state_path.read_text())
+            state["target_fingerprints"]["agents/security-reviewer.toml"] = hashlib.sha256(
+                target.read_bytes()
+            ).hexdigest()
+            state_path.write_text(json.dumps(state, sort_keys=True) + "\n")
+
+            self.assertEqual(self.run_install(home), 0)
+            self.assertEqual(
+                target.read_bytes(),
+                (ROOT / "templates" / "agents" / "security-reviewer.toml").read_bytes(),
+            )
+
+    def test_legacy_v2_extra_state_entry_aborts_before_write(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            state_path = self._legacy_home(home)
+            state = json.loads(state_path.read_text())
+            state["target_fingerprints"]["extra.toml"] = "0" * 64
+            state_path.write_text(json.dumps(state))
+            before = (home / "config.toml").read_bytes()
+            with self.assertRaisesRegex(InstallAbort, "manifest"):
+                self.run_install(home)
+            self.assertEqual((home / "config.toml").read_bytes(), before)
+
     def test_install_is_atomic_idempotent_and_records_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"
             self.assertEqual(self.run_install(home), 0)
             config = tomllib.loads((home / "config.toml").read_text())
-            self.assertEqual(config["features"]["multi_agent_v2"]["max_concurrent_threads_per_session"], 4)
+            self.assertEqual(config["agents"]["max_concurrent_threads_per_session"], 3)
             self.assertEqual({p.stem for p in (home / "agents").glob("*.toml")}, {"executor", "mech-executor", "plan-verifier", "scout", "security-executor", "security-reviewer", "verifier"})
             state = home.with_name(f"{home.name}.pilotfish-install-state.json")
             recorded = json.loads(state.read_text())
             self.assertEqual(recorded["status"], "committed")
             self.assertIn("config.toml", recorded["target_fingerprints"])
+            self.assertEqual(
+                (home / "hooks.json").read_bytes(),
+                (ROOT / "templates" / "hooks.json").read_bytes(),
+            )
+            self.assertEqual(
+                (home / "hooks" / "pilotfish_autoroute_gate.py").read_bytes(),
+                (ROOT / "hooks" / "pilotfish_autoroute_gate.py").read_bytes(),
+            )
+            self.assertIn("hooks.json", recorded["target_fingerprints"])
+            self.assertIn(
+                "hooks/pilotfish_autoroute_gate.py",
+                recorded["target_fingerprints"],
+            )
             self.assertIn("config.toml", recorded["original_targets"])
             first = {p.relative_to(home): p.read_bytes() for p in home.rglob("*") if p.is_file()}
             self.assertEqual(self.run_install(home), 0)
             second = {p.relative_to(home): p.read_bytes() for p in home.rglob("*") if p.is_file()}
             self.assertEqual(first, second)
+
+    def test_codex_hooks_state_append_is_accepted_and_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            config = home / "config.toml"
+            config.write_bytes(
+                config.read_bytes()
+                + b'\n[hooks.state]\npilotfish_autoroute_gate = "trusted"\n'
+            )
+            expected = config.read_bytes()
+
+            self.assertEqual(self.run_install(home), 0)
+            self.assertEqual(self.run_install(home), 0)
+            self.assertEqual(config.read_bytes(), expected)
+
+    def test_owned_routing_drift_aborts_without_installer_writes(self) -> None:
+        mutations = {
+            "model": lambda text: text.replace(
+                'model = "gpt-5.6-luna"', 'model = "unapproved-model"'
+            ),
+            "agents": lambda text: text.replace(
+                "max_concurrent_threads_per_session = 3",
+                "max_concurrent_threads_per_session = 2",
+            ),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                home = Path(directory) / "home"
+                self.assertEqual(self.run_install(home), 0)
+                config = home / "config.toml"
+                config.write_text(mutate(config.read_text()))
+                before = {
+                    path.relative_to(home): path.read_bytes()
+                    for path in home.rglob("*")
+                    if path.is_file()
+                }
+
+                with self.assertRaisesRegex(InstallAbort, "routing projection"):
+                    self.run_install(home)
+
+                after = {
+                    path.relative_to(home): path.read_bytes()
+                    for path in home.rglob("*")
+                    if path.is_file()
+                }
+                self.assertEqual(after, before)
+                self.assertFalse(
+                    home.with_name(f"{home.name}.pilotfish-install-state.json.pending").exists()
+                )
+
+    def test_config_snapshot_change_during_state_validation_aborts_before_write(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            config = home / "config.toml"
+            before = {
+                path.relative_to(home): path.read_bytes()
+                for path in home.rglob("*")
+                if path.is_file() and path != config
+            }
+            original_load_state = installer._load_state
+
+            def load_state_with_race(target_home: Path) -> dict | None:
+                state = original_load_state(target_home)
+                config.write_bytes(config.read_bytes() + b"\n[hooks.state]\nrace = true\n")
+                return state
+
+            with mock.patch.object(installer, "_load_state", side_effect=load_state_with_race):
+                with self.assertRaisesRegex(InstallAbort, "changed during state validation"):
+                    self.run_install(home)
+
+            after = {
+                path.relative_to(home): path.read_bytes()
+                for path in home.rglob("*")
+                if path.is_file() and path != config
+            }
+            self.assertEqual(after, before)
+            self.assertFalse(
+                home.with_name(f"{home.name}.pilotfish-install-state.json.pending").exists()
+            )
+
+    def test_legacy_v2_provenance_allows_hooks_state_but_rejects_legacy_deviation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self._legacy_home(home)
+            config = home / "config.toml"
+            config.write_bytes(config.read_bytes() + b"\n[hooks.state]\nlegacy = true\n")
+            self.assertEqual(self.run_install(home), 0)
+            migrated = tomllib.loads(config.read_text())
+            self.assertEqual(migrated["hooks"]["state"], {"legacy": True})
+            self.assertNotIn("multi_agent_v2", migrated.get("features", {}))
+
+            config.write_bytes(
+                config.read_bytes()
+                + b"\n[features.multi_agent_v2]\nenabled = true\n"
+                + b"max_concurrent_threads_per_session = 5\n"
+            )
+            before = config.read_bytes()
+            with self.assertRaisesRegex(InstallAbort, "routing projection"):
+                self.run_install(home)
+            self.assertEqual(config.read_bytes(), before)
+
+    def test_unowned_hooks_json_collision_aborts_before_any_primary_write(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            home.mkdir()
+            hooks = home / "hooks.json"
+            hooks.write_bytes(b'{"hooks":{"Stop":[]}}\n')
+
+            with self.assertRaisesRegex(InstallAbort, "unowned hooks.json collision"):
+                self.run_install(home)
+
+            self.assertEqual(hooks.read_bytes(), b'{"hooks":{"Stop":[]}}\n')
+            self.assertFalse((home / "config.toml").exists())
+            self.assertFalse((home / "agents").exists())
+            self.assertFalse((home / "AGENTS.md").exists())
+            self.assertFalse(
+                home.with_name(f"{home.name}.pilotfish-install-state.json").exists()
+            )
+
+    def test_committed_state_binds_registration_and_hook_script_bytes(self) -> None:
+        for relative in (
+            Path("hooks.json"),
+            Path("hooks/pilotfish_autoroute_gate.py"),
+        ):
+            with self.subTest(relative=relative.as_posix()), tempfile.TemporaryDirectory() as directory:
+                home = Path(directory) / "home"
+                self.assertEqual(self.run_install(home), 0)
+                target = home / relative
+                target.write_bytes(target.read_bytes() + b"\n")
+
+                with self.assertRaisesRegex(InstallAbort, "committed install state is stale"):
+                    self.run_install(home)
+
+    def test_staged_layout_requires_exact_owned_hook_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            self.assertIsNone(
+                stage_smoke_home.explicit_layout_error(
+                    home,
+                    allow_rollback_backups=True,
+                    project_active_root=True,
+                )
+            )
+            projection = stage_smoke_home._required_input_projection(home.resolve())
+            self.assertEqual(len(projection), 6)
+
+            extra = home / "hooks" / "unowned.py"
+            extra.write_text("pass\n")
+            self.assertIn(
+                "unapproved entry",
+                stage_smoke_home.explicit_layout_error(
+                    home,
+                    allow_rollback_backups=True,
+                    project_active_root=True,
+                ),
+            )
 
     def test_pending_state_and_role_drift_abort_before_write(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -109,11 +359,26 @@ class NativeInstallTests(unittest.TestCase):
             pending.write_text("{}")
             with self.assertRaises(InstallAbort):
                 self.run_install(home)
+
             pending.unlink()
             agents = home / "agents"; agents.mkdir()
             (agents / "scout.toml").write_text('name = "scout"\n')
             with self.assertRaises(InstallAbort):
                 self.run_install(home)
+
+    def test_unowned_agents_key_aborts_before_any_target_write(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            home.mkdir()
+            config = home / "config.toml"
+            original = '[custom]\nkeep = "yes"\n\n[agents]\nenabled = true\nmax_concurrent_threads_per_session = 3\nmax_depth = 1\n'
+            config.write_text(original)
+            with self.assertRaisesRegex(InstallAbort, "agents table"):
+                self.run_install(home)
+            self.assertEqual(config.read_text(), original)
+            self.assertFalse((home / "agents").exists())
+            self.assertFalse((home / "AGENTS.md").exists())
+            self.assertFalse(home.with_name(f"{home.name}.pilotfish-install-state.json").exists())
 
     def test_release_pinned_v130_roles_upgrade_but_custom_bytes_abort(self) -> None:
         previous = ROOT / "install" / "previous" / "v1.3.0" / "agents"
@@ -241,6 +506,7 @@ class NativeInstallTests(unittest.TestCase):
             "released canonical\nv1.3.1 `plan-verifier` and `verifier`",
             runbook,
         )
+        self.assertIn("released canonical v1.3.3 payloads", runbook)
 
     def test_release_pinned_v132_security_executor_upgrades(self) -> None:
         previous = (
@@ -294,6 +560,32 @@ class NativeInstallTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(InstallAbort, "installed_role_drift"):
                 self.run_install(home)
+
+    def test_release_pinned_v133_routing_roles_upgrade(self) -> None:
+        previous = ROOT / "install" / "previous" / "v1.3.3" / "agents"
+        roles = ("plan-verifier", "verifier")
+        for role in roles:
+            digest = hashlib.sha256((previous / f"{role}.toml").read_bytes()).hexdigest()
+            self.assertIn(digest, installer.CANONICAL_ROLE_UPGRADE_DIGESTS[role])
+
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            agents = home / "agents"
+            agents.mkdir(parents=True)
+            for role in installer.ROLES:
+                source = ROOT / "templates" / "agents" / f"{role}.toml"
+                (agents / f"{role}.toml").write_bytes(source.read_bytes())
+            for role in roles:
+                (agents / f"{role}.toml").write_bytes(
+                    (previous / f"{role}.toml").read_bytes()
+                )
+
+            self.assertEqual(self.run_install(home), 0)
+            for role in roles:
+                self.assertEqual(
+                    (agents / f"{role}.toml").read_bytes(),
+                    (ROOT / "templates" / "agents" / f"{role}.toml").read_bytes(),
+                )
 
     def test_two_nonempty_policy_files_abort_before_write(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

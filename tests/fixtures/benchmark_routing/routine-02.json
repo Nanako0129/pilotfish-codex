@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"routine-02","task":"email_extract","input":"Contact ada@example.test or linus@example.test","expected_artifact":{"emails":["ada@example.test","linus@example.test"]}}

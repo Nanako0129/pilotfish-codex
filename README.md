@@ -6,18 +6,18 @@ Codex CLI adaptation maintained by Miyago.
 
 ## Native target
 
-Pilotfish-Codex targets only Codex `rust-v0.145.0`. The native Multi-Agent V2
+Pilotfish-Codex targets only Codex `rust-v0.146.0`. The native Multi-Agent
 configuration is:
 
 ```toml
-[features.multi_agent_v2]
+[agents]
 enabled = true
-max_concurrent_threads_per_session = 4
+max_concurrent_threads_per_session = 3
 ```
 
-Four is a total thread limit: one root and up to three children. The active
-native configuration does not emit `features.multi_agent`, a forced spawn
-namespace, forced metadata visibility, or an `[agents]` concurrency fallback.
+Three is the child concurrency limit: one root and up to three children. The
+active configuration does not emit the retired `features.multi_agent_v2`
+table, adapter namespace/metadata keys, or `agents.max_threads`.
 Lower and higher Codex versions fail closed; the installer never selects an
 adapter route.
 
@@ -37,10 +37,69 @@ Role TOMLs own their model and reasoning effort. The global policy owns typed
 role delegation, approval boundaries, and fresh-context verification. The
 Claude-specific `Explore` compatibility override is not installed.
 
-The default root session uses Luna at `medium`; Plan mode escalates Luna to
-`xhigh`. General Plan and outcome review use Terra at `xhigh`, while security
-review and execution stay on Sol at `high`. Mechanical roles retain their
-existing Luna low/medium bindings.
+The default root session uses Luna at `medium`; Plan mode and outcome
+verification use Luna at `xhigh`. Terra is not installed. Sol stays at `high`
+for security review/execution and the existing risk-triggered Plan review.
+Mechanical roles retain their existing Luna low/medium bindings; the review
+trigger and its two-`REVISE` budget are unchanged.
+
+## Routing evidence
+
+The current decision uses the checked-in
+[36-trial v6 aggregate](./docs/benchmarks/usage-routing-v1/live-v6-summary.json):
+Luna is the default, Sol is reserved for the existing risk-triggered Plan
+review, and Terra has no active binding.
+
+### Weighted token usage
+
+![Weighted token usage per 12-trial cohort](./docs/assets/v6-weighted-tokens.svg)
+
+Weighted tokens are a normalized usage signal, not a currency value. Lower is
+better when the same work has comparable quality.
+
+### Equivalent cost
+
+![Equivalent cost per 12-trial cohort](./docs/assets/v6-equivalent-cost.svg)
+
+### Median wall time
+
+![Median wall time per candidate](./docs/assets/v6-median-wall-time.svg)
+
+### What the figures support
+
+The graphs answer one narrow question: which model should start routine work?
+They put Luna first. Across the same 12-trial cohort, Luna costs $0.74 and
+finishes in 28.55 seconds at the median. Terra uses 6% fewer weighted tokens,
+but costs 83% more and takes 44% longer; it has no active routing binding. Sol
+uses 9% more weighted tokens, costs 294% more, and takes 43% longer when used
+as the direct routine worker. Making either the default spends more or waits
+longer before the task has shown it needs deeper review.
+
+That does **not** say that Luna is universally more capable. The deterministic
+artifact check is evidence that Luna is a dependable routine executor here
+(12/12); it is not an intelligence score. Sol's direct-execution result (5/12)
+does not measure its planning ability either. The cohorts tested a fixed
+artifact, not ambiguous requirements, risk discovery, or competing technical
+options.
+
+The resulting division of labour is deliberate:
+
+1. Routine, mechanical, and ordinary execution start with Luna at `medium`.
+2. The existing concrete-risk trigger asks Sol at `high` to review the Plan,
+   where uncertainty, trade-offs, and failure modes matter.
+3. Luna turns the bounded Plan into changes and verification, keeping Sol out
+   of routine implementation calls.
+
+This concentrates Sol usage on a smaller decision surface instead of paying
+its direct-execution cost for every task. The claim that this improves planning
+quality is a hypothesis until it is measured. The role-fitness cohort will
+publish separate planning-quality, execution-reliability, and critical-risk
+yield figures before treating the split as a quality win.
+
+Cost and wall time are native-rollout proxy metrics. They do not measure
+planning or execution quality. See the
+[benchmark artifact contract](./docs/benchmarks/usage-routing-v1/) for the
+cohort, metric definitions, and limitations.
 
 ## Plan readiness
 
@@ -91,8 +150,28 @@ design boundary.
 The scripted route checks the exact CLI version, plans all writes, creates
 backups, validates the staged native configuration and manifest, atomically
 replaces targets, and commits a mode-`0600` sibling install-state sidecar.
-Unknown-provenance legacy adapter settings are preserved and block native
-verification rather than being deleted by name.
+Dry-run prints every primary path and creates nothing.
+
+Use the shell entrypoint from a local checkout. Run a dry-run first; a real
+Codex-home write needs separate approval.
+
+```bash
+bash install/install.sh --dry-run --codex-home "$ACTIVE_CODEX_HOME"
+bash install/install.sh --codex-home "$ACTIVE_CODEX_HOME"
+```
+
+For a remote install, pin both the downloaded script and its archive to the
+same release tag or commit SHA. Do not pipe the mutable `main` branch into a
+real home.
+
+```bash
+REF="<release-tag-or-commit-sha>"
+curl -fsSL \
+  "https://raw.githubusercontent.com/miyago9267/pilotfish-codex/$REF/install/install.sh" \
+  | bash -s -- --ref "$REF" --dry-run --codex-home "$ACTIVE_CODEX_HOME"
+```
+
+The direct Python command remains useful for a checked-out repository:
 
 ```bash
 python3 install/install.py --codex-home "$ACTIVE_CODEX_HOME"
@@ -100,9 +179,17 @@ python3 install/validate_agents.py \
   --config "$ACTIVE_CODEX_HOME/config.toml" "$ACTIVE_CODEX_HOME/agents"
 ```
 
-See [the install runbook](./install/AGENT-INSTALL.md) before modifying a real
-Codex home. The runbook requires a separate home-write approval for backups,
-writes, customized same-name role replacement, and retired-role cleanup.
+The install also registers `hooks.json` and the automatic Plan-review hook.
+After the first successful install, trust exactly `Pilotfish automatic typed
+Plan-review gate` in an interactive Codex session. Use `/hooks` when it is
+available; otherwise restart a session and confirm the launch-time trust
+prompt. Re-trust only when the hook definition changes. The resulting
+`[hooks.state]` entry is expected and an update dry-run should report
+`already up to date`.
+
+See [INSTALL.md](./INSTALL.md) for the agent playbook and
+[the install runbook](./install/AGENT-INSTALL.md) for updates, collision or
+drift handling, recovery, and the separate home-write approval boundary.
 
 ## Native verification
 

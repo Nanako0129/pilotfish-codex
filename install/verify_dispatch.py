@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline-safe verifier for the native Codex 0.145.0 dispatch contract.
+"""Offline-safe verifier for the native Codex 0.146.0 dispatch contract.
 
 ``--live --yes`` is deliberately the only path that invokes Codex.  All normal
 helpers validate staged inputs, receipts, and rollout evidence without reading a
@@ -30,6 +30,13 @@ from stage_smoke_home import StageError, explicit_layout_error, project_config_b
 TASK_NAME = "model_probe"
 TASK_NAME_RE = re.compile(r"^[a-z0-9_]+$")
 ROLE_NAMES = tuple(sorted(ROLES))
+AUTO_ROUTE_PROMPT = (
+    "Read the material, cross-service production database schema migration Plan in "
+    "PLAN.md and determine whether it is ready for user approval. Do not "
+    "implement, modify files, or contact external systems. Return a concise "
+    "approval recommendation and every P0-P2 blocker you find."
+)
+AUTO_ROUTE_DIRECTIVE_TOKENS = ("spawn", "delegate", "subagent")
 RECEIPT_KEYS = frozenset({
     "status", "reason_code", "phase", "child_created", "codex_version",
     "active_config_sha256", "active_role_manifest_sha256", "active_policy_sha256",
@@ -54,6 +61,8 @@ MATRIX = {
     ("post-spawn", "parent_model_unavailable_after_spawn", "SKIPPED"), ("post-spawn", "snapshot_mutated", "FAILED"),
     ("post-spawn", "codex_exec_failed_after_spawn", "FAILED"), ("post-spawn", "native_v2_selection_unobservable", "SKIPPED"),
     ("post-spawn", "native_v2_selection_mismatch", "FAILED"), ("post-spawn", "native_spawn_evidence_missing", "SKIPPED"),
+    ("post-spawn", "autoroute_prompt_missing", "FAILED"), ("post-spawn", "autoroute_prompt_directive_detected", "FAILED"),
+    ("post-spawn", "autoroute_plan_verifier_missing", "FAILED"),
     ("post-spawn", "untyped_fallback_detected", "FAILED"), ("dispatch", "policy_violation", "FAILED"),
     ("dispatch", "service_tier_override_forbidden", "FAILED"), ("post-spawn", "parent_child_mismatch", "FAILED"),
     ("post-spawn", "child_evidence_missing", "SKIPPED"), ("post-spawn", "child_binding_unobservable", "SKIPPED"),
@@ -380,10 +389,10 @@ def validate_stage_layout(home: Path, *, active_home: bool = False) -> str | Non
         config = tomllib.loads(config_content.decode("utf-8"))
         features = config.get("features", {})
         agents_config = config.get("agents", {})
-        v2 = features.get("multi_agent_v2", {}) if isinstance(features, dict) else {}
-        if (isinstance(features, dict) and features.get("multi_agent") is not None) or (isinstance(v2, dict) and any(key in v2 for key in ("tool_namespace", "hide_spawn_agent_metadata"))) or (isinstance(agents_config, dict) and any(key in agents_config for key in ("max_threads", "max_concurrent_threads_per_session"))):
+        if isinstance(features, dict) and (features.get("multi_agent") is not None or "multi_agent_v2" in features):
             return "legacy_key_unowned"
-        if isinstance(agents_config, dict) and set(agents_config) - {"max_depth"}:
+        expected_agent_keys = {"enabled", "max_concurrent_threads_per_session"}
+        if not isinstance(agents_config, dict) or set(agents_config) != expected_agent_keys or agents_config.get("enabled") is not True or agents_config.get("max_concurrent_threads_per_session") != 3:
             return "role_layer_unapproved"
         if active_home:
             project_config_bytes(config_content)
@@ -525,6 +534,23 @@ def build_codex_command(*, codex_bin: str, cwd: Path, parent_model: str, role: s
     ]
 
 
+def build_autoroute_command(*, codex_bin: str, cwd: Path) -> list[str]:
+    """Run the no-directive Plan-review probe on the configured root model."""
+    return [
+        codex_bin,
+        "exec",
+        "--json",
+        "--strict-config",
+        "--skip-git-repo-check",
+        "--dangerously-bypass-hook-trust",
+        "-C",
+        str(cwd),
+        "-s",
+        "read-only",
+        AUTO_ROUTE_PROMPT,
+    ]
+
+
 def _payloads(events: Iterable[dict], kind: str) -> list[dict]:
     return [event["payload"] for event in events if isinstance(event, dict) and event.get("type") == kind and isinstance(event.get("payload"), dict)]
 
@@ -538,11 +564,6 @@ def inspect_dispatch(parent_events: list[dict], child_events: list[dict], *, exp
     task = expected_task_name or task_name_for_role(expected_role_name)
     if not _events_valid(parent_events, {"session_meta", "turn_context", "response_item", "event_msg"}):
         return _verdict("FAILED", "policy_violation", phase="dispatch")
-    parent_contexts = _payloads(parent_events, "turn_context")
-    raw_versions = [ctx.get("multi_agent_version") for ctx in parent_contexts if "multi_agent_version" in ctx]
-    if any(not isinstance(version, str) for version in raw_versions):
-        return _verdict("FAILED", "native_v2_selection_mismatch", child_created="unknown")
-    versions = set(raw_versions)
     function_calls = [
         (index, event["payload"])
         for index, event in enumerate(parent_events)
@@ -564,6 +585,8 @@ def inspect_dispatch(parent_events: list[dict], child_events: list[dict], *, exp
     untyped = [p for p in _payloads(parent_events, "response_item") if p.get("type") == "function_call" and p.get("name") != "spawn_agent" and "spawn" in str(p.get("name", ""))]
     activities = [p for p in _payloads(parent_events, "event_msg") if p.get("type") == "sub_agent_activity" and p.get("kind") == "started"]
     created = "yes" if activities else "unknown"
+    # The rollout marker is undocumented and optional.  If a runtime emits it,
+    # an explicitly non-native value is still contradictory evidence.
     if untyped:
         return _verdict("FAILED", "untyped_fallback_detected", child_created=created)
     if len(calls) > 1:
@@ -595,10 +618,6 @@ def inspect_dispatch(parent_events: list[dict], child_events: list[dict], *, exp
     matched = [a for a in activities if a.get("event_id") == call_id]
     if not isinstance(call_id, str) or not call_id or len(matched) != 1:
         return _verdict("SKIPPED", "native_spawn_evidence_missing", child_created=created)
-    if not versions:
-        return _verdict("SKIPPED", "native_v2_selection_unobservable", child_created="yes")
-    if versions != {"v2"}:
-        return _verdict("FAILED", "native_v2_selection_mismatch", child_created="yes")
     child_id = matched[0].get("agent_thread_id")
     parent_id = next((p.get("id") for p in _payloads(parent_events, "session_meta") if isinstance(p.get("id"), str)), None)
     contexts = _payloads(child_events, "turn_context")
@@ -616,10 +635,122 @@ def inspect_dispatch(parent_events: list[dict], child_events: list[dict], *, exp
         return _verdict("FAILED", "child_model_mismatch", child_created="yes")
     if effort != expected_role.effort:
         return _verdict("FAILED", "child_effort_mismatch", child_created="yes")
-    parent_model = parent_contexts[0].get("model") if parent_contexts else None
-    if model == parent_model:
-        return _verdict("FAILED", "inherited_parent_model", child_created="yes")
+    # The observed child binding is authoritative. A role may intentionally use
+    # the same model and effort as its parent, which cannot be distinguished
+    # from inheritance but is behaviorally equivalent to the installed role.
     return _verdict("NATIVE_OK", "native_verified", child_created="yes", role=expected_role_name, task_name=task, fork_turns=args["fork_turns"], parent_ref=_short_ref(parent_id), child_ref=_short_ref(child_id), model=model, reasoning_effort=effort)
+
+
+def _user_message_texts(events: Iterable[dict]) -> list[str]:
+    texts: list[str] = []
+    for payload in _payloads(events, "response_item"):
+        if payload.get("type") != "message" or payload.get("role") != "user":
+            continue
+        content = payload.get("content")
+        if not isinstance(content, list):
+            continue
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "input_text" and isinstance(item.get("text"), str):
+                texts.append(item["text"])
+    return texts
+
+
+def inspect_autoroute(
+    parent_events: list[dict],
+    child_rollouts: dict[str, list[dict]],
+    *,
+    expected_role: RoleBinding,
+) -> Verdict:
+    """Verify that the fresh no-directive parent selected Plan review itself."""
+    prompts = _user_message_texts(parent_events)
+    if AUTO_ROUTE_PROMPT not in prompts:
+        if any(
+            token in prompt.casefold()
+            for prompt in prompts
+            for token in AUTO_ROUTE_DIRECTIVE_TOKENS
+        ):
+            return _verdict("FAILED", "autoroute_prompt_directive_detected")
+        return _verdict("FAILED", "autoroute_prompt_missing")
+    if any(token in AUTO_ROUTE_PROMPT.casefold() for token in AUTO_ROUTE_DIRECTIVE_TOKENS):
+        return _verdict("FAILED", "autoroute_prompt_directive_detected")
+
+    parent_id = next(
+        (payload.get("id") for payload in _payloads(parent_events, "session_meta") if isinstance(payload.get("id"), str)),
+        None,
+    )
+    calls: list[tuple[dict, dict]] = []
+    for payload in _payloads(parent_events, "response_item"):
+        if payload.get("type") != "function_call" or payload.get("name") != "spawn_agent":
+            continue
+        try:
+            args = json.loads(payload.get("arguments", ""))
+        except (TypeError, json.JSONDecodeError):
+            return _verdict("FAILED", "policy_violation")
+        if isinstance(args, dict) and args.get("agent_type") == "plan-verifier":
+            calls.append((payload, args))
+    task_name: str | None = None
+    fork_turns: str | None = None
+    if calls:
+        if len(calls) != 1:
+            return _verdict("FAILED", "policy_violation")
+        call, args = calls[0]
+        if set(args) != {"message", "agent_type", "task_name", "fork_turns"} or not isinstance(args.get("message"), str) or not args["message"].strip() or not TASK_NAME_RE.fullmatch(str(args.get("task_name"))) or args.get("fork_turns") not in {"none", "1", "2", "3"}:
+            return _verdict("FAILED", "policy_violation")
+        call_id = call.get("call_id")
+        activities = [
+            payload
+            for payload in _payloads(parent_events, "event_msg")
+            if payload.get("type") == "sub_agent_activity"
+            and payload.get("kind") == "started"
+            and payload.get("event_id") == call_id
+        ]
+        if not isinstance(call_id, str) or len(activities) != 1 or not isinstance(activities[0].get("agent_thread_id"), str):
+            return _verdict("SKIPPED", "native_spawn_evidence_missing")
+        child_id = activities[0]["agent_thread_id"]
+        task_name, fork_turns = args["task_name"], args["fork_turns"]
+    else:
+        linked = [
+            (child_id, events)
+            for child_id, events in child_rollouts.items()
+            if len(_payloads(events, "session_meta")) == 1
+            and _payloads(events, "session_meta")[0].get("id") == child_id
+            and _payloads(events, "session_meta")[0].get("parent_thread_id") == parent_id
+            and _payloads(events, "session_meta")[0].get("agent_role") == "plan-verifier"
+        ]
+        if not linked:
+            return _verdict("FAILED", "autoroute_plan_verifier_missing", child_created="no")
+        if len(linked) != 1:
+            return _verdict("FAILED", "policy_violation", child_created="yes")
+        child_id, _ = linked[0]
+    child_events = child_rollouts.get(child_id)
+    if not child_events:
+        return _verdict("SKIPPED", "child_evidence_missing", child_created="yes")
+    child_sessions = _payloads(child_events, "session_meta")
+    child_contexts = _payloads(child_events, "turn_context")
+    if len(child_sessions) != 1 or len(child_contexts) != 1:
+        return _verdict("SKIPPED", "child_binding_unobservable", child_created="yes")
+    child_session, child_context = child_sessions[0], child_contexts[0]
+    if child_session.get("id") != child_id or child_session.get("parent_thread_id") != parent_id or child_session.get("agent_role") != "plan-verifier":
+        return _verdict("FAILED", "parent_child_mismatch", child_created="yes")
+    model, effort = child_context.get("model"), child_context.get("effort")
+    if not isinstance(model, str) or not isinstance(effort, str):
+        return _verdict("SKIPPED", "child_binding_unobservable", child_created="yes")
+    if model != expected_role.model:
+        return _verdict("FAILED", "child_model_mismatch", child_created="yes")
+    if effort != expected_role.effort:
+        return _verdict("FAILED", "child_effort_mismatch", child_created="yes")
+    return _verdict(
+        "NATIVE_OK",
+        "native_verified",
+        child_created="yes",
+        role="plan-verifier",
+        task_name=task_name,
+        fork_turns=fork_turns,
+        parent_ref=_short_ref(parent_id),
+        child_ref=_short_ref(child_id),
+        model=model,
+        reasoning_effort=effort,
+    )
 
 
 def load_jsonl(path: Path) -> list[dict]:
@@ -674,6 +805,58 @@ def child_thread_from_parent(events: list[dict]) -> str:
     return activities[0]["agent_thread_id"]
 
 
+def inspect_autoroute_available_evidence(
+    home: Path,
+    stdout: str,
+    binding: RoleBinding,
+) -> tuple[Verdict | None, bool]:
+    """Inspect only children linked from the fresh no-directive parent trace."""
+    try:
+        parent_id = parse_exec_thread_id(stdout)
+        parent_events = load_jsonl(locate_rollout(home / "sessions", parent_id))
+        activities = [
+            payload
+            for payload in _payloads(parent_events, "event_msg")
+            if payload.get("type") == "sub_agent_activity"
+            and payload.get("kind") == "started"
+            and isinstance(payload.get("agent_thread_id"), str)
+        ]
+        children = {
+            activity["agent_thread_id"]: load_jsonl(
+                locate_rollout(home / "sessions", activity["agent_thread_id"])
+            )
+            for activity in activities
+        }
+        if not children:
+            children = child_rollouts_for_parent(home / "sessions", parent_id)
+        return inspect_autoroute(parent_events, children, expected_role=binding), bool(children)
+    except EvidenceError:
+        return None, False
+
+
+def child_rollouts_for_parent(sessions_root: Path, parent_id: str) -> dict[str, list[dict]]:
+    """Return bounded, metadata-linked children when v1 omits parent tool events."""
+    try:
+        root = sessions_root.resolve(strict=True)
+    except OSError as exc:
+        raise EvidenceError("session store is unavailable") from exc
+    matches: dict[str, list[dict]] = {}
+    candidates = 0
+    for path in root.rglob("*.jsonl"):
+        candidates += 1
+        if candidates > 64 or not path.is_file() or not _inside(path, root):
+            raise EvidenceError("child evidence is unavailable")
+        events = load_jsonl(path.resolve())
+        sessions = _payloads(events, "session_meta")
+        if len(sessions) != 1 or sessions[0].get("parent_thread_id") != parent_id:
+            continue
+        child_id = sessions[0].get("id")
+        if not isinstance(child_id, str) or not child_id or child_id in matches:
+            raise EvidenceError("child evidence is ambiguous")
+        matches[child_id] = events
+    return matches
+
+
 def inspect_available_evidence(home: Path, stdout: str, binding: RoleBinding, role: str) -> tuple[Verdict | None, bool]:
     """Inspect bounded rollout evidence and retain the spawn-attempt boundary."""
     try:
@@ -688,6 +871,63 @@ def inspect_available_evidence(home: Path, stdout: str, binding: RoleBinding, ro
         return inspect_dispatch(parent_events, child_events, expected_role=binding, expected_role_name=role), boundary
     except EvidenceError:
         return None, False
+
+
+def run_autoroute_probe(
+    *,
+    codex_bin: str,
+    codex_home: Path,
+    binding: RoleBinding,
+    cwd: Path,
+) -> tuple[Verdict, bool]:
+    """Run one read-only, no-directive Plan-review selection probe."""
+    fixture = (
+        "# Production schema migration plan (synthetic smoke fixture)\n\n"
+        "## Outcome\n\n"
+        "Move three production services to the next database schema version with no\n"
+        "planned downtime.\n\n"
+        "## Scope\n\n"
+        "- Add the new schema, backfill rows, and switch all three services.\n"
+        "- Remove the old schema only after production validation.\n"
+        "- Update deployment manifests and service configuration in three repositories.\n\n"
+        "## Proposed sequence\n\n"
+        "1. Add the compatible schema and deploy configuration updates.\n"
+        "2. Backfill rows and switch all services to the new schema.\n"
+        "3. Confirm production behavior, then remove the obsolete schema.\n\n"
+        "## Approval boundary\n\n"
+        "No implementation is authorized. Assess only whether this material,\n"
+        "cross-service, production data-migration Plan is ready for approval.\n"
+    )
+    before = snapshot_inputs(codex_home)
+    env = {
+        "CODEX_HOME": str(codex_home),
+        "CODEX_SQLITE_HOME": str(codex_home),
+        **{key: value for key, value in os.environ.items() if key not in {"CODEX_HOME", "CODEX_SQLITE_HOME"}},
+    }
+    plan_path = cwd / "PLAN.md"
+    if plan_path.exists():
+        return _verdict("FAILED", "smoke_cwd_untrusted", phase="preflight", child_created="no"), False
+    try:
+        plan_path.write_text(fixture, encoding="utf-8")
+        completed = subprocess.run(
+            build_autoroute_command(codex_bin=codex_bin, cwd=cwd),
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            env=env,
+            check=False,
+            timeout=300,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return _verdict("FAILED", "codex_exec_failed", phase="execution-pre-child", child_created="no"), False
+    finally:
+        plan_path.unlink(missing_ok=True)
+    observed, spawn_boundary = inspect_autoroute_available_evidence(codex_home, completed.stdout, binding)
+    if snapshot_changed(codex_home, before):
+        return _verdict("FAILED", "snapshot_mutated", phase="post-spawn" if spawn_boundary else "execution-pre-child", child_created=observed.child_created if observed else "unknown"), spawn_boundary
+    if completed.returncode:
+        return _verdict("FAILED", "codex_exec_failed_after_spawn" if spawn_boundary else "codex_exec_failed", phase="post-spawn" if spawn_boundary else "execution-pre-child", child_created=observed.child_created if observed else "unknown"), spawn_boundary
+    return observed or _verdict("SKIPPED", "native_spawn_evidence_missing"), spawn_boundary
 
 
 def receipt_payload(verdict: Verdict, *, codex_version: str, active: dict[str, str], target: dict[str, str]) -> dict:
@@ -740,7 +980,7 @@ def validate_receipt(payload: dict) -> None:
     child_bound_reasons = {"parent_child_mismatch", "child_binding_unobservable", "child_binding_mismatch", "child_model_mismatch", "child_effort_mismatch", "inherited_parent_model", "native_verified"}
     if payload["reason_code"] in child_bound_reasons and payload["child_created"] != "yes":
         raise ReceiptError("child-bound receipt lacks observed child")
-    if payload["status"] == "NATIVE_OK" and (payload["codex_version"] != "0.145.0" or payload["active_config_sha256"] != payload["target_config_sha256"] or payload["active_role_manifest_sha256"] != payload["target_role_manifest_sha256"] or payload["active_policy_sha256"] != payload["target_policy_sha256"]):
+    if payload["status"] == "NATIVE_OK" and (payload["codex_version"] != "0.146.0" or payload["active_config_sha256"] != payload["target_config_sha256"] or payload["active_role_manifest_sha256"] != payload["target_role_manifest_sha256"] or payload["active_policy_sha256"] != payload["target_policy_sha256"]):
         raise ReceiptError("NATIVE_OK receipt has invalid version or hash equality")
     if "role" in payload and (not isinstance(payload["role"], str) or payload["role"] not in ROLES):
         raise ReceiptError("role evidence is invalid")
@@ -764,8 +1004,8 @@ def validate_receipt(payload: dict) -> None:
         if isinstance(value, str) and ("/" in value or "\\" in value or "secret" in value.lower()):
             raise ReceiptError("receipt contains path or secret data")
     if payload["status"] == "NATIVE_OK":
-        needed = {"role", "task_name", "fork_turns", "parent_ref", "child_ref", "model", "reasoning_effort"}
-        if payload["phase"] != "post-spawn" or payload["child_created"] != "yes" or not needed <= set(payload) or payload["role"] not in ROLES or not TASK_NAME_RE.fullmatch(str(payload["task_name"])) or payload["fork_turns"] not in {"none", "1", "2", "3"} or not isinstance(payload["model"], str) or not payload["model"].strip() or not isinstance(payload["reasoning_effort"], str) or not payload["reasoning_effort"].strip():
+        needed = {"role", "parent_ref", "child_ref", "model", "reasoning_effort"}
+        if payload["phase"] != "post-spawn" or payload["child_created"] != "yes" or not needed <= set(payload) or payload["role"] not in ROLES or not isinstance(payload["model"], str) or not payload["model"].strip() or not isinstance(payload["reasoning_effort"], str) or not payload["reasoning_effort"].strip():
             raise ReceiptError("NATIVE_OK receipt lacks core evidence")
 
 
@@ -842,8 +1082,6 @@ def _preflight(args: argparse.Namespace) -> tuple[dict[str, str], dict[str, str]
         return _verdict("FAILED", "smoke_cwd_untrusted", phase="preflight", child_created="no")
     role_path = staged_home / "agents" / f"{args.role}.toml"
     binding = read_role_binding(role_path)
-    if binding.model == args.parent_model:
-        return _verdict("FAILED", "parent_model_not_distinct", phase="preflight", child_created="no")
     return active_hash, target_hash, binding
 
 
@@ -858,15 +1096,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true"); parser.add_argument("--yes", action="store_true")
     parser.add_argument("--role", choices=ROLE_NAMES, default="scout")
+    parser.add_argument("--autoroute", action="store_true")
     parser.add_argument("--codex-bin", default="codex")
     parser.add_argument("--codex-home", type=Path, required=True)
     parser.add_argument("--active-codex-home", type=Path, required=True)
     parser.add_argument("--repository-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--codex-cwd", type=Path, required=True)
-    parser.add_argument("--parent-model", default="gpt-5.6-terra")
+    parser.add_argument("--parent-model", default="gpt-5.6-luna")
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--launch-capture", type=Path)
     args = parser.parse_args(raw)
+    if args.autoroute:
+        args.role = "plan-verifier"
     if not args.live:
         _print(_verdict("SKIPPED", "live_flag_required", phase="preflight", child_created="no")); return 2
     if not args.yes:
@@ -918,27 +1159,35 @@ def main(argv: list[str] | None = None) -> int:
             env = {"CODEX_HOME": str(args.codex_home), "CODEX_SQLITE_HOME": str(args.codex_home), **{k: v for k, v in os.environ.items() if k not in {"CODEX_HOME", "CODEX_SQLITE_HOME"}}}
             if env.get("CODEX_HOME") != str(args.codex_home) or env.get("CODEX_SQLITE_HOME") != str(args.codex_home):
                 verdict = _verdict("FAILED", "environment_propagation_failed", phase="preflight", child_created="no")
-                payload = receipt_payload(verdict, codex_version="0.145.0", active=active_hash, target=target_hash)
+                payload = receipt_payload(verdict, codex_version="0.146.0", active=active_hash, target=target_hash)
                 write_receipt(destination, payload)
                 _print(verdict)
                 return 1
-            command = build_codex_command(codex_bin=args.codex_bin, cwd=args.codex_cwd, parent_model=args.parent_model, role=args.role)
-            before = snapshot_inputs(args.codex_home)
-            completed = subprocess.run(command, capture_output=True, text=True, stdin=subprocess.DEVNULL, env=env, check=False)
-            changed = snapshot_changed(args.codex_home, before)
-            observed, spawn_boundary = inspect_available_evidence(args.codex_home, completed.stdout, binding, args.role)
-            if completed.returncode:
-                if spawn_boundary:
-                    child_state = observed.child_created if observed is not None else "unknown"
-                    verdict = _verdict("FAILED", "codex_exec_failed_after_spawn", phase="post-spawn", child_created=child_state)
-                else:
-                    child_state = observed.child_created if observed is not None else "unknown"
-                    verdict = _verdict("FAILED", "codex_exec_failed", phase="execution-pre-child", child_created=child_state)
+            if args.autoroute:
+                verdict, spawn_boundary = run_autoroute_probe(
+                    codex_bin=args.codex_bin,
+                    codex_home=args.codex_home,
+                    binding=binding,
+                    cwd=args.codex_cwd,
+                )
             else:
-                verdict = observed or _verdict("SKIPPED", "native_spawn_evidence_missing", child_created="unknown")
-            if changed:
-                phase = "post-spawn" if spawn_boundary else "execution-pre-child"
-                verdict = _verdict("FAILED", "snapshot_mutated", phase=phase, child_created=verdict.child_created)
+                command = build_codex_command(codex_bin=args.codex_bin, cwd=args.codex_cwd, parent_model=args.parent_model, role=args.role)
+                before = snapshot_inputs(args.codex_home)
+                completed = subprocess.run(command, capture_output=True, text=True, stdin=subprocess.DEVNULL, env=env, check=False)
+                changed = snapshot_changed(args.codex_home, before)
+                observed, spawn_boundary = inspect_available_evidence(args.codex_home, completed.stdout, binding, args.role)
+                if completed.returncode:
+                    if spawn_boundary:
+                        child_state = observed.child_created if observed is not None else "unknown"
+                        verdict = _verdict("FAILED", "codex_exec_failed_after_spawn", phase="post-spawn", child_created=child_state)
+                    else:
+                        child_state = observed.child_created if observed is not None else "unknown"
+                        verdict = _verdict("FAILED", "codex_exec_failed", phase="execution-pre-child", child_created=child_state)
+                else:
+                    verdict = observed or _verdict("SKIPPED", "native_spawn_evidence_missing", child_created="unknown")
+                if changed:
+                    phase = "post-spawn" if spawn_boundary else "execution-pre-child"
+                    verdict = _verdict("FAILED", "snapshot_mutated", phase=phase, child_created=verdict.child_created)
     version_text = ".".join(map(str, token)) if token else "unknown"
     try:
         payload = receipt_payload(verdict, codex_version=version_text, active=active_hash, target=target_hash)

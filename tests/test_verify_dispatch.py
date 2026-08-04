@@ -16,8 +16,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "install"))
 import stage_smoke_home  # noqa: E402
 import verify_dispatch  # noqa: E402
-from stage_smoke_home import StageError, materialize  # noqa: E402
-from verify_dispatch import RoleBinding, build_codex_command, hash_inputs, inspect_dispatch, receipt_payload, validate_home_pair, validate_receipt, validate_stage_layout  # noqa: E402
+from stage_smoke_home import StageError, materialize, project_config_bytes  # noqa: E402
+from verify_dispatch import (  # noqa: E402
+    AUTO_ROUTE_PROMPT,
+    RoleBinding,
+    build_autoroute_command,
+    build_codex_command,
+    hash_inputs,
+    inspect_autoroute,
+    inspect_dispatch,
+    receipt_payload,
+    validate_home_pair,
+    validate_receipt,
+    validate_stage_layout,
+)
 
 PARENT = "parent-runtime-id"
 CHILD = "child-runtime-id"
@@ -40,11 +52,81 @@ def child_events(model: str = "gpt-5.6-luna", effort: str = "low") -> list[dict]
     return [{"type": "session_meta", "payload": {"id": CHILD, "parent_thread_id": PARENT}}, {"type": "turn_context", "payload": {"model": model, "effort": effort}}]
 
 
+def autoroute_parent_events(
+    *,
+    prompt: str = AUTO_ROUTE_PROMPT,
+    child_id: str = CHILD,
+    call_id: str = CALL,
+) -> list[dict]:
+    return [
+        {"type": "session_meta", "payload": {"id": PARENT}},
+        {
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": prompt}],
+            },
+        },
+        {
+            "type": "response_item",
+            "payload": {
+                "type": "function_call",
+                "name": "spawn_agent",
+                "call_id": call_id,
+                "arguments": json.dumps(
+                    {
+                        "message": "Review the Plan only.",
+                        "agent_type": "plan-verifier",
+                        "task_name": "autoroute_plan_review",
+                        "fork_turns": "none",
+                    }
+                ),
+            },
+        },
+        {
+            "type": "event_msg",
+            "payload": {
+                "type": "sub_agent_activity",
+                "kind": "started",
+                "event_id": call_id,
+                "agent_thread_id": child_id,
+            },
+        },
+    ]
+
+
+def autoroute_child_events(
+    *,
+    child_id: str = CHILD,
+    parent_id: str = PARENT,
+    model: str = "gpt-5.6-sol",
+    effort: str = "high",
+) -> list[dict]:
+    return [
+        {
+            "type": "session_meta",
+            "payload": {
+                "id": child_id,
+                "parent_thread_id": parent_id,
+                "agent_role": "plan-verifier",
+            },
+        },
+        {"type": "turn_context", "payload": {"model": model, "effort": effort}},
+    ]
+
+
 def make_home(path: Path) -> None:
     path.mkdir()
     shutil.copy2(ROOT / "templates" / "config.snippet.toml", path / "config.toml")
     shutil.copytree(ROOT / "templates" / "agents", path / "agents")
     shutil.copy2(ROOT / "templates" / "agents-md.orchestration.md", path / "AGENTS.md")
+    shutil.copy2(ROOT / "templates" / "hooks.json", path / "hooks.json")
+    (path / "hooks").mkdir()
+    shutil.copy2(
+        ROOT / "hooks" / "pilotfish_autoroute_gate.py",
+        path / "hooks" / "pilotfish_autoroute_gate.py",
+    )
 
 
 REAL_PUBLISH_NO_REPLACE = stage_smoke_home.publish_no_replace
@@ -96,6 +178,24 @@ class NativeEvidenceTests(unittest.TestCase):
         self.assertEqual(len(verdict.parent_ref or ""), 16)
         self.assertNotEqual(verdict.parent_ref, PARENT)
 
+    def test_undocumented_multi_agent_marker_is_optional(self) -> None:
+        events = parent_events()
+        events[1]["payload"].pop("multi_agent_version")
+        verdict = inspect_dispatch(events, child_events(), expected_role=self.binding)
+        self.assertEqual((verdict.status, verdict.reason_code), ("NATIVE_OK", "native_verified"))
+
+    def test_explicit_child_binding_may_match_parent_binding(self) -> None:
+        events = parent_events()
+        events[1]["payload"].update({"model": "gpt-5.6-luna", "effort": "medium"})
+
+        verdict = inspect_dispatch(
+            events,
+            child_events(model="gpt-5.6-luna", effort="medium"),
+            expected_role=RoleBinding("gpt-5.6-luna", "medium"),
+        )
+
+        self.assertEqual((verdict.status, verdict.reason_code), ("NATIVE_OK", "native_verified"))
+
     def test_service_tier_wins_over_missing_correlation(self) -> None:
         args = {"message": "ready", "agent_type": "scout", "task_name": "model_probe_scout", "fork_turns": "none", "service_tier": "fast"}
         events = parent_events(args)
@@ -141,10 +241,101 @@ class NativeEvidenceTests(unittest.TestCase):
         self.assertEqual(inspect_dispatch(parent_events(), [], expected_role=self.binding).reason_code, "child_evidence_missing")
         self.assertEqual(inspect_dispatch(parent_events(), child_events(model="wrong"), expected_role=self.binding).reason_code, "child_model_mismatch")
         self.assertEqual(inspect_dispatch(parent_events(), child_events(effort="medium"), expected_role=self.binding).reason_code, "child_effort_mismatch")
-        self.assertEqual(inspect_dispatch(parent_events(version="v1"), child_events(), expected_role=self.binding).reason_code, "native_v2_selection_mismatch")
+        self.assertEqual(
+            inspect_dispatch(parent_events(version="v1"), child_events(), expected_role=self.binding).status,
+            "NATIVE_OK",
+        )
+
+
+class AutomaticPlanReviewEvidenceTests(unittest.TestCase):
+    binding = RoleBinding("gpt-5.6-sol", "high")
+
+    def test_autoroute_command_contains_no_dispatch_directive_or_parent_override(self) -> None:
+        command = build_autoroute_command(codex_bin="codex", cwd=Path("/tmp/clean-smoke"))
+
+        self.assertIn("--strict-config", command)
+        self.assertIn("--skip-git-repo-check", command)
+        self.assertIn("--dangerously-bypass-hook-trust", command)
+        self.assertEqual(command[command.index("-s") + 1], "read-only")
+        self.assertNotIn("-m", command)
+        self.assertNotIn("-c", command)
+        prompt = command[-1].casefold()
+        self.assertEqual(command[-1], AUTO_ROUTE_PROMPT)
+        self.assertTrue(all(token not in prompt for token in ("spawn", "delegate", "subagent")))
+
+    def test_linked_plan_verifier_sol_high_child_is_native_ok(self) -> None:
+        verdict = inspect_autoroute(
+            autoroute_parent_events(),
+            {CHILD: autoroute_child_events()},
+            expected_role=self.binding,
+        )
+
+        self.assertEqual(
+            (verdict.status, verdict.reason_code, verdict.role, verdict.model, verdict.reasoning_effort),
+            ("NATIVE_OK", "native_verified", "plan-verifier", "gpt-5.6-sol", "high"),
+        )
+
+    def test_missing_plan_verifier_fails_closed(self) -> None:
+        parent = autoroute_parent_events()
+        parent.pop(2)
+        parent.pop(2)
+
+        verdict = inspect_autoroute(parent, {}, expected_role=self.binding)
+
+        self.assertEqual((verdict.status, verdict.reason_code), ("FAILED", "autoroute_plan_verifier_missing"))
+
+    def test_metadata_linked_child_is_native_ok_when_v1_omits_parent_tool_event(self) -> None:
+        parent = autoroute_parent_events()
+        parent.pop(2)
+        parent.pop(2)
+
+        verdict = inspect_autoroute(
+            parent,
+            {CHILD: autoroute_child_events()},
+            expected_role=self.binding,
+        )
+
+        self.assertEqual(
+            (verdict.status, verdict.reason_code, verdict.task_name, verdict.fork_turns),
+            ("NATIVE_OK", "native_verified", None, None),
+        )
+
+    def test_unlinked_matching_sol_child_cannot_satisfy_autoroute(self) -> None:
+        verdict = inspect_autoroute(
+            autoroute_parent_events(child_id="linked-child"),
+            {"unrelated-child": autoroute_child_events(child_id="unrelated-child")},
+            expected_role=self.binding,
+        )
+
+        self.assertEqual((verdict.status, verdict.reason_code), ("SKIPPED", "child_evidence_missing"))
+
+    def test_prompt_with_dispatch_instruction_is_rejected(self) -> None:
+        verdict = inspect_autoroute(
+            autoroute_parent_events(prompt="Delegate this Plan before you answer."),
+            {CHILD: autoroute_child_events()},
+            expected_role=self.binding,
+        )
+
+        self.assertEqual((verdict.status, verdict.reason_code), ("FAILED", "autoroute_prompt_directive_detected"))
+
+    def test_wrong_linked_child_binding_fails(self) -> None:
+        verdict = inspect_autoroute(
+            autoroute_parent_events(),
+            {CHILD: autoroute_child_events(model="gpt-5.6-luna", effort="medium")},
+            expected_role=self.binding,
+        )
+
+        self.assertEqual((verdict.status, verdict.reason_code), ("FAILED", "child_model_mismatch"))
 
 
 class NativeHomeAndReceiptTests(unittest.TestCase):
+    def test_smoke_projection_requires_the_installed_luna_root_binding(self) -> None:
+        source = (ROOT / "templates" / "config.snippet.toml").read_bytes()
+
+        self.assertEqual(project_config_bytes(source), stage_smoke_home.SMOKE_CONFIG)
+        with self.assertRaisesRegex(StageError, "Luna routing config"):
+            project_config_bytes(source.replace(b'gpt-5.6-luna', b'gpt-5.6-sol'))
+
     def test_home_pair_rejects_alias_and_nesting(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); active = root / "active"; staged = root / "staged"
@@ -162,7 +353,8 @@ class NativeHomeAndReceiptTests(unittest.TestCase):
             (home / "untrusted.txt").write_text("x")
             self.assertEqual(validate_stage_layout(home), "stage_layout_untrusted")
             (home / "untrusted.txt").unlink()
-            (home / "config.toml").write_text('[mcp_servers.x]\ncommand = "/bin/evil"\n')
+            with (home / "config.toml").open("a", encoding="utf-8") as config:
+                config.write('\n[mcp_servers.x]\ncommand = "/bin/evil"\n')
             self.assertEqual(validate_stage_layout(home), "external_input_unowned")
 
     def test_active_config_projection_rejects_any_role_declaration(self) -> None:
@@ -177,7 +369,7 @@ class NativeHomeAndReceiptTests(unittest.TestCase):
                 validate_stage_layout(active, active_home=True),
                 "role_layer_unapproved",
             )
-            with self.assertRaisesRegex(StageError, "required native V2"):
+            with self.assertRaisesRegex(StageError, "native agents table must contain exactly"):
                 materialize(active, root / "staged")
             self.assertFalse((root / "staged").exists())
 
@@ -218,7 +410,7 @@ class NativeHomeAndReceiptTests(unittest.TestCase):
     def test_receipt_keys_hashes_and_matrix_are_strict(self) -> None:
         verdict = inspect_dispatch(parent_events(), child_events(), expected_role=RoleBinding("gpt-5.6-luna", "low"))
         hashes = {"config": "a" * 64, "role_manifest": "b" * 64, "policy": "c" * 64}
-        payload = receipt_payload(verdict, codex_version="0.145.0", active=hashes, target=hashes)
+        payload = receipt_payload(verdict, codex_version="0.146.0", active=hashes, target=hashes)
         validate_receipt(payload)
         self.assertTrue(set(payload) <= verify_dispatch.RECEIPT_KEYS)
         payload["raw_id"] = PARENT
@@ -228,8 +420,8 @@ class NativeHomeAndReceiptTests(unittest.TestCase):
     def test_receipt_rejects_impossible_execution_and_native_success_cells(self) -> None:
         hashes = {"config": "a" * 64, "role_manifest": "b" * 64, "policy": "c" * 64}
         with self.assertRaises(Exception):
-            receipt_payload(verify_dispatch._verdict("FAILED", "codex_exec_failed", phase="execution-pre-child", child_created="yes"), codex_version="0.145.0", active=hashes, target=hashes)
-        success = receipt_payload(inspect_dispatch(parent_events(), child_events(), expected_role=RoleBinding("gpt-5.6-luna", "low")), codex_version="0.145.0", active=hashes, target=hashes)
+            receipt_payload(verify_dispatch._verdict("FAILED", "codex_exec_failed", phase="execution-pre-child", child_created="yes"), codex_version="0.146.0", active=hashes, target=hashes)
+        success = receipt_payload(inspect_dispatch(parent_events(), child_events(), expected_role=RoleBinding("gpt-5.6-luna", "low")), codex_version="0.146.0", active=hashes, target=hashes)
         success["target_policy_sha256"] = "d" * 64
         with self.assertRaises(Exception):
             validate_receipt(success)
@@ -414,7 +606,7 @@ class StageSmokeHomeTests(unittest.TestCase):
             self.assertEqual(active_hashes, hash_inputs(staged))
             self.assertEqual(
                 {path.name for path in staged.iterdir()},
-                {"config.toml", "agents", "AGENTS.md"},
+                {"config.toml", "agents", "AGENTS.md", "hooks.json", "hooks"},
             )
             staged_bytes = b"".join(
                 path.read_bytes()
@@ -493,7 +685,7 @@ class StageSmokeHomeTests(unittest.TestCase):
 
             self.assertEqual(
                 {path.name for path in staged.iterdir()},
-                {"config.toml", "agents", "AGENTS.md", "auth.json"},
+                {"config.toml", "agents", "AGENTS.md", "hooks.json", "hooks", "auth.json"},
             )
             self.assertTrue(ignored_names.isdisjoint(path.name for path in staged.iterdir()))
             self.assertEqual(hash_inputs(active), hash_inputs(staged))
@@ -526,6 +718,8 @@ class StageSmokeHomeTests(unittest.TestCase):
             Path("config.toml"),
             Path("AGENTS.md"),
             Path("agents/scout.toml"),
+            Path("hooks.json"),
+            Path("hooks/pilotfish_autoroute_gate.py"),
             Path("auth.json"),
         )
         replacements = (
@@ -562,6 +756,8 @@ class StageSmokeHomeTests(unittest.TestCase):
             Path("config.toml"),
             Path("AGENTS.md"),
             Path("agents/scout.toml"),
+            Path("hooks.json"),
+            Path("hooks/pilotfish_autoroute_gate.py"),
             Path("auth.json"),
         )
         for relative in relative_inputs:
@@ -591,6 +787,8 @@ class StageSmokeHomeTests(unittest.TestCase):
             Path("config.toml"),
             Path("AGENTS.md"),
             Path("agents/scout.toml"),
+            Path("hooks.json"),
+            Path("hooks/pilotfish_autoroute_gate.py"),
             Path("auth.json"),
         )
         for relative in relative_inputs:
@@ -722,7 +920,10 @@ class StageSmokeHomeTests(unittest.TestCase):
             result = materialize(active, staged)
             self.assertEqual(result, staged.resolve())
             self.assertTrue((staged / "auth.json").exists())
-            self.assertEqual({p.name for p in staged.iterdir()}, {"config.toml", "agents", "AGENTS.md", "auth.json"})
+            self.assertEqual(
+                {p.name for p in staged.iterdir()},
+                {"config.toml", "agents", "AGENTS.md", "hooks.json", "hooks", "auth.json"},
+            )
             self.assertEqual({path.name for path in (staged / "agents").iterdir()}, {f"{role}.toml" for role in verify_dispatch.ROLES})
             self.assertIsNone(validate_stage_layout(staged))
 

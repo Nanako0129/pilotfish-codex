@@ -1,10 +1,10 @@
 # SPEC — Codex native Multi-Agent V2 migration
 
 - Slug: `codex-native-multi-agent-migration`
-- Status: Implementation complete; live gate pending
+- Status: Superseded by `model-routing-tuning` Codex 0.146 migration
 - Owner: Miyago
 - Created: 2026-07-22
-- Updated: 2026-07-23
+- Updated: 2026-08-04
 - Related specs: `subagent-issue`, `dispatch-verification`,
   `subagent-service-tier-guard`
 - Upstream: [Codex `rust-v0.145.0` release](
@@ -14,12 +14,11 @@
 
 ## Outcome
 
-Pilotfish shall target the pinned Codex `rust-v0.145.0` release with native
-typed named-role Multi-Agent V2. The migration removes the pre-stable transport
-workarounds while retaining role routing, delegation policy, redaction, and
-fresh-context verification. Later releases are outside this spec; a future
-version requires a separate revalidation decision and an updated version pin
-before the same evidence contract can be applied.
+This is historical v0.145 evidence only. The active configuration contract is
+the user-approved Codex 0.146 migration in
+[`model-routing-tuning`](../model-routing-tuning/SPEC.md). It retains role
+routing, delegation policy, redaction, and fresh-context verification while
+replacing the V2 feature table with the documented `[agents]` contract.
 
 The native target has one authoritative configuration shape:
 

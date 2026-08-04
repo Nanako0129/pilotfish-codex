@@ -60,6 +60,15 @@ and a bounded fail-soft bug alone do not trigger it. Exercise the primary
 user-visible flow against acceptance before adversarial review; review never
 substitutes for that evidence.
 
+For a triggered material pre-approval Plan, this is a mandatory tool-use gate:
+the main session must call `plan-verifier` before sending any readiness
+recommendation. When security evidence applies, call `security-reviewer`
+first, carry its findings into the Plan, then call `plan-verifier`. Do not
+return `READY` or `REVISE` from the main session first, even if the Plan looks
+obviously incomplete or the user did not name an agent. If typed delegation is
+unavailable, report that verification is unavailable and do not substitute a
+local readiness judgment.
+
 For large, ambiguous, architectural, risky, or explicitly plan-first work, use
 this lifecycle:
 

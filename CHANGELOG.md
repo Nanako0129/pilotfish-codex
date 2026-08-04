@@ -5,6 +5,13 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
+## Unreleased
+
+- Retire Terra from the active role bindings. Luna now owns Plan-mode and
+  outcome reasoning at `xhigh`.
+- Route the existing risk-triggered Plan-review role to Sol `high`; its timing,
+  two-`REVISE` budget, and security boundary are unchanged.
+
 ## v1.3.3 — 2026-08-03
 
 - Route the main session through Luna at `medium`, escalate Plan mode to Luna

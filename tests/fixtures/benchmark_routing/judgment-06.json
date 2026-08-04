@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"judgment-06","task":"rollback_decision","input":{"deploy":{"health":"degraded","error_rate":0.12},"rollback_threshold":0.05,"migration_reversible":true},"expected_artifact":{"action":"rollback","reason":"error rate exceeds threshold"}}

@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"judgment-01","task":"risk_rank","input":[{"name":"api","impact":5,"likelihood":2},{"name":"docs","impact":1,"likelihood":5}],"expected_artifact":{"highest":"api","score":10}}

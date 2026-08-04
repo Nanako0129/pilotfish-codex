@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the one native Codex rust-v0.145.0 Pilotfish target.
+"""Install the one native Codex rust-v0.146.0 Pilotfish target.
 
 This route refuses unsupported versions and ambiguous ownership.  It never
 selects the retired adapter route.  Existing user bytes are preserved unless a
@@ -24,12 +24,13 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from validate_agents import ROLES, validate_agent, validate_dir, validate_multi_agent_v2_config
+from validate_agents import ROLES, validate_agent, validate_agents_config
 
-PINNED_CODEX_VERSION = (0, 145, 0)
+PINNED_CODEX_VERSION = (0, 146, 0)
 MARKER_BEGIN = "<!-- pilotfish-codex:begin -->"
 MARKER_END = "<!-- pilotfish-codex:end -->"
-NATIVE_TABLE = ("[features.multi_agent_v2]", "enabled = true", "max_concurrent_threads_per_session = 4")
+NATIVE_TABLE = ("[agents]", "enabled = true", "max_concurrent_threads_per_session = 3")
+OLD_V2_KEYS = frozenset({"enabled", "max_concurrent_threads_per_session"})
 LEGACY_PATHS = frozenset({
     "features.multi_agent", "features.multi_agent_v2.tool_namespace",
     "features.multi_agent_v2.hide_spawn_agent_metadata", "agents.max_threads",
@@ -39,6 +40,7 @@ CANONICAL_ROLE_UPGRADE_DIGESTS = {
     "plan-verifier": frozenset({
         "c552938705065c826da9a3cbaf09c2fbbaa9fde4adb1f691a59b694d8468f541",
         "e29dff16ee22d8dcf60f214c7226eba52e9c1d5fca475d47ca750c8850a32852",
+        "5cfd8630f9807a45eb18bfd587ab12dc41e8c06de82872ec6aa87f2c3e4c8fe0",
     }),
     "security-reviewer": frozenset({
         "94d7de12d1cb197c98e83c2f78d402cf3fb393e860feee1e146f5b6294075d27",
@@ -48,6 +50,7 @@ CANONICAL_ROLE_UPGRADE_DIGESTS = {
     }),
     "verifier": frozenset({
         "9478638b7456b6e4120ecd5a59408431d886c87ae1a7391aade61bc84d722e2e",
+        "07e9864edc5734644557bff9c26a41476a30620779980658954e07ff865c9cb8",
     }),
 }
 
@@ -109,13 +112,30 @@ def _remove_table_key(lines: list[str], table: str, key: str) -> list[str]:
     return [line for i, line in enumerate(lines) if not (start < i < end and pattern.match(line))]
 
 
+def _remove_table(lines: list[str], table: str) -> list[str]:
+    span = _table_span(lines, table)
+    if span is None:
+        return lines
+    start, end = span
+    result = lines[:start] + lines[end:]
+    while start > 0 and start <= len(result) and not result[start - 1].strip():
+        result.pop(start - 1)
+        start -= 1
+    return result
+
+
 def _inline_or_dotted_v2(text: str) -> bool:
     """Reject only forms whose rewrite would collide with a table header."""
     return bool(re.search(r"^\s*features\.multi_agent_v2\s*=|^\s*multi_agent_v2\s*=\s*\{", text, re.M))
 
 
-def merge_config_text(text: str, *, owned_legacy: frozenset[str] = frozenset()) -> tuple[str, list[str]]:
-    """Make the native V2 table while preserving unowned legacy settings."""
+def merge_config_text(
+    text: str,
+    *,
+    owned_legacy: frozenset[str] = frozenset(),
+    migration_proven: bool = False,
+) -> tuple[str, list[str]]:
+    """Render the native ``[agents]`` table while preserving user config."""
     try:
         config = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
@@ -126,19 +146,37 @@ def merge_config_text(text: str, *, owned_legacy: frozenset[str] = frozenset()) 
     agents = config.get("agents", {})
     if not isinstance(agents, dict):
         raise InstallAbort("agents must be a TOML table")
+    expected_agent_keys = {"enabled", "max_concurrent_threads_per_session"}
+    unknown_agent_keys = set(agents) - expected_agent_keys
+    if unknown_agent_keys:
+        raise InstallAbort(
+            "agents table has unsupported key(s): "
+            + ", ".join(sorted(unknown_agent_keys))
+        )
     v2 = features.get("multi_agent_v2")
-    if v2 is not None and not isinstance(v2, (dict, bool)):
-        raise InstallAbort("features.multi_agent_v2 must be a boolean or table")
+    if v2 is not None and not isinstance(v2, dict):
+        raise InstallAbort("legacy features.multi_agent_v2 must be an exact table")
     if _inline_or_dotted_v2(text):
         raise InstallAbort("features.multi_agent_v2 uses inline or dotted TOML syntax that cannot be safely rewritten")
-    if v2 is False or (isinstance(v2, dict) and v2.get("enabled") is False):
-        raise InstallAbort("features.multi_agent_v2 is explicitly disabled")
-    concurrency = v2.get("max_concurrent_threads_per_session") if isinstance(v2, dict) else None
-    if concurrency is not None and (type(concurrency) is not int or not 1 <= concurrency <= 8):
-        raise InstallAbort("native V2 concurrency must be an integer from 1 to 8")
+    migrating_v2 = v2 is not None
+    if isinstance(v2, dict):
+        if set(v2) != OLD_V2_KEYS:
+            raise InstallAbort("legacy V2 table has extra or unowned entries")
+        if v2.get("enabled") is not True:
+            raise InstallAbort("legacy features.multi_agent_v2 is explicitly disabled")
+        if type(v2.get("max_concurrent_threads_per_session")) is not int or v2["max_concurrent_threads_per_session"] != 4:
+            raise InstallAbort("legacy V2 concurrency must be exactly 4")
+        if not migration_proven:
+            raise InstallAbort("legacy V2 migration requires committed installer provenance")
+    if agents.get("enabled") is not None and agents.get("enabled") is not True:
+        raise InstallAbort("agents.enabled conflicts with native migration")
     fallback = agents.get("max_concurrent_threads_per_session")
     if fallback is not None and (type(fallback) is not int or fallback != 3):
-        raise InstallAbort("agents.max_concurrent_threads_per_session conflicts with native V2 total 4")
+        raise InstallAbort("agents.max_concurrent_threads_per_session conflicts with native child concurrency 3")
+    if "max_threads" in agents:
+        raise InstallAbort("legacy agents.max_threads is unowned")
+    if features.get("multi_agent") is True and "features.multi_agent" not in owned_legacy:
+        raise InstallAbort("legacy_key_unowned: features.multi_agent")
 
     lines = text.splitlines(keepends=True)
     nl = _newline(text)
@@ -154,25 +192,15 @@ def merge_config_text(text: str, *, owned_legacy: frozenset[str] = frozenset()) 
         index = next((i for i, line in enumerate(lines) if line.lstrip().startswith("[")), len(lines))
         lines[index:index] = [f"{line}{nl}" for line, _ in missing_root_defaults]
         notes.extend(note for _, note in missing_root_defaults)
-    if isinstance(v2, bool):
-        # Scalar true must be removed before the explicit table can exist.
-        lines = [line for line in lines if not re.match(r"^\s*(?:features\.)?multi_agent_v2\s*=", line)]
-        notes.append("converted scalar multi_agent_v2 to native table")
-    lines = _set_table_key(lines, "features.multi_agent_v2", "enabled", "true", nl)
-    lines = _set_table_key(lines, "features.multi_agent_v2", "max_concurrent_threads_per_session", "4", nl)
-    notes.append("normalized native V2 total concurrency to 4")
-    for table, key, path in (
-        ("features", "multi_agent", "features.multi_agent"),
-        ("features.multi_agent_v2", "tool_namespace", "features.multi_agent_v2.tool_namespace"),
-        ("features.multi_agent_v2", "hide_spawn_agent_metadata", "features.multi_agent_v2.hide_spawn_agent_metadata"),
-        ("agents", "max_threads", "agents.max_threads"),
-        ("agents", "max_concurrent_threads_per_session", "agents.max_concurrent_threads_per_session"),
-    ):
-        if path in owned_legacy:
-            lines = _remove_table_key(lines, table, key)
-            notes.append(f"removed owned legacy key {path}")
-        elif (table == "features" and key in features) or (table == "agents" and key in agents) or (isinstance(v2, dict) and table.endswith("v2") and key in v2):
-            notes.append(f"legacy_key_unowned: preserved {path}")
+    if migrating_v2:
+        lines = _remove_table(lines, "features.multi_agent_v2")
+        notes.append("migrated exact legacy V2 table to native agents table")
+    if "features.multi_agent" in owned_legacy:
+        lines = _remove_table_key(lines, "features", "multi_agent")
+        notes.append("removed owned legacy key features.multi_agent")
+    lines = _set_table_key(lines, "agents", "enabled", "true", nl)
+    lines = _set_table_key(lines, "agents", "max_concurrent_threads_per_session", "3", nl)
+    notes.append("normalized native agents child concurrency to 3")
     result = "".join(lines)
     try:
         tomllib.loads(result)
@@ -231,43 +259,169 @@ def _load_state(home: Path) -> dict | None:
     return state
 
 
-def _owned_legacy_from_state(state: dict | None, config_text: str, home: Path) -> frozenset[str]:
-    """Trust cleanup ownership only after every committed target still matches."""
-    if not state:
-        return frozenset()
+def _required_state_targets(
+    policy_path: Path,
+    home: Path,
+    *,
+    include_hooks: bool = True,
+) -> frozenset[str]:
+    policy_relative = policy_path.relative_to(home).as_posix()
+    targets = {
+        "config.toml",
+        *(f"agents/{role}.toml" for role in ROLES),
+        policy_relative,
+    }
+    if include_hooks:
+        targets.update({"hooks.json", "hooks/pilotfish_autoroute_gate.py"})
+    return frozenset(targets)
+
+
+def _config_value(config: dict, dotted: str) -> tuple[bool, object | None]:
+    current: object = config
+    for segment in dotted.split("."):
+        if not isinstance(current, dict) or segment not in current:
+            return False, None
+        current = current[segment]
+    return True, current
+
+
+def _routing_projection(config: dict, owned_legacy: frozenset[str]) -> dict[str, object]:
+    """Return only config state whose ownership belongs to Pilotfish."""
+    return {
+        "model": _config_value(config, "model"),
+        "model_reasoning_effort": _config_value(config, "model_reasoning_effort"),
+        "plan_mode_reasoning_effort": _config_value(config, "plan_mode_reasoning_effort"),
+        "agents": _config_value(config, "agents"),
+        "legacy_v2": _config_value(config, "features.multi_agent_v2"),
+        "owned_legacy": tuple(
+            (path, _config_value(config, path)) for path in sorted(owned_legacy)
+        ),
+    }
+
+
+def _decode_config(payload: bytes, *, source: str) -> tuple[str, dict]:
+    try:
+        text = payload.decode("utf-8")
+        parsed = tomllib.loads(text)
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise InstallAbort(f"{source} config.toml is invalid: {exc}") from exc
+    return text, parsed
+
+
+def _validate_committed_state(
+    state: dict,
+    *,
+    home: Path,
+    policy_path: Path,
+    config_snapshot: bytes | None,
+) -> tuple[frozenset[str], bool]:
+    """Validate sidecar provenance and return ownership plus migration proof."""
+    if not isinstance(state, dict) or state.get("status") != "committed":
+        raise InstallAbort("install state is not a committed transaction")
+    allowed_top = {"status", "target_fingerprints", "original_targets", "owned_legacy"}
+    if set(state) != allowed_top:
+        raise InstallAbort("install state has missing or unknown fields")
     targets = state.get("target_fingerprints")
     originals = state.get("original_targets")
-    required_targets = {"config.toml", *(f"agents/{role}.toml" for role in ROLES)}
-    if not isinstance(targets, dict) or not isinstance(originals, dict) or not required_targets <= set(targets) or set(targets) != set(originals):
-        return frozenset()
-    for relative, fingerprint in targets.items():
-        original = originals.get(relative)
-        if not isinstance(relative, str) or not isinstance(fingerprint, str) or not isinstance(original, dict) or not {"present", "sha256", "bytes_b64"} <= set(original):
-            return frozenset()
+    if not isinstance(targets, dict) or not isinstance(originals, dict):
+        raise InstallAbort("install state target evidence is malformed")
+    required = _required_state_targets(policy_path, home)
+    legacy = _required_state_targets(policy_path, home, include_hooks=False)
+    recorded = frozenset(targets)
+    if recorded not in {required, legacy} or set(originals) != recorded:
+        raise InstallAbort("install state target manifest is stale or incomplete")
+    config_path = home / "config.toml"
+    config_on_disk = config_path.read_bytes() if config_path.is_file() else None
+    if config_on_disk != config_snapshot:
+        raise InstallAbort("config.toml changed during state validation")
+    sha_re = re.compile(r"^[0-9a-f]{64}$")
+    original_payloads: dict[str, bytes | None] = {}
+    for relative in sorted(recorded):
+        fingerprint = targets.get(relative)
+        evidence = originals.get(relative)
+        if not isinstance(fingerprint, str) or not sha_re.fullmatch(fingerprint):
+            raise InstallAbort("install state target fingerprint is malformed")
+        if not isinstance(evidence, dict) or set(evidence) != {"present", "sha256", "bytes_b64"}:
+            raise InstallAbort("install state original evidence is malformed")
+        present, digest, encoded = evidence["present"], evidence["sha256"], evidence["bytes_b64"]
+        if not isinstance(present, bool):
+            raise InstallAbort("install state original presence is malformed")
+        if present:
+            if not isinstance(digest, str) or not sha_re.fullmatch(digest) or not isinstance(encoded, str):
+                raise InstallAbort("install state original bytes are malformed")
+            try:
+                original = base64.b64decode(encoded, validate=True)
+            except (ValueError, TypeError):
+                raise InstallAbort("install state original bytes are malformed")
+            if _sha256_bytes(original) != digest:
+                raise InstallAbort("install state original bytes fingerprint mismatch")
+            original_payloads[relative] = original
+        elif digest is not None or encoded is not None:
+            raise InstallAbort("install state absent-original evidence is malformed")
+        else:
+            original_payloads[relative] = None
         target = home / relative
+        if relative == "config.toml":
+            continue
         if not target.is_file() or _sha256_bytes(target.read_bytes()) != fingerprint:
             raise InstallAbort("committed install state is stale; operator resolution required")
-    config_fingerprint = targets.get("config.toml")
-    if config_fingerprint != _sha256_bytes(config_text.encode()):
-        return frozenset()
-    paths = state.get("owned_legacy", {})
-    if not isinstance(paths, dict):
+    ownership = state.get("owned_legacy", {})
+    if not isinstance(ownership, dict):
         raise InstallAbort("install state ownership evidence is malformed")
-    trusted: set[str] = set()
-    for path, evidence in paths.items():
+    proven: set[str] = set()
+    for path, evidence in ownership.items():
         if path not in LEGACY_PATHS or not isinstance(evidence, dict):
-            continue
-        present, digest, encoded = (evidence.get("original_present"), evidence.get("original_sha256"), evidence.get("original_bytes_b64"))
-        if not isinstance(present, bool) or not isinstance(digest, str) or not isinstance(encoded, str):
-            continue
+            raise InstallAbort("install state ownership evidence is malformed")
+        if set(evidence) != {"original_present", "original_sha256", "original_bytes_b64"}:
+            raise InstallAbort("install state ownership evidence is malformed")
+        present = evidence["original_present"]
+        digest = evidence["original_sha256"]
+        encoded = evidence["original_bytes_b64"]
+        if not isinstance(present, bool) or not present or not isinstance(digest, str) or not sha_re.fullmatch(digest) or not isinstance(encoded, str):
+            raise InstallAbort("install state ownership evidence is malformed")
         try:
             original = base64.b64decode(encoded, validate=True)
-        except ValueError:
-            continue
-        if not present or _sha256_bytes(original) != digest:
-            continue
-        trusted.add(path)
-    return frozenset(trusted)
+        except (ValueError, TypeError):
+            raise InstallAbort("install state ownership evidence is malformed")
+        if _sha256_bytes(original) != digest:
+            raise InstallAbort("install state ownership fingerprint mismatch")
+        proven.add(path)
+    owned = frozenset(proven)
+    if config_snapshot is None:
+        raise InstallAbort("committed install state is stale; operator resolution required")
+
+    recorded_config_digest = targets["config.toml"]
+    original_config = original_payloads["config.toml"] or b""
+    original_text, original_parsed = _decode_config(
+        original_config, source="install state original"
+    )
+    original_features = original_parsed.get("features", {})
+    migration_proven = (
+        isinstance(original_features, dict)
+        and "multi_agent_v2" in original_features
+    )
+    reconstructed, _ = merge_config_text(
+        original_text,
+        owned_legacy=owned,
+        migration_proven=migration_proven,
+    )
+    if _sha256_bytes(original_config) == recorded_config_digest:
+        expected_config = original_config
+    elif _sha256_bytes(reconstructed.encode()) == recorded_config_digest:
+        expected_config = reconstructed.encode()
+    else:
+        raise InstallAbort("committed config provenance cannot be reconstructed")
+
+    if _sha256_bytes(config_snapshot) != recorded_config_digest:
+        _, expected_parsed = _decode_config(
+            expected_config, source="reconstructed committed"
+        )
+        _, current_parsed = _decode_config(config_snapshot, source="current")
+        if _routing_projection(current_parsed, owned) != _routing_projection(
+            expected_parsed, owned
+        ):
+            raise InstallAbort("committed config routing projection is stale")
+    return owned, migration_proven
 
 
 def _config_path_present(data: dict, dotted: str) -> bool:
@@ -368,6 +522,32 @@ def _destination(path: Path) -> Path:
     return path
 
 
+def _assert_hook_targets(codex_home: Path) -> None:
+    """Reject symlinked or non-regular source-owned hook target paths."""
+    hooks_root = codex_home / "hooks"
+    try:
+        home_real = codex_home.resolve(strict=False)
+        hooks_real = hooks_root.resolve(strict=False)
+        hooks_real.relative_to(home_real)
+    except (OSError, ValueError) as exc:
+        raise InstallAbort("hooks root escapes Codex home") from exc
+    if hooks_root.exists() or hooks_root.is_symlink():
+        if hooks_root.is_symlink() or not hooks_root.is_dir():
+            raise InstallAbort("hooks root must be a non-symlink directory")
+    for path in (
+        codex_home / "hooks.json",
+        hooks_root / "pilotfish_autoroute_gate.py",
+    ):
+        if not path.exists() and not path.is_symlink():
+            continue
+        try:
+            info = path.lstat()
+        except OSError as exc:
+            raise InstallAbort("hook target is unavailable") from exc
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode):
+            raise InstallAbort("hook target must be a regular non-symlink file")
+
+
 def _stamp() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S-%f")
 
@@ -388,19 +568,26 @@ def _atomic_write(path: Path, payload: bytes, mode: int) -> None:
 
 
 def _commit(writes: list[tuple[Path, bytes, int, bytes | None]], stamp: str,
-            *, agents_root: Path, codex_home: Path, policy_path: Path) -> None:
+            *, agents_root: Path, hooks_root: Path, codex_home: Path,
+            policy_path: Path) -> None:
     _assert_active_instruction_file(codex_home, policy_path)
-    staged: list[tuple[Path, Path, bytes | None, bool]] = []
+    _assert_hook_targets(codex_home)
+    staged: list[tuple[Path, Path, bytes | None, bool, bool]] = []
     expected_post = {_destination(path): payload for path, payload, _, _ in writes}
     agents_root.mkdir(parents=True, exist_ok=True)
     _assert_agents_root(agents_root, codex_home)
+    hooks_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    _assert_hook_targets(codex_home)
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     agents_fd = os.open(agents_root, flags)
     try:
         for path, payload, mode, original in writes:
             is_role = path.parent == agents_root
+            is_hook = path == codex_home / "hooks.json" or path.parent == hooks_root
             if is_role:
                 _assert_agents_root(agents_root, codex_home)
+            if is_hook:
+                _assert_hook_targets(codex_home)
             dest = _destination(path)
             dest.parent.mkdir(parents=True, exist_ok=True)
             temp_dir = codex_home if is_role else dest.parent
@@ -409,22 +596,24 @@ def _commit(writes: list[tuple[Path, bytes, int, bytes | None]], stamp: str,
             with os.fdopen(fd, "wb") as handle:
                 handle.write(payload); handle.flush(); os.fsync(handle.fileno())
             os.chmod(temp, stat.S_IMODE(dest.stat().st_mode) if dest.is_file() else mode)
-            staged.append((dest, temp, original, is_role))
-        for dest, _, original, _ in staged:
+            staged.append((dest, temp, original, is_role, is_hook))
+        for dest, _, original, _, _ in staged:
             actual = dest.read_bytes() if dest.is_file() else None
             if actual != original:
                 raise InstallAbort(f"{dest} changed while install was planned")
         _assert_active_instruction_file(codex_home, policy_path)
-        for dest, _, original, _ in staged:
+        for dest, _, original, _, _ in staged:
             if original is not None:
                 shutil.copy2(dest, dest.with_name(f"{dest.name}.pilotfish-codex-{stamp}"))
         applied: list[tuple[Path, bytes | None]] = []
         try:
-            for dest, temp, original, is_role in staged:
+            for dest, temp, original, is_role, is_hook in staged:
                 if is_role:
                     _assert_agents_root(agents_root, codex_home)
                     os.replace(temp, dest.name, dst_dir_fd=agents_fd)
                 else:
+                    if is_hook:
+                        _assert_hook_targets(codex_home)
                     os.replace(temp, dest)
                 applied.append((dest, original))
             for destination, expected in expected_post.items():
@@ -438,7 +627,7 @@ def _commit(writes: list[tuple[Path, bytes, int, bytes | None]], stamp: str,
             raise
     finally:
         os.close(agents_fd)
-        for _, temp, _, _ in staged:
+        for _, temp, _, _, _ in staged:
             temp.unlink(missing_ok=True)
 
 
@@ -453,18 +642,40 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
             print("error: version_parse_failed", file=sys.stderr); return 2
         if version != PINNED_CODEX_VERSION:
             print("error: version_not_pinned", file=sys.stderr); return 2
-    state = _load_state(codex_home)
     config_path = codex_home / "config.toml"
-    config_text = config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
-    owned = _owned_legacy_from_state(state, config_text, codex_home) | _backup_owned_legacy(codex_home, config_text)
-    new_config, notes = merge_config_text(config_text, owned_legacy=owned)
+    config_snapshot = config_path.read_bytes() if config_path.is_file() else None
+    config_text, parsed_config = _decode_config(
+        config_snapshot or b"", source="existing"
+    )
     policy_template = (source_root / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
     policy_path = active_instruction_file(codex_home)
     policy_text = policy_path.read_text(encoding="utf-8") if policy_path.is_file() else ""
+    state = _load_state(codex_home)
+    owned = frozenset()
+    migration_proven = False
+    features = parsed_config.get("features", {}) if isinstance(parsed_config, dict) else {}
+    legacy_v2 = isinstance(features, dict) and "multi_agent_v2" in features
+    if state is not None:
+        owned, migration_proven = _validate_committed_state(
+            state,
+            home=codex_home,
+            policy_path=policy_path,
+            config_snapshot=config_snapshot,
+        )
+    elif legacy_v2:
+        # Let the config validator classify malformed/disabled/extra legacy
+        # forms before reporting the missing provenance gate.
+        merge_config_text(config_text, migration_proven=False)
+        raise InstallAbort("legacy V2 migration requires a committed install state")
+    new_config, notes = merge_config_text(
+        config_text,
+        owned_legacy=owned,
+        migration_proven=migration_proven,
+    )
     new_policy, policy_action = merge_instruction_text(policy_text, policy_template)
     writes: list[tuple[Path, bytes, int, bytes | None]] = []
     if new_config != config_text:
-        writes.append((config_path, new_config.encode(), 0o600, config_text.encode() if config_path.is_file() else None))
+        writes.append((config_path, new_config.encode(), 0o600, config_snapshot))
     agents = codex_home / "agents"
     _assert_agents_root(agents, codex_home)
     existing = list(agents.rglob("*.toml")) if agents.is_dir() else []
@@ -483,18 +694,58 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
             writes.append((target, payload, 0o600, None))
     if new_policy != policy_text:
         writes.append((policy_path, new_policy.encode(), 0o644, policy_text.encode() if policy_path.is_file() else None))
+    hooks_registration = codex_home / "hooks.json"
+    hooks_root = codex_home / "hooks"
+    hook_script = hooks_root / "pilotfish_autoroute_gate.py"
+    _assert_hook_targets(codex_home)
+    hook_sources = (
+        (hooks_registration, source_root / "templates" / "hooks.json"),
+        (hook_script, source_root / "hooks" / "pilotfish_autoroute_gate.py"),
+    )
+    for target, source in hook_sources:
+        payload = source.read_bytes()
+        current = target.read_bytes() if target.is_file() else None
+        if current is not None and current != payload:
+            if target == hooks_registration:
+                raise InstallAbort("unowned hooks.json collision; refusing replacement")
+            raise InstallAbort("installed_hook_drift: hook script requires explicit replacement approval")
+        if current is None:
+            writes.append((target, payload, 0o600, None))
     planned_roles = {p.stem for p in existing} | set(ROLES)
     extras = planned_roles - ROLES
     if extras:
         raise InstallAbort(f"role_manifest_extra: {', '.join(sorted(extras))}")
-    errors, _ = validate_multi_agent_v2_config(tomllib.loads(new_config))
+    if legacy_v2:
+        allowed_migration = {
+            "config.toml",
+            "agents/plan-verifier.toml",
+            "agents/security-reviewer.toml",
+            "agents/verifier.toml",
+            "hooks.json",
+            "hooks/pilotfish_autoroute_gate.py",
+            policy_path.relative_to(codex_home).as_posix(),
+        }
+        changed_migration = {path.relative_to(codex_home).as_posix() for path, _, _, _ in writes}
+        if not changed_migration <= allowed_migration:
+            raise InstallAbort("legacy V2 migration would replace an unapproved primary target")
+    errors, _ = validate_agents_config(tomllib.loads(new_config))
     if errors:
         raise InstallAbort("planned native config invalid: " + "; ".join(errors))
-    inventory = [config_path, policy_path, *(agents / f"{role}.toml" for role in sorted(ROLES))]
+    inventory = [
+        config_path,
+        policy_path,
+        *(agents / f"{role}.toml" for role in sorted(ROLES)),
+        hooks_registration,
+        hook_script,
+    ]
     pre_targets: dict[str, dict[str, object]] = {}
     for path in inventory:
         relative = path.relative_to(codex_home).as_posix()
-        current = path.read_bytes() if path.is_file() else None
+        current = (
+            config_snapshot
+            if path == config_path
+            else path.read_bytes() if path.is_file() else None
+        )
         pre_targets[relative] = {"present": current is not None,
                                  "sha256": _sha256_bytes(current) if current is not None else None,
                                  "bytes_b64": base64.b64encode(current).decode() if current is not None else None}
@@ -508,18 +759,44 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
     if dry_run:
         for note in notes:
             print(f"note: {note}")
-        print("would change" if writes else "already up to date; nothing to change")
+        if not writes:
+            print("already up to date; nothing to change")
+            return 0
+        for path, _, _, _ in writes:
+            print(f"would change primary: {path.relative_to(codex_home).as_posix()}")
+        state_path = _state_path(codex_home)
+        print(f"allowed transaction artifact: {state_path.name}.pending")
+        print(f"allowed transaction artifact: {state_path.name}")
+        for path, _, _, original in writes:
+            if original is not None:
+                print(f"allowed transaction artifact: {path.name}.pilotfish-codex-<timestamp>")
         return 0
     if writes:
         pending = _state_path(codex_home).with_suffix(".json.pending")
-        pending_record = {"status": "pending", "original_targets": pre_targets,
-                          "owned_legacy": {path: {"original_present": True, "original_sha256": _sha256_bytes(config_text.encode()),
-                        "original_bytes_b64": base64.b64encode(config_text.encode()).decode()} for path in owned}}
+        pending_record = {
+            "status": "pending",
+            "original_targets": pre_targets,
+            "owned_legacy": {
+                path: {
+                    "original_present": True,
+                    "original_sha256": _sha256_bytes(config_text.encode()),
+                    "original_bytes_b64": base64.b64encode(config_text.encode()).decode(),
+                }
+                for path in owned
+            },
+        }
         _atomic_write(pending, json.dumps(pending_record, sort_keys=True).encode() + b"\n", 0o600)
         state_path = _state_path(codex_home)
         state_published = False
         try:
-            _commit(writes, _stamp(), agents_root=agents, codex_home=codex_home, policy_path=policy_path)
+            _commit(
+                writes,
+                _stamp(),
+                agents_root=agents,
+                hooks_root=hooks_root,
+                codex_home=codex_home,
+                policy_path=policy_path,
+            )
             _assert_active_instruction_file(codex_home, policy_path)
             for path in inventory:
                 relative = path.relative_to(codex_home).as_posix()
@@ -530,11 +807,7 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
                 relative = path.relative_to(codex_home).as_posix()
                 if not path.is_file() or _sha256_bytes(path.read_bytes()) != expected_inventory[relative]:
                     raise InstallAbort("post-write state publication fingerprint mismatch")
-            ownership = {
-                path: {"original_present": True, "original_sha256": _sha256_bytes(config_text.encode()),
-                       "original_bytes_b64": base64.b64encode(config_text.encode()).decode()}
-                for path in owned
-            }
+            ownership = dict(pending_record["owned_legacy"])
             record = {"status": "committed", "target_fingerprints": expected_inventory,
                       "original_targets": pre_targets, "owned_legacy": ownership}
             _assert_active_instruction_file(codex_home, policy_path)

@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"routine-03","task":"sort_numbers","input":[9,1,4,1],"expected_artifact":{"sorted":[1,1,4,9]}}

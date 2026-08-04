@@ -1,24 +1,23 @@
 # Pilotfish-Codex native install runbook
 
-This runbook installs one native Codex Multi-Agent V2 target. It does not
+This runbook installs one native Codex 0.146 Multi-Agent target. It does not
 support an adapter fallback.
 
 ## Preconditions
 
-- Require exactly Codex `0.145.0`. Lower, higher, ambiguous, suffixed, or
+- Require exactly Codex `0.146.0`. Lower, higher, ambiguous, suffixed, or
   nonzero `codex --version` output fails before writes.
 - The native configuration is exactly:
 
 ```toml
-[features.multi_agent_v2]
+[agents]
 enabled = true
-max_concurrent_threads_per_session = 4
+max_concurrent_threads_per_session = 3
 ```
 
-- The total of four slots includes the root session and permits three children.
-  Do not emit `features.multi_agent`, `tool_namespace`,
-  `hide_spawn_agent_metadata`, `agents.max_threads`, or an `[agents]`
-  concurrency fallback.
+- The value is child concurrency: one root plus up to three children. Do not
+  emit `features.multi_agent_v2`, adapter namespace/metadata keys, or
+  `agents.max_threads`.
 - The native manifest is exactly `executor`, `mech-executor`,
   `plan-verifier`, `scout`, `security-executor`, `security-reviewer`, and
   `verifier`. Role identity is each TOML `name`; filename equality is a local
@@ -27,7 +26,7 @@ max_concurrent_threads_per_session = 4
 ## Preflight and approval
 
 1. Run `codex --version` and stop unless its one standalone version token is
-   exactly `0.145.0`.
+   exactly `0.146.0`.
 2. Read the active `config.toml`, effective global policy (`AGENTS.override.md`
    wins over `AGENTS.md`), and recursively discovered role files. Preserve all
    unrelated content.
@@ -45,25 +44,53 @@ before replacement, validates the post-write fingerprint, then atomically
 commits the mode-`0600` state sidecar. A pending state is never ownership proof.
 Repeated identical installs are idempotent.
 
-A proven, committed per-key record may remove only these prior adapter-owned
-paths: `features.multi_agent`, `features.multi_agent_v2.tool_namespace`,
-`features.multi_agent_v2.hide_spawn_agent_metadata`, `agents.max_threads`, and
-`agents.max_concurrent_threads_per_session`. Matching bytes alone are not
-provenance. Unknown legacy input is preserved as `legacy_key_unowned` and blocks
-the native smoke.
+A legacy V2 table is migratable only when it is exactly `enabled = true` and
+`max_concurrent_threads_per_session = 4`, and the committed sidecar has exactly
+`config.toml`, all seven canonical role paths, and the currently selected policy
+in both target maps. Every non-config target fingerprint and original-byte
+record must match; missing, stale, extra, malformed, or unowned state aborts
+before writes. A trusted Codex hook may append `[hooks.state]` to
+`config.toml`: that is accepted only when the owned routing projection is
+unchanged. Conflicting `[agents]` values and extra V2 keys abort as well.
+Unrelated config and custom same-name role bytes remain untouched.
 
-The installer refuses scalar `false` or table `enabled = false`. Scalar `true`
-is converted to the native table. Inline and dotted V2 forms that cannot be
-rewritten without collateral edits abort. Existing V2 totals in `1..8` normalize
-to `4`; zero, values above eight, or malformed values abort before writes.
+The installer refuses disabled or scalar legacy V2 forms, inline/dotted forms,
+and malformed/conflicting `[agents]` values. Fresh homes receive the native
+`[agents]` table; migration removes only the exact proven old V2 table.
 
 Release-pinned canonical v1.3.0 `plan-verifier` and `security-reviewer` bytes
 may upgrade to their packaged v1.3.1 replacements. The released canonical
-v1.3.1 `plan-verifier` and `verifier` may likewise upgrade to their packaged
-calibrated contracts. Any other same-name role difference remains
-`installed_role_drift` and requires explicit operator resolution.
+v1.3.1 `plan-verifier` and `verifier` payloads may likewise upgrade to their
+packaged calibrated contracts. The released canonical v1.3.3 payloads for
+those roles may upgrade to the latest packaged routing contracts. Any other
+same-name role difference remains `installed_role_drift` and requires explicit
+operator resolution.
 
-## Install and offline validation
+## Install entrypoints and offline validation
+
+For a local checkout, use the shell bootstrapper. It selects the checkout,
+forwards `--codex-home` and `--dry-run` to the one real installer, and never
+needs a network download:
+
+```bash
+bash install/install.sh --dry-run --codex-home "$ACTIVE_CODEX_HOME"
+bash install/install.sh --codex-home "$ACTIVE_CODEX_HOME"
+```
+
+For a remote install, choose a release tag or immutable commit SHA. Pin that
+same value in both the raw shell URL and `--ref`; do not install a real home
+from the mutable `main` branch:
+
+```bash
+REF="<release-tag-or-commit-sha>"
+curl -fsSL \
+  "https://raw.githubusercontent.com/miyago9267/pilotfish-codex/$REF/install/install.sh" \
+  | bash -s -- --ref "$REF" --dry-run --codex-home "$ACTIVE_CODEX_HOME"
+```
+
+The shell requires Bash, Python 3.11+, and the pinned Codex CLI. Inspect it
+with `bash install/install.sh --help` before using a remote copy. The direct
+Python route is equivalent for a checked-out repository:
 
 ```bash
 python3 install/install.py --codex-home "$ACTIVE_CODEX_HOME"
@@ -73,6 +100,34 @@ python3 install/validate_agents.py \
 
 Do not add `[agents.<role>] config_file` declarations. Native recursive
 role discovery loads the seven TOMLs directly.
+
+After the installer adds `hooks.json`, open an interactive Codex session and
+use `/hooks` to inspect and trust `Pilotfish automatic typed Plan-review gate`.
+If `/hooks` is unavailable, start a new interactive session and confirm the
+launch-time trust prompt for that exact label. Codex records trust against the
+hook definition hash; repeat this one-time step only when the hook definition
+changes. Do not use the bypass flag for normal active-runtime work. Its
+`[hooks.state]` entry is expected and does not require reinstalling Pilotfish.
+
+## Update, failure handling, and rollback
+
+Use the same pinned ref for an update. First run its dry-run, inspect the
+primary paths and allowed transaction artifacts, then run the identical command
+without `--dry-run`. A clean rerun reports `already up to date; nothing to
+change`. Trust the hook again only when the prompt identifies a changed hook
+definition.
+
+The installer intentionally aborts rather than replacing an existing unowned
+`hooks.json`, a changed hook script, a customized same-name role, or a stale
+sidecar. Stop on those errors. Inspect the current file and its recorded
+ownership before taking a separately approved replacement action; do not delete
+the collision, state sidecar, or rollback backup merely to make an install pass.
+
+There is no automatic uninstall or rollback. Each replaced target has a
+timestamped sibling backup named `*.pilotfish-codex-<timestamp>`. If recovery
+is required, stop the installer, identify the exact affected target and backup,
+obtain separate approval, restore only that target, and then rerun the dry-run.
+Do not restore a whole Codex home or copy a backup over unrelated runtime state.
 
 The only retired role eligible for cleanup is lowercase `explore.toml`, after
 separate approval, when its bytes exactly match
@@ -97,10 +152,11 @@ python3 "$REPO_ROOT/install/stage_smoke_home.py" \
   --staged-codex-home "$STAGED_CODEX_HOME"
 ```
 
-The helper derives a canonical config containing only
-`features.multi_agent_v2.enabled = true` and total concurrency `4`, then copies
-one effective policy, the seven-role manifest, and `auth.json`. All other
-active config keys remain untouched and are not selected for the smoke.
+The helper derives a canonical config containing the installed Luna/medium root
+binding, xhigh Plan mode, `agents.enabled = true`, and child concurrency `3`.
+It then copies one effective policy, the seven-role manifest, source-owned
+`hooks.json` plus its hook script, and `auth.json`. All other active config
+keys remain untouched and are not selected for the smoke.
 Recognized
 `*.pilotfish-codex-*` rollback backups remain in the active home and are not
 staged input; they do not require pre-gate cleanup. It canonicalizes
@@ -121,7 +177,7 @@ containment escapes, and mutation or TOCTOU. Before launch,
 runtime state there only after preflight succeeds.
 
 After separate quota approval, run from the clean `SMOKE_DIR` in a fresh,
-authenticated `rust-v0.145.0` session:
+authenticated `rust-v0.146.0` session:
 
 ```bash
 cd "$SMOKE_DIR"
@@ -143,7 +199,7 @@ policy hashes before child creation and freezes the staged hash snapshot.
 The internal `codex exec` command uses `--skip-git-repo-check` because the
 verified clean smoke cwd is intentionally outside every repository.
 
-`NATIVE_OK` requires observed V2 selection, one typed `spawn_agent` call with
+`NATIVE_OK` requires one typed `spawn_agent` call with
 exactly `message`, `agent_type`, `task_name`, and `fork_turns`, exact correlation
 to child activity, and child `turn_context.model` and `turn_context.effort`.
 The probe waits once for that child so `codex exec` does not abort it while

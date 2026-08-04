@@ -1,0 +1,245 @@
+# Pilotfish-Codex installation playbook
+
+This playbook is for an AI agent installing the native Pilotfish-Codex target.
+Read it completely before running an installation command. The detailed
+ownership and migration rules are in
+[`install/AGENT-INSTALL.md`](install/AGENT-INSTALL.md); this playbook does not
+replace that runbook.
+
+## Scope and prerequisites
+
+The installer changes one Codex home. The default is `~/.codex`; set the
+`CODEX_HOME` environment variable or pass `--codex-home` to select another
+home. It installs the
+native seven-role manifest, the managed orchestration policy, native config,
+and the Pilotfish hook registration and script. It does not install an
+adapter, change shell startup files, manage credentials, or use `sudo`.
+
+Before any run, confirm all of the following:
+
+- Codex CLI is exactly `0.146.0` (one bare version token; a suffix or an
+  ambiguous `--version` result is not accepted).
+- Python is `3.11` or newer.
+- A local checkout has Bash and Python. No network tools are needed for the
+  local path.
+- A remote path additionally needs Bash, `curl`, `tar`, `mktemp`, and network
+  access to `github.com`. The remote archive is selected by a visible ref.
+- The shell entrypoint is `install/install.sh`; the actual installer remains
+  `install/install.py`. `--ref` belongs to the shell wrapper and must not be
+  passed to `install.py`.
+
+Do not print or copy `auth.json`, tokens, API keys, or other credentials while
+inspecting the home.
+
+## Confirmation boundary
+
+The agent may fetch this playbook, inspect source, check versions, read the
+documented configuration files, and run `--help` or `--dry-run` without
+approval. A remote dry-run downloads a pinned archive into the installer's
+private temporary directory; it does not write the Codex home.
+
+Stop immediately after the dry-run and before any real install command that
+targets the selected home. Show the user:
+
+- the absolute Codex home path;
+- the selected source and ref;
+- every `would change primary:` path;
+- the policy and hook changes;
+- existing files that will receive a timestamped
+  `*.pilotfish-codex-<timestamp>` backup; and
+- any role drift, extra role, pending transaction, or unowned hook collision
+  that caused an abort.
+
+Ask for explicit approval to back up and write that home. Approval must name
+the path and does not authorize replacing customized same-name roles,
+deleting residual roles, changing credentials, or using elevated privileges.
+If the user does not approve, stop with no install command.
+
+## Inspect before execution
+
+From a checkout, inspect both the thin shell wrapper and the detailed runbook
+before invoking the wrapper:
+
+```bash
+sed -n '1,220p' install/install.sh
+sed -n '1,260p' install/AGENT-INSTALL.md
+bash install/install.sh --help
+```
+
+For a remote-only run, fetch `INSTALL.md` and the shell entrypoint from the
+same pinned ref, then inspect the unpacked `install/AGENT-INSTALL.md` and
+`install/install.sh` before proceeding. Do not silently substitute `main` for a
+requested pinned ref.
+
+Check the prerequisites and select the target home without changing it:
+
+```bash
+python3 --version
+codex --version
+PILOTFISH_TARGET_HOME="${CODEX_HOME:-$HOME/.codex}"
+printf 'target home=%s\n' "$PILOTFISH_TARGET_HOME"
+```
+
+Inspect only the managed inputs. Preserve unrelated config and custom role
+files; do not read credentials:
+
+```bash
+if [ -f "$PILOTFISH_TARGET_HOME/config.toml" ]; then
+  sed -n '1,240p' "$PILOTFISH_TARGET_HOME/config.toml"
+fi
+for policy in "$PILOTFISH_TARGET_HOME/AGENTS.md" "$PILOTFISH_TARGET_HOME/AGENTS.override.md"; do
+  if [ -s "$policy" ]; then
+    printf '\n--- %s ---\n' "$policy"
+    sed -n '1,260p' "$policy"
+  fi
+done
+if [ -d "$PILOTFISH_TARGET_HOME/agents" ]; then
+  find "$PILOTFISH_TARGET_HOME/agents" -maxdepth 1 -type f -name '*.toml' -print
+fi
+```
+
+If both policy files are non-empty, or if a pending state sidecar exists, stop
+for operator resolution before a dry-run. The detailed runbook defines the
+legacy migration and ownership evidence that must remain intact.
+
+## Dry-run
+
+Use one of these entrypoints. Local checkout is always the first source choice
+when the shell script is executed from a valid checkout.
+
+Local checkout:
+
+```bash
+PILOTFISH_TARGET_HOME="${CODEX_HOME:-$HOME/.codex}"
+bash install/install.sh --dry-run --codex-home "$PILOTFISH_TARGET_HOME"
+```
+
+Pinned remote source (replace the placeholder with an exact published tag or
+full commit SHA; do not run the placeholder itself):
+
+```bash
+PILOTFISH_TARGET_HOME="${CODEX_HOME:-$HOME/.codex}"
+PILOTFISH_REF='<release-tag-or-commit-sha>'
+curl -fsSL \
+  "https://raw.githubusercontent.com/miyago9267/pilotfish-codex/${PILOTFISH_REF}/install/install.sh" \
+  | bash -s -- --ref "$PILOTFISH_REF" --dry-run \
+    --codex-home "$PILOTFISH_TARGET_HOME"
+```
+
+`--ref=<release-tag-or-commit-sha>` is equivalent to the two-argument form.
+Keep the raw script URL ref and the archive ref identical. `PILOTFISH_REF` is
+only the wrapper fallback when `--ref` is omitted. The wrapper prints
+`selected source:` and `selected ref:` before a remote fetch.
+
+A successful dry-run prints `would change primary:` lines and allowed state,
+backup, and pending-artifact names, or says that the target is already up to
+date. It must not create those artifacts. A failed dry-run is a stop signal;
+resolve its ownership or state error rather than weakening the installer.
+
+## Install after approval
+
+After the user approves the exact home and planned writes, rerun the same
+source and ref without `--dry-run`.
+
+Local checkout:
+
+```bash
+PILOTFISH_TARGET_HOME="${CODEX_HOME:-$HOME/.codex}"
+bash install/install.sh --codex-home "$PILOTFISH_TARGET_HOME"
+```
+
+Pinned remote source:
+
+```bash
+PILOTFISH_TARGET_HOME="${CODEX_HOME:-$HOME/.codex}"
+PILOTFISH_REF='<release-tag-or-commit-sha>'
+curl -fsSL \
+  "https://raw.githubusercontent.com/miyago9267/pilotfish-codex/${PILOTFISH_REF}/install/install.sh" \
+  | bash -s -- --ref "$PILOTFISH_REF" \
+    --codex-home "$PILOTFISH_TARGET_HOME"
+```
+
+The wrapper forwards only installer arguments such as `--dry-run` and
+`--codex-home`; it consumes `--help` and `--ref`. It validates a remote ref
+before constructing the codeload URL, uses no `eval` or `sudo`, and removes
+only its own temporary directory.
+
+## Validate and trust the hook
+
+When a checkout is available, validate the installed config and role manifest:
+
+```bash
+python3 install/validate_agents.py \
+  --config "$PILOTFISH_TARGET_HOME/config.toml" "$PILOTFISH_TARGET_HOME/agents"
+```
+
+The expected result is:
+`all native Pilotfish config and agent TOMLs valid`.
+Also confirm that these managed hook files exist, without printing secrets:
+
+```bash
+test -f "$PILOTFISH_TARGET_HOME/hooks.json"
+test -f "$PILOTFISH_TARGET_HOME/hooks/pilotfish_autoroute_gate.py"
+grep -F 'Pilotfish automatic typed Plan-review gate.' \
+  "$PILOTFISH_TARGET_HOME/hooks.json"
+```
+
+Trust the hook once in an interactive Codex session. Inspect `hooks.json`,
+start Codex, and use `/hooks` to inspect and trust the exact description
+`Pilotfish automatic typed Plan-review gate.`. Codex records trust against the
+hook definition hash; repeat this only when that definition changes. Do not
+use a bypass flag for normal active-runtime work.
+
+If the UI exposes trust only as a prompt while a session is starting, close
+that session and start a fresh one. Approve the exact hook at session start,
+then run `/hooks` in that session (or the next fresh session) to confirm the
+trusted state. The resulting `[hooks.state]` entry is expected and does not
+require reinstalling Pilotfish.
+
+For a remote-only install with no checkout, validate the same files from a
+checkout or source archive at the exact installed ref. Do not fetch an
+un-pinned validator or claim validation from a different ref.
+
+## Safe rerun and update
+
+Rerunning the same command at the same ref is intended to be idempotent. It
+preserves unrelated config, custom same-name role bytes, and user files. Run a
+new dry-run and obtain approval again before changing to another visible tag
+or commit. Review every changed role, policy, hook, and backup path before the
+real update.
+
+The installer fails closed for customized role drift, an unowned `hooks.json`
+collision, extra roles, malformed config, or stale transaction evidence. Do
+not force those cases by deleting state or passing an unsupported option to
+`install.py`.
+
+## Recovery and rollback
+
+If an install aborts, stop. Preserve the error output, the pending or aborted
+state sidecar, and every `*.pilotfish-codex-<timestamp>` backup. Do not rerun
+over a pending transaction, delete unknown roles, or restore the whole home
+blindly. After separate operator approval, copy the affected managed files and
+state evidence to an explicitly chosen recovery directory; exclude credentials
+unless the operator deliberately handles them.
+
+The installer stages writes, creates backups before replacement, verifies
+post-write fingerprints, and records committed ownership in a mode-`0600`
+sidecar. Use those records and
+[`install/AGENT-INSTALL.md`](install/AGENT-INSTALL.md) to decide a targeted
+restoration. A customized same-name role or an unowned hook collision requires
+an explicit operator decision; this playbook does not authorize deletion or an
+uninstall shortcut.
+
+## Final report
+
+Report all of the following in the agent's completion message:
+
+- selected source, exact ref, and absolute target home;
+- dry-run result and real install result, including whether it was already
+  up to date;
+- validation command and its output;
+- changed primary paths and exact backup/state paths, if any;
+- hook trust result, including whether a fresh session-start prompt was used;
+- preserved or unresolved custom roles, extra files, and pending state; and
+- confirmation that no credentials, shell startup files, or elevated
+  privileges were used.

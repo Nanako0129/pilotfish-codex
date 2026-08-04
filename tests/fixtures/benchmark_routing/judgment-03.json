@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"judgment-03","task":"incident_triage","input":[{"id":"i1","severity":"high","customer":true},{"id":"i2","severity":"low","customer":false}],"expected_artifact":{"first":"i1","queue":["i1","i2"]}}
