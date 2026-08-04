@@ -5,21 +5,30 @@ workers, and fresh-context verification while using Codex-native TOML roles and
 global `AGENTS.md` policy. Claude-specific worktrees, task dashboards, agent
 IDs, resume commands, and `Explore` shadowing are not Codex runtime claims.
 
-## Native Multi-Agent V2 boundary
+## Native Multi-Agent boundary
 
-The active target is exactly Codex `rust-v0.145.0` and one explicit feature
-table:
+The active target is exactly Codex `rust-v0.146.0` and one explicit global
+agent table:
 
 ```toml
-[features.multi_agent_v2]
+[agents]
 enabled = true
-max_concurrent_threads_per_session = 4
+max_concurrent_threads_per_session = 3
 ```
 
-The value is total concurrency including the root. Native defaults retain
-namespace, metadata visibility, and child override exposure decisions; the
-configuration does not force an adapter namespace or legacy `[agents]`
-concurrency fallback.
+The value is child concurrency, so three permits the root plus three children.
+Role TOMLs retain model and reasoning-effort precedence. The retired V2 feature
+table is migratable only with exact installer provenance; the active contract
+does not rely on an adapter namespace, metadata visibility override, or an
+undocumented rollout marker.
+
+Migration provenance is an exact committed sidecar schema: `config.toml`, the
+seven canonical role paths, and the currently selected policy must be the only
+entries in both target maps, with matching SHA-256 fingerprints and original
+byte evidence. Missing, stale, extra, or malformed state, an unowned V2 key,
+or a conflicting `[agents]` value aborts before writes. Dry-run reports only
+primary paths and the pending/committed sidecars plus backups for replaced
+targets; it creates none.
 
 The role manifest is seven recursively discovered TOMLs. Pilotfish validates a
 single approved staged manifest and rejects duplicate names, filename/name
@@ -117,19 +126,19 @@ scope behavior. Static assertions prevent accidental policy removal; they are
 not behavioral proof that a live model or host always complies.
 
 The verifier is post-hoc evidence classification, not a pre-execution cancel
-hook. Native proof requires observed V2 selection, one `spawn_agent` with exact
-typed arguments, call/activity correlation, and child `turn_context.model` and
+hook. Native proof requires one `spawn_agent` with exact typed arguments,
+call/activity correlation, and child `turn_context.model` and
 `turn_context.effort` matching the installed role. It records only redacted,
-hashed identifiers and receipt fields. A namespace is neither required nor
-sufficient evidence.
+hashed identifiers and receipt fields. A namespace and an undocumented rollout
+marker are neither required nor sufficient evidence.
 
 ## Staging boundary
 
 The native smoke first copies the post-install active target into a distinct,
 not-yet-existing staged home using canonical containment, confined reads,
 TOCTOU checks, cleanup on failure, and exclusive atomic no-replace publication.
-Only the canonical native-V2 config projection, hashed policy/manifest input,
-and `auth.json` are materialized. Unrelated active config and existing runtime
+Only the canonical native-agent config projection, hashed policy/manifest
+input, and `auth.json` are materialized. Unrelated active config and existing runtime
 metadata are outside the smoke projection and are not copied or hashed. Before
 launch the staged home is an exact minimal allowlist; Codex creates its own
 runtime state there only after preflight. The verifier compares active and

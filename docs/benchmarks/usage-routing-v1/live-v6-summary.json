@@ -1,0 +1,43 @@
+{
+  "schema": "pilotfish-codex.usage-routing-summary.v1",
+  "cohort": "live-20260803-v6",
+  "trial_count": 36,
+  "metric_source": "native-rollout-proxy",
+  "candidate_aggregates": {
+    "luna": {
+      "artifact_acceptance": { "accepted": 12, "total": 12 },
+      "equivalent_cost_usd": 0.743874,
+      "median_wall_seconds": 28.55,
+      "total_tokens": 2175891,
+      "weighted_tokens": 697183,
+      "reasoning_tokens": 1689
+    },
+    "terra": {
+      "artifact_acceptance": { "accepted": 10, "total": 12 },
+      "equivalent_cost_usd": 1.363531,
+      "median_wall_seconds": 41.09,
+      "total_tokens": 2349913,
+      "weighted_tokens": 653938,
+      "reasoning_tokens": 3127
+    },
+    "sol": {
+      "artifact_acceptance": { "accepted": 5, "total": 12 },
+      "equivalent_cost_usd": 2.931608,
+      "median_wall_seconds": 40.76,
+      "total_tokens": 2014887,
+      "weighted_tokens": 761050,
+      "reasoning_tokens": 3841
+    }
+  },
+  "recommendation": {
+    "chain": ["luna", "sol"],
+    "terra_retained": false,
+    "median_primary_usage_usd": 0.0647605,
+    "p95_settled_time_seconds": 37.49953648749215
+  },
+  "limitations": [
+    "Artifact acceptance is a deterministic contract, not a human intelligence benchmark.",
+    "Wall time is process wall time, not pure model reasoning time.",
+    "The raw live report remains local and ignored; this file contains aggregates only."
+  ]
+}

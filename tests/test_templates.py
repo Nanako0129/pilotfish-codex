@@ -8,20 +8,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "install"))
-from validate_agents import ROLES, validate_config, validate_dir, validate_multi_agent_v2_config  # noqa: E402
+from validate_agents import ROLES, validate_agents_config, validate_config, validate_dir  # noqa: E402
 
 
 class NativeTemplateTests(unittest.TestCase):
-    def test_exact_v2_table_has_no_adapter_transport(self) -> None:
+    def test_exact_agents_table_has_no_legacy_transport(self) -> None:
         with (ROOT / "templates" / "config.snippet.toml").open("rb") as handle:
             config = tomllib.load(handle)
         self.assertEqual(config["model"], "gpt-5.6-luna")
         self.assertEqual(config["model_reasoning_effort"], "medium")
         self.assertEqual(config["plan_mode_reasoning_effort"], "xhigh")
-        self.assertEqual(config["features"]["multi_agent_v2"], {"enabled": True, "max_concurrent_threads_per_session": 4})
-        self.assertNotIn("multi_agent", config["features"])
-        self.assertNotIn("agents", config)
-        errors, warnings = validate_multi_agent_v2_config(config)
+        self.assertEqual(config["agents"], {"enabled": True, "max_concurrent_threads_per_session": 3})
+        self.assertNotIn("multi_agent_v2", config.get("features", {}))
+        errors, warnings = validate_agents_config(config)
         self.assertEqual(errors, [])
         self.assertEqual(warnings, [])
 
@@ -42,11 +41,11 @@ class NativeTemplateTests(unittest.TestCase):
             executor = tomllib.load(handle)
         self.assertEqual(
             (plan_verifier["model"], plan_verifier["model_reasoning_effort"]),
-            ("gpt-5.6-terra", "xhigh"),
+            ("gpt-5.6-sol", "high"),
         )
         self.assertEqual(
             (verifier["model"], verifier["model_reasoning_effort"]),
-            ("gpt-5.6-terra", "high"),
+            ("gpt-5.6-luna", "xhigh"),
         )
         self.assertEqual(
             (security_executor["model"], security_executor["model_reasoning_effort"]),
@@ -56,11 +55,14 @@ class NativeTemplateTests(unittest.TestCase):
             (executor["model"], executor["model_reasoning_effort"]),
             ("gpt-5.6-luna", "max"),
         )
+        for path in agents.glob("*.toml"):
+            with path.open("rb") as handle:
+                self.assertNotEqual(tomllib.load(handle).get("model"), "gpt-5.6-terra")
 
     def test_rejects_forced_adapter_keys_and_duplicate_names(self) -> None:
-        config = {"features": {"multi_agent": True, "multi_agent_v2": {"enabled": True, "max_concurrent_threads_per_session": 4, "tool_namespace": "agents"}}}
-        errors, _ = validate_multi_agent_v2_config(config)
-        self.assertTrue(any("tool_namespace" in item for item in errors))
+        config = {"features": {"multi_agent_v2": {"enabled": True, "max_concurrent_threads_per_session": 4, "tool_namespace": "agents"}}, "agents": {"enabled": True, "max_concurrent_threads_per_session": 3}}
+        errors, _ = validate_agents_config(config)
+        self.assertTrue(any("legacy features.multi_agent_v2" in item for item in errors))
         with tempfile.TemporaryDirectory() as directory:
             agents = Path(directory); source = (ROOT / "templates" / "agents" / "scout.toml").read_text()
             (agents / "scout.toml").write_text(source)
@@ -68,6 +70,17 @@ class NativeTemplateTests(unittest.TestCase):
             problems = validate_dir(agents, expected_names=ROLES)
             self.assertTrue(any("duplicate role" in item for item in problems))
             self.assertTrue(any("manifest missing" in item for item in problems))
+
+    def test_validator_rejects_nonpackaged_agents_keys(self) -> None:
+        config = {
+            "agents": {
+                "enabled": True,
+                "max_concurrent_threads_per_session": 3,
+                "max_depth": 1,
+            }
+        }
+        errors, _ = validate_agents_config(config)
+        self.assertTrue(any("unsupported key" in item for item in errors))
 
     def test_policy_is_native_typed_and_post_hoc(self) -> None:
         policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
@@ -96,6 +109,16 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertIn("stable, complete one-shot brief, not a numeric trigger", policy)
         self.assertIn("smallest coherent integration boundary", policy)
         self.assertIn("`spawn_agent` calls back-to-back", policy)
+
+    def test_policy_preserves_risk_triggered_plan_review(self) -> None:
+        policy = " ".join(
+            (ROOT / "templates" / "agents-md.orchestration.md").read_text().split()
+        )
+        self.assertIn("Independent review is risk-triggered, not a synonym for non-trivial", policy)
+        self.assertIn("a data, schema, serialization, migration, or release boundary", policy)
+        self.assertIn("After two automatic `REVISE` verdicts for the same unit", policy)
+        self.assertIn("not merely to authorize another review round", policy)
+        self.assertNotIn("Sol escalation is narrower than the risk trigger", policy)
 
     def test_policy_preserves_parent_ownership_and_no_untyped_fallback(self) -> None:
         policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
@@ -172,7 +195,7 @@ class NativeTemplateTests(unittest.TestCase):
 
     def test_runbook_is_native_only(self) -> None:
         runbook = (ROOT / "install" / "AGENT-INSTALL.md").read_text()
-        self.assertIn("exactly Codex `0.145.0`", runbook)
+        self.assertIn("exactly Codex `0.146.0`", runbook)
         self.assertIn("stage_smoke_home.py", runbook)
         self.assertIn("NATIVE_OK", runbook)
         self.assertIn("no `--mode` or `--all-roles`", runbook)

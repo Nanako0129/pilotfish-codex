@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"judgment-04","task":"migration_plan","input":{"tables":[{"name":"users","rows":1000,"nullable":false},{"name":"events","rows":50000,"nullable":true}],"window_minutes":30},"expected_artifact":{"order":["users","events"],"parallel":false}}

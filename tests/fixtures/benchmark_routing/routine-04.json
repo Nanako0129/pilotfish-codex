@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"routine-04","task":"checklist_count","input":[{"name":"lint","done":true},{"name":"tests","done":false},{"name":"docs","done":true}],"expected_artifact":{"done":2,"total":3}}

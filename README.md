@@ -4,20 +4,35 @@ Codex-native role orchestration inspired by
 [Pilotfish](https://github.com/Nanako0129/pilotfish). This is an independent
 Codex CLI adaptation maintained by Miyago.
 
+## Contents
+
+- [Native target](#native-target)
+- [Roles](#roles)
+- [Routing evidence](#routing-evidence)
+- [Plan readiness](#plan-readiness)
+- [Outcome verification](#outcome-verification)
+- [Continuation across user input](#continuation-across-user-input)
+- [Installation](#installation)
+  - [Give it to an AI agent](#give-it-to-an-ai-agent)
+  - [Run it yourself](#run-it-yourself)
+- [Native verification](#native-verification)
+- [Development](#development)
+- [License](#license)
+
 ## Native target
 
-Pilotfish-Codex targets only Codex `rust-v0.145.0`. The native Multi-Agent V2
+Pilotfish-Codex targets only Codex `rust-v0.146.0`. The native Multi-Agent
 configuration is:
 
 ```toml
-[features.multi_agent_v2]
+[agents]
 enabled = true
-max_concurrent_threads_per_session = 4
+max_concurrent_threads_per_session = 3
 ```
 
-Four is a total thread limit: one root and up to three children. The active
-native configuration does not emit `features.multi_agent`, a forced spawn
-namespace, forced metadata visibility, or an `[agents]` concurrency fallback.
+Three is the child concurrency limit: one root and up to three children. The
+active configuration does not emit the retired `features.multi_agent_v2`
+table, adapter namespace/metadata keys, or `agents.max_threads`.
 Lower and higher Codex versions fail closed; the installer never selects an
 adapter route.
 
@@ -37,10 +52,75 @@ Role TOMLs own their model and reasoning effort. The global policy owns typed
 role delegation, approval boundaries, and fresh-context verification. The
 Claude-specific `Explore` compatibility override is not installed.
 
-The default root session uses Luna at `medium`; Plan mode escalates Luna to
-`xhigh`. General Plan and outcome review use Terra at `xhigh`, while security
-review and execution stay on Sol at `high`. Mechanical roles retain their
-existing Luna low/medium bindings.
+The default root session uses Luna at `medium`; Plan mode and outcome
+verification use Luna at `xhigh`. Terra is not installed. Sol stays at `high`
+for security review/execution and the existing risk-triggered Plan review.
+Mechanical roles retain their existing Luna low/medium bindings; the review
+trigger and its two-`REVISE` budget are unchanged.
+
+## Routing evidence
+
+The current decision uses the checked-in
+[36-trial v6 aggregate](./docs/benchmarks/usage-routing-v1/live-v6-summary.json):
+Luna is the default, Sol is reserved for the existing risk-triggered Plan
+review, and Terra has no active binding.
+
+### Weighted token usage
+
+![Weighted token usage per 12-trial cohort](./docs/assets/v6-weighted-tokens.svg)
+
+Weighted tokens are a normalized usage signal, not a currency value. Lower is
+better when the same work has comparable quality.
+
+### Equivalent cost
+
+![Equivalent cost per 12-trial cohort](./docs/assets/v6-equivalent-cost.svg)
+
+### Median wall time
+
+![Median wall time per candidate](./docs/assets/v6-median-wall-time.svg)
+
+### What the figures support
+
+The graphs answer one narrow question: which model should start routine work?
+They put Luna first. Across the same 12-trial cohort, Luna costs $0.74 and
+finishes in 28.55 seconds at the median. Terra uses 6% fewer weighted tokens,
+but costs 83% more and takes 44% longer; it has no active routing binding. Sol
+uses 9% more weighted tokens, costs 294% more, and takes 43% longer when used
+as the direct routine worker. Making either the default spends more or waits
+longer before the task has shown it needs deeper review.
+
+That does **not** say that Luna is universally more capable. The deterministic
+artifact check is evidence that Luna is a dependable routine executor here
+(12/12); it is not an intelligence score. Sol's direct-execution result (5/12)
+does not measure its planning ability either. The cohorts tested a fixed
+artifact, not ambiguous requirements, risk discovery, or competing technical
+options.
+
+The resulting division of labour is deliberate:
+
+1. Routine, mechanical, and ordinary execution start with Luna at `medium`.
+2. The existing concrete-risk trigger asks Sol at `high` to review the Plan,
+   where uncertainty, trade-offs, and failure modes matter.
+3. Luna turns the bounded Plan into changes and verification, keeping Sol out
+   of routine implementation calls.
+
+This concentrates Sol usage on a smaller decision surface instead of paying
+its direct-execution cost for every task. The claim that this improves planning
+quality is a hypothesis until it is measured. The role-fitness cohort will
+publish separate planning-quality, execution-reliability, and critical-risk
+yield figures before treating the split as a quality win.
+
+Cost and wall time are native-rollout proxy metrics. They do not measure
+planning or execution quality. See the
+[benchmark artifact contract](./docs/benchmarks/usage-routing-v1/) for the
+cohort, metric definitions, and limitations.
+
+The release gate is tracked separately from the 36-trial cohort. The
+[v1.4.0 trusted-hook smoke](./docs/verification/v1.4.0-live-smoke.json) records
+one non-bypass live run: a Luna/medium root produced the required Sol/high
+Plan-review child. It proves the installed dispatch path, not a cost or quality
+improvement.
 
 ## Plan readiness
 
@@ -86,13 +166,59 @@ compliance.
 See [Continuation liveness](./docs/design.md#continuation-liveness) for the
 design boundary.
 
-## Install
+## Installation
 
 The scripted route checks the exact CLI version, plans all writes, creates
 backups, validates the staged native configuration and manifest, atomically
 replaces targets, and commits a mode-`0600` sibling install-state sidecar.
-Unknown-provenance legacy adapter settings are preserved and block native
-verification rather than being deleted by name.
+Dry-run prints every primary path and creates nothing.
+
+### Give it to an AI agent
+
+This prompt uses only repository files and ordinary shell commands, so it can
+be pasted into any coding agent that can access this checkout. It intentionally
+keeps the explicit approval boundary before modifying `~/.codex`.
+
+```text
+Install Pilotfish-Codex from this repository checkout. First read INSTALL.md,
+then inspect install/install.sh and install/AGENT-INSTALL.md. Run only the
+documented dry-run against the Codex home you identify, report the selected
+source, target path, planned writes, and backups, then stop for my explicit
+approval before any real home write. After approval, use the same source to
+install and validate it, trust exactly "Pilotfish automatic typed Plan-review
+gate.", and report the verification result. Do not use sudo, print credentials,
+delete files to bypass an installer error, or use a hook-bypass flag.
+
+If this checkout is unavailable, ask me for an exact published release tag or
+full commit SHA before fetching anything; do not assume main.
+```
+
+The reusable prompt is also available as
+[INSTALL_PROMPT.md](./INSTALL_PROMPT.md). It works with Codex, Claude Code,
+Cursor, Gemini CLI, and other agents without requiring vendor-specific tools.
+
+### Run it yourself
+
+Use the shell entrypoint from a local checkout. Run a dry-run first; a real
+Codex-home write needs separate approval.
+
+```bash
+bash install/install.sh --dry-run --codex-home "$ACTIVE_CODEX_HOME"
+bash install/install.sh --codex-home "$ACTIVE_CODEX_HOME"
+```
+
+For a remote install, pin both the downloaded script and its archive to the
+same release tag or commit SHA. Do not pipe the mutable `main` branch into a
+real home.
+
+```bash
+REF="<release-tag-or-commit-sha>"
+curl -fsSL \
+  "https://raw.githubusercontent.com/miyago9267/pilotfish-codex/$REF/install/install.sh" \
+  | bash -s -- --ref "$REF" --dry-run --codex-home "$ACTIVE_CODEX_HOME"
+```
+
+The direct Python command remains useful for a checked-out repository:
 
 ```bash
 python3 install/install.py --codex-home "$ACTIVE_CODEX_HOME"
@@ -100,9 +226,17 @@ python3 install/validate_agents.py \
   --config "$ACTIVE_CODEX_HOME/config.toml" "$ACTIVE_CODEX_HOME/agents"
 ```
 
-See [the install runbook](./install/AGENT-INSTALL.md) before modifying a real
-Codex home. The runbook requires a separate home-write approval for backups,
-writes, customized same-name role replacement, and retired-role cleanup.
+The install also registers `hooks.json` and the automatic Plan-review hook.
+After the first successful install, trust exactly `Pilotfish automatic typed
+Plan-review gate.` in an interactive Codex session. Use `/hooks` when it is
+available; otherwise restart a session and confirm the launch-time trust
+prompt. Re-trust only when the hook definition changes. The resulting
+`[hooks.state]` entry is expected and an update dry-run should report
+`already up to date`.
+
+See [INSTALL.md](./INSTALL.md) for the agent playbook and
+[the install runbook](./install/AGENT-INSTALL.md) for updates, collision or
+drift handling, recovery, and the separate home-write approval boundary.
 
 ## Native verification
 
@@ -133,12 +267,18 @@ CODEX_HOME="$STAGED_CODEX_HOME" CODEX_SQLITE_HOME="$STAGED_CODEX_HOME" \
 ```
 
 The verifier rejects retired `--mode` and `--all-roles` options before
-authentication, quota spending, child creation, or receipt writing. It requires
-one native typed `spawn_agent` with a non-empty message, known role, safe task
-name, bounded fork, correlation to child activity, and observed child
-`turn_context.model` plus `turn_context.effort`. Namespace is not native
-evidence. `NATIVE_OK` completes the runtime gate; `SKIPPED` is incomplete and
-`FAILED` blocks completion.
+authentication, quota spending, child creation, or receipt writing. Generic
+role probes require one native typed `spawn_agent` with a non-empty message,
+known role, safe task name, bounded fork, correlation to child activity, and
+observed child `turn_context.model` plus `turn_context.effort`.
+
+`--autoroute` additionally permits `session_metadata` correlation only when
+the runtime has emitted no spawn/activity transport evidence at all. It then
+requires exactly one root at Luna/medium and one directly linked
+`plan-verifier` child at Sol/high; mixed, orphaned, duplicate, or malformed
+evidence fails closed. Every `NATIVE_OK` receipt names its
+`correlation_mode`. Namespace is not native evidence. `SKIPPED` is incomplete
+and `FAILED` blocks completion.
 
 ## Development
 

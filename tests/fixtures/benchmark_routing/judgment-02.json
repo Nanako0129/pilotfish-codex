@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"judgment-02","task":"policy_choice","input":{"options":[{"name":"safe","benefit":7,"risk":1},{"name":"fast","benefit":9,"risk":6}],"risk_limit":3},"expected_artifact":{"choice":"safe","reason":"within risk limit"}}

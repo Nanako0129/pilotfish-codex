@@ -293,6 +293,18 @@ class PolicyTests(unittest.TestCase):
             r"and continue unrelated approved safe slices",
         )
 
+    def test_risk_triggered_plan_review_is_a_mandatory_tool_use_gate(self) -> None:
+        policy = " ".join(
+            (ROOT / "templates" / "agents-md.orchestration.md").read_text().split()
+        )
+        for phrase in (
+            "mandatory tool-use gate",
+            "must call `plan-verifier` before sending any readiness recommendation",
+            "Do not return `READY` or `REVISE` from the main session first",
+            "typed delegation is unavailable",
+        ):
+            self.assertIn(phrase, policy)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"routine-06","task":"dependency_graph","input":{"a":["b","c"],"b":["d"],"c":[],"d":[]},"expected_artifact":{"roots":["a"],"leaves":["c","d"]}}

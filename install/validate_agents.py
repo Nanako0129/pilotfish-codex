@@ -1,4 +1,4 @@
-"""Fail-closed static validation for the native Codex 0.145.0 target.
+"""Fail-closed static validation for the native Codex 0.146.0 target.
 
 The validator intentionally validates Pilotfish's staged single-layer contract;
 it does not claim to reproduce Codex's layered role loader.
@@ -23,9 +23,9 @@ REQUIRED_KEYS = {"name", "description", "model", "model_reasoning_effort", "deve
 SANDBOX_MODES = {"read-only", "workspace-write", "danger-full-access"}
 WEB_SEARCH_MODES = {"disabled", "cached", "indexed", "live", "custom"}
 REASONING_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
-V2_CONCURRENCY_MIN = 1
-V2_CONCURRENCY_MAX = 8
-V2_CONCURRENCY_RECOMMENDED = 4
+AGENTS_CONCURRENCY_MIN = 1
+AGENTS_CONCURRENCY_MAX = 8
+AGENTS_CONCURRENCY_RECOMMENDED = 3
 
 
 def validate_agent(data: dict) -> list[str]:
@@ -51,36 +51,36 @@ def validate_agent(data: dict) -> list[str]:
     return errors
 
 
-def validate_multi_agent_v2_config(config: dict) -> tuple[list[str], list[str]]:
-    """Validate the one authoritative native V2 table, without adapter keys."""
+def validate_agents_config(config: dict) -> tuple[list[str], list[str]]:
+    """Validate the one authoritative native ``[agents]`` table."""
     errors: list[str] = []
     warnings: list[str] = []
-    features = config.get("features")
+    features = config.get("features", {})
     if not isinstance(features, dict):
-        return ["features.multi_agent_v2 table is missing"], warnings
-    v2 = features.get("multi_agent_v2")
-    if not isinstance(v2, dict):
-        return ["features.multi_agent_v2 must use table form"], warnings
-    if v2.get("enabled") is not True:
-        errors.append("features.multi_agent_v2.enabled must be true")
-    concurrency = v2.get("max_concurrent_threads_per_session")
-    if type(concurrency) is not int or not V2_CONCURRENCY_MIN <= concurrency <= V2_CONCURRENCY_MAX:
-        errors.append("concurrency must be an integer from 1 to 8")
-    elif concurrency != V2_CONCURRENCY_RECOMMENDED:
-        warnings.append(f"concurrency {concurrency} is normalized by the installer to 4")
-    for forbidden in ("tool_namespace", "hide_spawn_agent_metadata", "expose_spawn_agent_model_overrides"):
-        if forbidden in v2:
-            errors.append(f"native V2 must not force {forbidden}")
-    if features.get("multi_agent") is True:
-        errors.append("native V2 must not require features.multi_agent")
-    agents = config.get("agents", {})
+        errors.append("features must be a TOML table")
+    elif "multi_agent_v2" in features:
+        errors.append("legacy features.multi_agent_v2 must be migrated")
+    agents = config.get("agents")
     if not isinstance(agents, dict):
-        errors.append("agents must be a TOML table")
-    else:
-        for forbidden in ("max_threads", "max_concurrent_threads_per_session"):
-            if forbidden in agents:
-                errors.append(f"native template must not emit agents.{forbidden}")
+        errors.append("agents table is missing")
+        return errors, warnings
+    if agents.get("enabled") is not True:
+        errors.append("agents.enabled must be true")
+    concurrency = agents.get("max_concurrent_threads_per_session")
+    if type(concurrency) is not int or not AGENTS_CONCURRENCY_MIN <= concurrency <= AGENTS_CONCURRENCY_MAX:
+        errors.append("agents concurrency must be an integer from 1 to 8")
+    elif concurrency != AGENTS_CONCURRENCY_RECOMMENDED:
+        warnings.append(f"agents concurrency {concurrency} is normalized by the installer to 3")
+    expected_keys = {"enabled", "max_concurrent_threads_per_session"}
+    unknown = set(agents) - expected_keys
+    if unknown:
+        errors.append(f"agents table has unsupported key(s): {', '.join(sorted(unknown))}")
     return errors, warnings
+
+
+def validate_multi_agent_v2_config(config: dict) -> tuple[list[str], list[str]]:
+    """Compatibility alias retained for callers while the schema is migrated."""
+    return validate_agents_config(config)
 
 
 def _inside(path: Path, root: Path) -> bool:
@@ -137,7 +137,7 @@ def validate_config(path: Path) -> tuple[list[str], list[str]]:
         return [f"{path}: config file not found"], []
     except tomllib.TOMLDecodeError as exc:
         return [f"{path}: invalid TOML — {exc}"], []
-    errors, warnings = validate_multi_agent_v2_config(data)
+    errors, warnings = validate_agents_config(data)
     return [f"{path}: {e}" for e in errors], [f"{path}: {w}" for w in warnings]
 
 

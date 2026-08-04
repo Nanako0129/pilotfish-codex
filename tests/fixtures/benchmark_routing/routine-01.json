@@ -1,0 +1,1 @@
+{"fixture_version":"1","case_id":"routine-01","task":"word_count","input":"red blue green blue","expected_artifact":{"word_count":4}}
