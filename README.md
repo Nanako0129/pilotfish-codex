@@ -4,6 +4,21 @@ Codex-native role orchestration inspired by
 [Pilotfish](https://github.com/Nanako0129/pilotfish). This is an independent
 Codex CLI adaptation maintained by Miyago.
 
+## Contents
+
+- [Native target](#native-target)
+- [Roles](#roles)
+- [Routing evidence](#routing-evidence)
+- [Plan readiness](#plan-readiness)
+- [Outcome verification](#outcome-verification)
+- [Continuation across user input](#continuation-across-user-input)
+- [Installation](#installation)
+  - [Give it to an AI agent](#give-it-to-an-ai-agent)
+  - [Run it yourself](#run-it-yourself)
+- [Native verification](#native-verification)
+- [Development](#development)
+- [License](#license)
+
 ## Native target
 
 Pilotfish-Codex targets only Codex `rust-v0.146.0`. The native Multi-Agent
@@ -145,12 +160,38 @@ compliance.
 See [Continuation liveness](./docs/design.md#continuation-liveness) for the
 design boundary.
 
-## Install
+## Installation
 
 The scripted route checks the exact CLI version, plans all writes, creates
 backups, validates the staged native configuration and manifest, atomically
 replaces targets, and commits a mode-`0600` sibling install-state sidecar.
 Dry-run prints every primary path and creates nothing.
+
+### Give it to an AI agent
+
+This prompt uses only repository files and ordinary shell commands, so it can
+be pasted into any coding agent that can access this checkout. It intentionally
+keeps the explicit approval boundary before modifying `~/.codex`.
+
+```text
+Install Pilotfish-Codex from this repository checkout. First read INSTALL.md,
+then inspect install/install.sh and install/AGENT-INSTALL.md. Run only the
+documented dry-run against the Codex home you identify, report the selected
+source, target path, planned writes, and backups, then stop for my explicit
+approval before any real home write. After approval, use the same source to
+install and validate it, trust exactly "Pilotfish automatic typed Plan-review
+gate.", and report the verification result. Do not use sudo, print credentials,
+delete files to bypass an installer error, or use a hook-bypass flag.
+
+If this checkout is unavailable, ask me for an exact published release tag or
+full commit SHA before fetching anything; do not assume main.
+```
+
+The reusable prompt is also available as
+[INSTALL_PROMPT.md](./INSTALL_PROMPT.md). It works with Codex, Claude Code,
+Cursor, Gemini CLI, and other agents without requiring vendor-specific tools.
+
+### Run it yourself
 
 Use the shell entrypoint from a local checkout. Run a dry-run first; a real
 Codex-home write needs separate approval.
