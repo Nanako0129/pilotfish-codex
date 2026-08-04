@@ -39,6 +39,7 @@ from hook_registration import (
 from validate_agents import ROLES, validate_agent, validate_agents_config
 
 PINNED_CODEX_VERSION = (0, 146, 0)
+IS_WINDOWS = sys.platform == "win32"
 MARKER_BEGIN = "<!-- pilotfish-codex:begin -->"
 MARKER_END = "<!-- pilotfish-codex:end -->"
 NATIVE_TABLE = ("[agents]", "enabled = true", "max_concurrent_threads_per_session = 3")
@@ -648,6 +649,13 @@ def _atomic_write_if_unchanged(
     _atomic_write(path, payload, mode)
 
 
+def _open_agents_directory(agents_root: Path) -> int | None:
+    if IS_WINDOWS:
+        return None
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    return os.open(agents_root, flags)
+
+
 def _commit(writes: list[tuple[Path, bytes, int, bytes | None]], stamp: str,
             *, agents_root: Path, hooks_root: Path, codex_home: Path,
             policy_path: Path) -> list[tuple[Path, bytes | None, bytes, int]]:
@@ -659,9 +667,12 @@ def _commit(writes: list[tuple[Path, bytes, int, bytes | None]], stamp: str,
     _assert_agents_root(agents_root, codex_home)
     hooks_root.mkdir(mode=0o700, parents=True, exist_ok=True)
     _assert_hook_targets(codex_home)
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    agents_fd = os.open(agents_root, flags)
+    agents_fd: int | None = None
     try:
+        # Windows cannot open a directory with os.open for the dir_fd form of
+        # os.replace. Use the ordinary path-based replacement there; the
+        # surrounding containment and fingerprint checks still apply.
+        agents_fd = _open_agents_directory(agents_root)
         for path, payload, mode, original in writes:
             is_role = path.parent == agents_root
             is_hook = path == codex_home / "hooks.json" or path.parent == hooks_root
@@ -719,7 +730,8 @@ def _commit(writes: list[tuple[Path, bytes, int, bytes | None]], stamp: str,
             raise
         return applied
     finally:
-        os.close(agents_fd)
+        if agents_fd is not None:
+            os.close(agents_fd)
         for _, temp, _, _, _ in staged:
             temp.unlink(missing_ok=True)
 
