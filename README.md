@@ -116,6 +116,12 @@ planning or execution quality. See the
 [benchmark artifact contract](./docs/benchmarks/usage-routing-v1/) for the
 cohort, metric definitions, and limitations.
 
+The release gate is tracked separately from the 36-trial cohort. The
+[v1.4.0 trusted-hook smoke](./docs/verification/v1.4.0-live-smoke.json) records
+one non-bypass live run: a Luna/medium root produced the required Sol/high
+Plan-review child. It proves the installed dispatch path, not a cost or quality
+improvement.
+
 ## Plan readiness
 
 Large Plans use one program envelope followed by independently approvable
@@ -261,12 +267,18 @@ CODEX_HOME="$STAGED_CODEX_HOME" CODEX_SQLITE_HOME="$STAGED_CODEX_HOME" \
 ```
 
 The verifier rejects retired `--mode` and `--all-roles` options before
-authentication, quota spending, child creation, or receipt writing. It requires
-one native typed `spawn_agent` with a non-empty message, known role, safe task
-name, bounded fork, correlation to child activity, and observed child
-`turn_context.model` plus `turn_context.effort`. Namespace is not native
-evidence. `NATIVE_OK` completes the runtime gate; `SKIPPED` is incomplete and
-`FAILED` blocks completion.
+authentication, quota spending, child creation, or receipt writing. Generic
+role probes require one native typed `spawn_agent` with a non-empty message,
+known role, safe task name, bounded fork, correlation to child activity, and
+observed child `turn_context.model` plus `turn_context.effort`.
+
+`--autoroute` additionally permits `session_metadata` correlation only when
+the runtime has emitted no spawn/activity transport evidence at all. It then
+requires exactly one root at Luna/medium and one directly linked
+`plan-verifier` child at Sol/high; mixed, orphaned, duplicate, or malformed
+evidence fails closed. Every `NATIVE_OK` receipt names its
+`correlation_mode`. Namespace is not native evidence. `SKIPPED` is incomplete
+and `FAILED` blocks completion.
 
 ## Development
 

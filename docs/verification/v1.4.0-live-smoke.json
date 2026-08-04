@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "release": "v1.4.0",
+  "recorded_on": "2026-08-04",
+  "scope": "trusted-hook autoroute release gate",
+  "live_smoke": {
+    "sample_size": 1,
+    "hook_trust_path": "normal_trusted_path",
+    "status": "NATIVE_OK",
+    "reason_code": "native_verified",
+    "root": {
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "medium"
+    },
+    "child": {
+      "count": 1,
+      "role": "plan-verifier",
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "high"
+    },
+    "correlation_mode": "session_metadata"
+  },
+  "offline_verification": {
+    "unit_tests": 208,
+    "dispatch_verifier_tests": 61,
+    "documentation_files_linted": 5,
+    "active_install_dry_run": "idempotent",
+    "active_agent_validation": "passed"
+  },
+  "limitations": [
+    "The live smoke is one release-gate invocation, not a cost benchmark.",
+    "The live smoke does not measure planning quality or general intelligence.",
+    "Raw transcripts, rollout identifiers, credentials, and prompts are excluded."
+  ]
+}

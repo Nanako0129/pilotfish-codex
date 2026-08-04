@@ -11,7 +11,7 @@ import re
 import stat
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +26,7 @@ MAX_SCAN_CANDIDATES = 256
 MAX_SCAN_BYTES = 64 * 1_048_576
 MAX_SCAN_DEPTH = 8
 SCAN_MTIME_SLOP_SECONDS = 5
+SCAN_DATE_SLOP_SECONDS = 86_400
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._:-]{1,256}$")
 TASK_NAME_RE = re.compile(r"^[a-z0-9_]+$")
 
@@ -64,8 +65,8 @@ _CATEGORY_PATTERNS = {
     "security": re.compile(
         r"\b(?:security|secure|trust boundary|authentication|authorization|"
         r"authn|authz|credential|secret|permission|iam|cryptography|crypto|"
-        r"encryption|vulnerabilit(?:y|ies))\b|安全|信任邊界|驗證|授權|"
-        r"憑證|密鑰|祕密|秘密|權限|加密|漏洞",
+        r"encryption|vulnerabilit(?:y|ies))\b|安全|信任邊界|身分驗證|身份驗證|"
+        r"認證|授權|憑證|密鑰|祕密|秘密|權限|加密|漏洞",
         re.IGNORECASE,
     ),
 }
@@ -386,7 +387,7 @@ def _linked_child_status(
     if not _valid_identifier(child_id) or child_id == parent_id:
         return -1
     if allowed_child_id is not None and child_id != allowed_child_id:
-        return 0
+        return -1
     session_started_at = _timestamp_epoch(session_event.get("timestamp"))
     if (
         session_started_at is None
@@ -457,7 +458,51 @@ def _linked_child_status(
 
 
 class _ScanRejected(Exception):
-    pass
+    """Evidence that cannot be trusted; the gate must not be suppressed."""
+
+
+class _ScanExhausted(_ScanRejected):
+    """A scan budget ran out before the tree was covered.
+
+    Kept fail-closed on purpose: an unfinished scan is indistinguishable from a
+    scan whose budget was deliberately consumed, so it may never stand in for a
+    proven review. Date pruning keeps the budgets far away from ordinary use.
+    """
+
+
+def _scan_cutoff(root_started_at: float) -> tuple[int, int, int]:
+    """Return the earliest UTC date whose session subtree can hold evidence."""
+    stamp = datetime.fromtimestamp(
+        max(root_started_at - SCAN_DATE_SLOP_SECONDS, 0), tz=timezone.utc
+    )
+    return (stamp.year, stamp.month, stamp.day)
+
+
+def _prunable_subtree(parts: tuple[str, ...], cutoff: tuple[int, int, int]) -> bool:
+    """Report whether a `sessions/YYYY/MM/DD` subtree predates the current turn.
+
+    Any component that is not a well-formed date segment disables pruning for
+    that subtree, so an unexpected layout is walked rather than skipped.
+    """
+    widths = (4, 2, 2)
+    if not parts or len(parts) > len(widths):
+        return False
+    values: list[int] = []
+    for index, part in enumerate(parts):
+        if len(part) != widths[index] or not part.isdigit():
+            return False
+        values.append(int(part))
+    if len(values) > 1 and not 1 <= values[1] <= 12:
+        return False
+    if len(values) > 2 and not 1 <= values[2] <= 31:
+        return False
+    latest = (values[0], values[1] if len(values) > 1 else 12, values[2] if len(values) > 2 else 31)
+    return latest < cutoff
+
+
+def _directory_identity(value: os.stat_result) -> tuple[int, ...]:
+    """Fingerprint a directory without its mtime, which live sessions change."""
+    return (value.st_dev, value.st_ino, value.st_mode, value.st_uid)
 
 
 def _decode_jsonl(payload: bytes) -> list[dict[str, Any]]:
@@ -522,19 +567,20 @@ def _intrinsic_child_review_proven(
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     root_fd: int | None = None
     state = {"entries": 0, "candidates": 0, "bytes": 0}
+    cutoff = _scan_cutoff(root_started_at)
     valid_children = 0
 
-    def scan(directory_fd: int, depth: int) -> None:
+    def scan(directory_fd: int, depth: int, parts: tuple[str, ...]) -> None:
         nonlocal valid_children
         if depth > MAX_SCAN_DEPTH:
-            raise _ScanRejected
+            raise _ScanExhausted
         names: list[str] = []
         try:
             with os.scandir(directory_fd) as iterator:
                 for entry in iterator:
                     state["entries"] += 1
                     if state["entries"] > MAX_SCAN_ENTRIES:
-                        raise _ScanRejected
+                        raise _ScanExhausted
                     names.append(entry.name)
         except OSError as exc:
             raise _ScanRejected from exc
@@ -544,31 +590,32 @@ def _intrinsic_child_review_proven(
             except OSError as exc:
                 raise _ScanRejected from exc
             if stat.S_ISLNK(info.st_mode) or info.st_uid != current_uid:
-                raise _ScanRejected
+                continue
             if stat.S_ISDIR(info.st_mode):
+                child_parts = parts + (name,)
+                if _prunable_subtree(child_parts, cutoff):
+                    continue
                 child_fd: int | None = None
                 try:
-                    child_fd = os.open(name, flags, dir_fd=directory_fd)
+                    try:
+                        child_fd = os.open(name, flags, dir_fd=directory_fd)
+                    except OSError:
+                        continue
                     opened = os.fstat(child_fd)
                     if (
                         (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino)
                         or opened.st_uid != current_uid
                     ):
                         raise _ScanRejected
-                    scan(child_fd, depth + 1)
+                    scan(child_fd, depth + 1, child_parts)
                     after = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-                    if (
-                        _stat_fingerprint(after) != _stat_fingerprint(info)
-                        or after.st_uid != current_uid
-                    ):
+                    if _directory_identity(after) != _directory_identity(info):
                         raise _ScanRejected
                 finally:
                     if child_fd is not None:
                         os.close(child_fd)
                 continue
-            if not stat.S_ISREG(info.st_mode):
-                raise _ScanRejected
-            if not name.endswith(".jsonl"):
+            if not stat.S_ISREG(info.st_mode) or not name.endswith(".jsonl"):
                 continue
             if info.st_mtime + SCAN_MTIME_SLOP_SECONDS < root_started_at:
                 continue
@@ -576,9 +623,10 @@ def _intrinsic_child_review_proven(
             state["bytes"] += info.st_size
             if (
                 state["candidates"] > MAX_SCAN_CANDIDATES
-                or info.st_size > MAX_TRANSCRIPT_BYTES
                 or state["bytes"] > MAX_SCAN_BYTES
             ):
+                raise _ScanExhausted
+            if info.st_size > MAX_TRANSCRIPT_BYTES:
                 raise _ScanRejected
             events = _read_scanned_jsonl(directory_fd, name, info)
             status = _linked_child_status(
@@ -609,12 +657,9 @@ def _intrinsic_child_review_proven(
             or opened.st_uid != current_uid
         ):
             return False
-        scan(root_fd, 0)
+        scan(root_fd, 0, ())
         after = sessions.lstat()
-        if (
-            _stat_fingerprint(after) != _stat_fingerprint(root_info)
-            or after.st_uid != current_uid
-        ):
+        if _directory_identity(after) != _directory_identity(root_info):
             return False
     except (OSError, _ScanRejected):
         return False
@@ -792,8 +837,17 @@ def handle(
     return None
 
 
-def main() -> int:
+SELFTEST_OK = f"pilotfish-autoroute-gate schema={SCHEMA} launchable"
+
+
+def main(argv: list[str] | None = None) -> int:
     """Read one bounded JSON hook envelope and print only protocol output."""
+    arguments = sys.argv[1:] if argv is None else argv
+    if arguments == ["--selftest"]:
+        sys.stdout.write(SELFTEST_OK + "\n")
+        return 0
+    if arguments:
+        return 0
     try:
         raw = sys.stdin.buffer.read(MAX_HOOK_INPUT_BYTES + 1)
         if len(raw) > MAX_HOOK_INPUT_BYTES:

@@ -5,12 +5,32 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
-## Unreleased
+## v1.4.0 — 2026-08-04
 
 - Retire Terra from the active role bindings. Luna now owns Plan-mode and
   outcome reasoning at `xhigh`.
 - Route the existing risk-triggered Plan-review role to Sol `high`; its timing,
   two-`REVISE` budget, and security boundary are unchanged.
+- Bound the Plan-review session scan to current evidence: it prunes stale
+  dated subtrees, ignores entries that cannot be transcript evidence, and keeps
+  ambiguous or unreadable current transcripts fail-closed.
+- Add a `--selftest` launch probe for the registered hook command, and document
+  the silent native-Windows interpreter failure in both install playbooks.
+- Narrow the security trigger so generic Chinese `驗證` no longer buys a Sol
+  review; the trigger surface is pinned by a routine/material prompt corpus.
+- Print dry-run backup artifacts as Codex-home-relative paths.
+- Support coexistence with structurally unrelated native Codex hook groups while
+  retaining fail-closed ownership of the complete event-bound Pilotfish groups
+  and hook script. Isolated smoke candidates now use the clean Pilotfish
+  registration, and transaction rollback preserves concurrent foreign edits.
+- Permit a hook-script source upgrade only after its current bytes match the
+  committed Pilotfish sidecar; unproven script drift still aborts before writes.
+- Accept the runtime's metadata-linked Plan-review child only for `--autoroute`
+  when spawn/activity transport is completely absent; generic role probes retain
+  strict native spawn/activity correlation and receipts record the evidence mode.
+- Run the autoroute smoke through the normally trusted hook path, without a
+  hook-trust bypass; directive detection now examines only the submitted smoke
+  prompt, not unrelated runtime-injected policy messages.
 
 ## v1.3.3 — 2026-08-03
 

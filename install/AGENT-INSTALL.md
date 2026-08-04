@@ -42,7 +42,9 @@ max_concurrent_threads_per_session = 3
 The installer uses a pending sidecar, stages all target files, writes backups
 before replacement, validates the post-write fingerprint, then atomically
 commits the mode-`0600` state sidecar. A pending state is never ownership proof.
-Repeated identical installs are idempotent.
+The sidecar binds Pilotfish to its allowlisted, event-bound complete hook groups
+instead of claiming ownership of unrelated groups in `hooks.json`. Repeated
+identical installs are idempotent.
 
 A legacy V2 table is migratable only when it is exactly `enabled = true` and
 `max_concurrent_threads_per_session = 4`, and the committed sidecar has exactly
@@ -101,13 +103,30 @@ python3 install/validate_agents.py \
 Do not add `[agents.<role>] config_file` declarations. Native recursive
 role discovery loads the seven TOMLs directly.
 
-After the installer adds `hooks.json`, open an interactive Codex session and
-use `/hooks` to inspect and trust `Pilotfish automatic typed Plan-review gate.`
-If `/hooks` is unavailable, start a new interactive session and confirm the
-launch-time trust prompt for that exact label. Codex records trust against the
-hook definition hash; repeat this one-time step only when the hook definition
-changes. Do not use the bypass flag for normal active-runtime work. Its
-`[hooks.state]` entry is expected and does not require reinstalling Pilotfish.
+Before trusting the hook, prove the registered command can launch at all. A
+missing interpreter fails silently and open, so a trusted-but-unlaunchable hook
+enforces nothing:
+
+```bash
+/usr/bin/env python3 \
+  "$ACTIVE_CODEX_HOME/hooks/pilotfish_autoroute_gate.py" --selftest
+```
+
+Require `pilotfish-autoroute-gate schema=<n> launchable`. On native Windows run
+the probe through the `commandWindows` form instead, because `python` is often
+the Store alias stub. Report the gate as unenforced on any other result rather
+than reporting a gated install; see
+[the installation playbook](../INSTALL.md#prove-the-hook-can-launch).
+
+After the installer adds the Pilotfish hook group, open an interactive Codex
+session and use `/hooks` to inspect and trust the group that runs
+`hooks/pilotfish_autoroute_gate.py`. An existing `hooks.json` can retain a
+user-owned top-level description, so trust the exact group rather than assuming
+one global label. If `/hooks` is unavailable, start a new interactive session
+and confirm the launch-time trust prompt. Codex records trust against the hook
+definition hash; repeat this one-time step only when that definition changes.
+Do not use the bypass flag for normal active-runtime work. Its `[hooks.state]`
+entry is expected and does not require reinstalling Pilotfish.
 
 ## Update, failure handling, and rollback
 
@@ -117,11 +136,14 @@ without `--dry-run`. A clean rerun reports `already up to date; nothing to
 change`. Trust the hook again only when the prompt identifies a changed hook
 definition.
 
-The installer intentionally aborts rather than replacing an existing unowned
-`hooks.json`, a changed hook script, a customized same-name role, or a stale
-sidecar. Stop on those errors. Inspect the current file and its recorded
-ownership before taking a separately approved replacement action; do not delete
-the collision, state sidecar, or rollback backup merely to make an install pass.
+The installer preserves structurally unrelated valid hook groups, but aborts
+rather than adopting an unproven current or historical Pilotfish group,
+repairing a changed/duplicated/moved Pilotfish group, replacing an unproven hook
+script, replacing a customized same-name role, or accepting a stale sidecar. A
+script proven by the committed sidecar may upgrade to the selected source. Stop
+on other errors. Inspect the current file and its recorded ownership before
+taking a separately approved replacement action; do not delete the state
+sidecar or rollback backup merely to make an install pass.
 
 There is no automatic uninstall or rollback. Each replaced target has a
 timestamped sibling backup named `*.pilotfish-codex-<timestamp>`. If recovery
@@ -199,12 +221,17 @@ policy hashes before child creation and freezes the staged hash snapshot.
 The internal `codex exec` command uses `--skip-git-repo-check` because the
 verified clean smoke cwd is intentionally outside every repository.
 
-`NATIVE_OK` requires one typed `spawn_agent` call with
-exactly `message`, `agent_type`, `task_name`, and `fork_turns`, exact correlation
-to child activity, and child `turn_context.model` and `turn_context.effort`.
+Generic role probes require one typed `spawn_agent` call with exactly
+`message`, `agent_type`, `task_name`, and `fork_turns`, exact correlation to
+child activity, and child `turn_context.model` and `turn_context.effort`.
+
+For `--autoroute` only, the verifier also accepts `session_metadata` correlation
+when no spawn/activity transport evidence exists. The metadata path requires
+exactly one Luna/medium root and one directly linked `plan-verifier` child at
+Sol/high; any mixed, orphaned, duplicate, or malformed evidence fails closed.
 The probe waits once for that child so `codex exec` does not abort it while
-evidence is being written.
-Receipts normalize the latter to `reasoning_effort`; raw runtime IDs are hashed.
-Namespace is not native evidence. `SKIPPED` is incomplete and `FAILED` blocks
-completion. Only after `NATIVE_OK` and Gate 4 approval may residual adapter
-artifacts or temporary receipts be deleted.
+evidence is being written. Receipts normalize effort to `reasoning_effort`,
+hash raw runtime IDs, and record `correlation_mode`. Namespace is not native
+evidence. `SKIPPED` is incomplete and `FAILED` blocks completion. Only after
+`NATIVE_OK` and Gate 4 approval may residual adapter artifacts or temporary
+receipts be deleted.

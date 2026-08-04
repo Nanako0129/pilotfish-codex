@@ -25,7 +25,14 @@ from typing import Iterable
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from install import PINNED_CODEX_VERSION, parse_codex_version
 from validate_agents import ROLES, validate_agent
-from stage_smoke_home import StageError, explicit_layout_error, project_config_bytes
+from stage_smoke_home import (
+    StageError,
+    _active_hook_state,
+    _read_proven_policy_symlink,
+    _state_policy_digest,
+    explicit_layout_error,
+    project_config_bytes,
+)
 
 TASK_NAME = "model_probe"
 TASK_NAME_RE = re.compile(r"^[a-z0-9_]+$")
@@ -37,12 +44,15 @@ AUTO_ROUTE_PROMPT = (
     "approval recommendation and every P0-P2 blocker you find."
 )
 AUTO_ROUTE_DIRECTIVE_TOKENS = ("spawn", "delegate", "subagent")
+AUTO_ROUTE_PARENT_MODEL = "gpt-5.6-luna"
+AUTO_ROUTE_PARENT_EFFORT = "medium"
+CORRELATION_MODES = frozenset({"spawn_activity", "session_metadata"})
 RECEIPT_KEYS = frozenset({
     "status", "reason_code", "phase", "child_created", "codex_version",
     "active_config_sha256", "active_role_manifest_sha256", "active_policy_sha256",
     "target_config_sha256", "target_role_manifest_sha256", "target_policy_sha256",
     "role", "task_name", "fork_turns", "parent_ref", "child_ref", "model",
-    "reasoning_effort", "sandbox",
+    "reasoning_effort", "sandbox", "correlation_mode",
 })
 MATRIX = {
     ("preflight", "live_flag_required", "SKIPPED"), ("preflight", "operator_opt_in_required", "SKIPPED"),
@@ -99,6 +109,7 @@ class Verdict:
     child_ref: str | None = None
     model: str | None = None
     reasoning_effort: str | None = None
+    correlation_mode: str | None = None
 
 
 def _verdict(status: str, reason_code: str, *, phase: str = "post-spawn", child_created: str = "unknown", **values: str | None) -> Verdict:
@@ -259,7 +270,7 @@ def role_manifest_hash(home: Path) -> str:
     return _role_manifest(home)[0]
 
 
-def effective_policy(home: Path) -> Path:
+def effective_policy(home: Path, *, active_home: bool = False) -> Path:
     candidates: list[Path] = []
     for name in ("AGENTS.override.md", "AGENTS.md"):
         candidate = home / name
@@ -269,12 +280,57 @@ def effective_policy(home: Path) -> Path:
             continue
         except OSError as exc:
             raise ReceiptError("effective global policy is unavailable") from exc
-        if stat.S_ISLNK(candidate_stat.st_mode) or not stat.S_ISREG(candidate_stat.st_mode):
+        if stat.S_ISLNK(candidate_stat.st_mode):
+            if not active_home:
+                raise ReceiptError("effective global policy is unsafe")
+        elif not stat.S_ISREG(candidate_stat.st_mode):
             raise ReceiptError("effective global policy is unsafe")
         candidates.append(candidate)
     if len(candidates) != 1:
         raise ReceiptError("exactly one effective global policy file is required")
     return candidates[0]
+
+
+def _read_effective_policy_snapshot(
+    home: Path,
+    policy: Path,
+    *,
+    active_home: bool,
+) -> tuple[bytes, list[tuple[Path, tuple[int, ...]]]]:
+    try:
+        policy_stat = policy.lstat()
+    except OSError as exc:
+        raise ReceiptError("effective global policy is unavailable") from exc
+    if not stat.S_ISLNK(policy_stat.st_mode):
+        content, fingerprint = _read_stable_file_snapshot(policy, home)
+        return content, [(policy, fingerprint)]
+    if not active_home:
+        raise ReceiptError("effective global policy is unsafe")
+
+    hooks_path = home / "hooks.json"
+    hooks_content, hooks_fingerprint = _read_stable_file_snapshot(
+        hooks_path,
+        home,
+    )
+    try:
+        _, state_snapshot, state = _active_hook_state(home, hooks_content)
+        expected_digest = _state_policy_digest(state, policy.name)
+        content, policy_snapshots = _read_proven_policy_symlink(
+            policy,
+            home,
+            expected_digest,
+        )
+    except StageError as exc:
+        raise ReceiptError("effective global policy is unsafe") from exc
+    if state_snapshot is None:
+        raise ReceiptError("effective global policy is unsafe")
+    snapshots = [
+        (hooks_path, hooks_fingerprint),
+        state_snapshot,
+        *policy_snapshots,
+    ]
+    _revalidate_hash_sources(snapshots)
+    return content, snapshots
 
 
 def _validate_role_entries(
@@ -365,6 +421,7 @@ def validate_stage_layout(home: Path, *, active_home: bool = False) -> str | Non
     """Validate staged layout or the explicit active-home input projection."""
     try:
         root = home.resolve(strict=True)
+        home = root
         if explicit_layout_error(
             root,
             allow_rollback_backups=active_home,
@@ -379,13 +436,17 @@ def validate_stage_layout(home: Path, *, active_home: bool = False) -> str | Non
             (candidate, _optional_fingerprint(candidate))
             for candidate in policy_candidates
         ]
-        policy = effective_policy(home)
+        policy = effective_policy(home, active_home=active_home)
         config_path = home / "config.toml"
         config_content, config_fingerprint = _read_stable_file_snapshot(
             config_path,
             root,
         )
-        _, policy_fingerprint = _read_stable_file_snapshot(policy, root)
+        _, policy_snapshots = _read_effective_policy_snapshot(
+            root,
+            policy,
+            active_home=active_home,
+        )
         config = tomllib.loads(config_content.decode("utf-8"))
         features = config.get("features", {})
         agents_config = config.get("agents", {})
@@ -414,7 +475,7 @@ def validate_stage_layout(home: Path, *, active_home: bool = False) -> str | Non
         _revalidate_hash_sources(
             [
                 (config_path, config_fingerprint),
-                (policy, policy_fingerprint),
+                *policy_snapshots,
             ]
         )
         if any(
@@ -433,7 +494,11 @@ def validate_stage_layout(home: Path, *, active_home: bool = False) -> str | Non
     return None
 
 
-def hash_inputs(home: Path) -> dict[str, str]:
+def hash_inputs(home: Path, *, active_home: bool = False) -> dict[str, str]:
+    try:
+        home = home.resolve(strict=True)
+    except OSError as exc:
+        raise ReceiptError("mandatory hash input unavailable") from exc
     config = home / "config.toml"
     policy_candidates = [
         home / "AGENTS.override.md",
@@ -443,9 +508,13 @@ def hash_inputs(home: Path) -> dict[str, str]:
         (candidate, _optional_fingerprint(candidate))
         for candidate in policy_candidates
     ]
-    policy = effective_policy(home)
+    policy = effective_policy(home, active_home=active_home)
     config_content, config_fingerprint = _read_stable_file_snapshot(config, home)
-    policy_content, policy_fingerprint = _read_stable_file_snapshot(policy, home)
+    policy_content, policy_snapshots = _read_effective_policy_snapshot(
+        home,
+        policy,
+        active_home=active_home,
+    )
     try:
         config_projection = project_config_bytes(config_content)
     except StageError as exc:
@@ -454,7 +523,7 @@ def hash_inputs(home: Path) -> dict[str, str]:
     _revalidate_hash_sources(
         [
             (config, config_fingerprint),
-            (policy, policy_fingerprint),
+            *policy_snapshots,
         ]
     )
     if any(
@@ -480,12 +549,17 @@ def hash_inputs(home: Path) -> dict[str, str]:
     }
 
 
-def snapshot_inputs(home: Path) -> dict[str, str]:
-    return hash_inputs(home)
+def snapshot_inputs(home: Path, *, active_home: bool = False) -> dict[str, str]:
+    return hash_inputs(home, active_home=active_home)
 
 
-def snapshot_changed(home: Path, snapshot: dict[str, str]) -> bool:
-    return hash_inputs(home) != snapshot
+def snapshot_changed(
+    home: Path,
+    snapshot: dict[str, str],
+    *,
+    active_home: bool = False,
+) -> bool:
+    return hash_inputs(home, active_home=active_home) != snapshot
 
 
 def read_role_binding(path: Path) -> RoleBinding:
@@ -542,7 +616,6 @@ def build_autoroute_command(*, codex_bin: str, cwd: Path) -> list[str]:
         "--json",
         "--strict-config",
         "--skip-git-repo-check",
-        "--dangerously-bypass-hook-trust",
         "-C",
         str(cwd),
         "-s",
@@ -638,7 +711,7 @@ def inspect_dispatch(parent_events: list[dict], child_events: list[dict], *, exp
     # The observed child binding is authoritative. A role may intentionally use
     # the same model and effort as its parent, which cannot be distinguished
     # from inheritance but is behaviorally equivalent to the installed role.
-    return _verdict("NATIVE_OK", "native_verified", child_created="yes", role=expected_role_name, task_name=task, fork_turns=args["fork_turns"], parent_ref=_short_ref(parent_id), child_ref=_short_ref(child_id), model=model, reasoning_effort=effort)
+    return _verdict("NATIVE_OK", "native_verified", child_created="yes", role=expected_role_name, task_name=task, fork_turns=args["fork_turns"], parent_ref=_short_ref(parent_id), child_ref=_short_ref(child_id), model=model, reasoning_effort=effort, correlation_mode="spawn_activity")
 
 
 def _user_message_texts(events: Iterable[dict]) -> list[str]:
@@ -660,80 +733,137 @@ def inspect_autoroute(
     child_rollouts: dict[str, list[dict]],
     *,
     expected_role: RoleBinding,
+    parent_rollout_id: str,
 ) -> Verdict:
     """Verify that the fresh no-directive parent selected Plan review itself."""
     prompts = _user_message_texts(parent_events)
-    if AUTO_ROUTE_PROMPT not in prompts:
-        if any(
-            token in prompt.casefold()
-            for prompt in prompts
-            for token in AUTO_ROUTE_DIRECTIVE_TOKENS
-        ):
-            return _verdict("FAILED", "autoroute_prompt_directive_detected")
-        return _verdict("FAILED", "autoroute_prompt_missing")
-    if any(token in AUTO_ROUTE_PROMPT.casefold() for token in AUTO_ROUTE_DIRECTIVE_TOKENS):
-        return _verdict("FAILED", "autoroute_prompt_directive_detected")
-
-    parent_id = next(
-        (payload.get("id") for payload in _payloads(parent_events, "session_meta") if isinstance(payload.get("id"), str)),
+    submitted_probe = next(
+        (prompt for prompt in prompts if prompt == AUTO_ROUTE_PROMPT),
         None,
     )
-    calls: list[tuple[dict, dict]] = []
-    for payload in _payloads(parent_events, "response_item"):
-        if payload.get("type") != "function_call" or payload.get("name") != "spawn_agent":
-            continue
-        try:
-            args = json.loads(payload.get("arguments", ""))
-        except (TypeError, json.JSONDecodeError):
-            return _verdict("FAILED", "policy_violation")
-        if isinstance(args, dict) and args.get("agent_type") == "plan-verifier":
-            calls.append((payload, args))
+    if submitted_probe is None:
+        return _verdict("FAILED", "autoroute_prompt_missing")
+    if any(
+        token in submitted_probe.casefold()
+        for token in AUTO_ROUTE_DIRECTIVE_TOKENS
+    ):
+        return _verdict("FAILED", "autoroute_prompt_directive_detected")
+    if not _events_valid(
+        parent_events,
+        {"session_meta", "turn_context", "response_item", "event_msg"},
+    ):
+        return _verdict("FAILED", "policy_violation")
+
+    function_calls = [
+        payload
+        for payload in _payloads(parent_events, "response_item")
+        if payload.get("type") == "function_call"
+    ]
+    spawn_calls = [payload for payload in function_calls if payload.get("name") == "spawn_agent"]
+    untyped_spawns = [
+        payload
+        for payload in function_calls
+        if payload.get("name") != "spawn_agent"
+        and "spawn" in str(payload.get("name", ""))
+    ]
+    activities = [
+        payload
+        for payload in _payloads(parent_events, "event_msg")
+        if payload.get("type") == "sub_agent_activity"
+    ]
+    transport_present = bool(spawn_calls or untyped_spawns or activities)
     task_name: str | None = None
     fork_turns: str | None = None
-    if calls:
-        if len(calls) != 1:
+    correlation_mode: str
+
+    if transport_present:
+        if untyped_spawns or len(spawn_calls) != 1 or len(activities) != 1:
             return _verdict("FAILED", "policy_violation")
-        call, args = calls[0]
-        if set(args) != {"message", "agent_type", "task_name", "fork_turns"} or not isinstance(args.get("message"), str) or not args["message"].strip() or not TASK_NAME_RE.fullmatch(str(args.get("task_name"))) or args.get("fork_turns") not in {"none", "1", "2", "3"}:
+        call = spawn_calls[0]
+        try:
+            args = json.loads(call.get("arguments", ""))
+        except (TypeError, json.JSONDecodeError):
+            return _verdict("FAILED", "policy_violation")
+        if (
+            not isinstance(args, dict)
+            or set(args) != {"message", "agent_type", "task_name", "fork_turns"}
+            or not isinstance(args.get("message"), str)
+            or not args["message"].strip()
+            or args.get("agent_type") != "plan-verifier"
+            or not TASK_NAME_RE.fullmatch(str(args.get("task_name")))
+            or args.get("fork_turns") not in {"none", "1", "2", "3"}
+        ):
             return _verdict("FAILED", "policy_violation")
         call_id = call.get("call_id")
-        activities = [
-            payload
-            for payload in _payloads(parent_events, "event_msg")
-            if payload.get("type") == "sub_agent_activity"
-            and payload.get("kind") == "started"
-            and payload.get("event_id") == call_id
-        ]
-        if not isinstance(call_id, str) or len(activities) != 1 or not isinstance(activities[0].get("agent_thread_id"), str):
-            return _verdict("SKIPPED", "native_spawn_evidence_missing")
-        child_id = activities[0]["agent_thread_id"]
+        activity = activities[0]
+        child_id = activity.get("agent_thread_id")
+        if (
+            not isinstance(call_id, str)
+            or not call_id
+            or activity.get("kind") != "started"
+            or activity.get("event_id") != call_id
+            or not isinstance(child_id, str)
+            or not child_id
+        ):
+            return _verdict("FAILED", "policy_violation")
+        parent_id = next(
+            (
+                payload.get("id")
+                for payload in _payloads(parent_events, "session_meta")
+                if isinstance(payload.get("id"), str)
+            ),
+            None,
+        )
         task_name, fork_turns = args["task_name"], args["fork_turns"]
+        correlation_mode = "spawn_activity"
     else:
-        linked = [
-            (child_id, events)
-            for child_id, events in child_rollouts.items()
-            if len(_payloads(events, "session_meta")) == 1
-            and _payloads(events, "session_meta")[0].get("id") == child_id
-            and _payloads(events, "session_meta")[0].get("parent_thread_id") == parent_id
-            and _payloads(events, "session_meta")[0].get("agent_role") == "plan-verifier"
-        ]
-        if not linked:
-            return _verdict("FAILED", "autoroute_plan_verifier_missing", child_created="no")
-        if len(linked) != 1:
+        parent_sessions = _payloads(parent_events, "session_meta")
+        parent_contexts = _payloads(parent_events, "turn_context")
+        child_state = "yes" if child_rollouts else "no"
+        if (
+            not isinstance(parent_rollout_id, str)
+            or not parent_rollout_id
+            or len(parent_sessions) != 1
+            or parent_sessions[0].get("id") != parent_rollout_id
+            or len(parent_contexts) != 1
+            or parent_contexts[0].get("model") != AUTO_ROUTE_PARENT_MODEL
+            or parent_contexts[0].get("effort") != AUTO_ROUTE_PARENT_EFFORT
+        ):
+            return _verdict("FAILED", "policy_violation", child_created=child_state)
+        parent_id = parent_rollout_id
+        if not child_rollouts:
+            return _verdict(
+                "FAILED",
+                "autoroute_plan_verifier_missing",
+                child_created="no",
+            )
+        if len(child_rollouts) != 1:
             return _verdict("FAILED", "policy_violation", child_created="yes")
-        child_id, _ = linked[0]
+        child_id = next(iter(child_rollouts))
+        if not isinstance(child_id, str) or not child_id:
+            return _verdict("FAILED", "policy_violation", child_created="yes")
+        correlation_mode = "session_metadata"
+
     child_events = child_rollouts.get(child_id)
     if not child_events:
+        if correlation_mode == "session_metadata":
+            return _verdict("FAILED", "policy_violation", child_created="yes")
         return _verdict("SKIPPED", "child_evidence_missing", child_created="yes")
+    if not _events_valid(child_events, {"session_meta", "turn_context"}):
+        return _verdict("FAILED", "policy_violation", child_created="yes")
     child_sessions = _payloads(child_events, "session_meta")
     child_contexts = _payloads(child_events, "turn_context")
     if len(child_sessions) != 1 or len(child_contexts) != 1:
+        if correlation_mode == "session_metadata":
+            return _verdict("FAILED", "policy_violation", child_created="yes")
         return _verdict("SKIPPED", "child_binding_unobservable", child_created="yes")
     child_session, child_context = child_sessions[0], child_contexts[0]
     if child_session.get("id") != child_id or child_session.get("parent_thread_id") != parent_id or child_session.get("agent_role") != "plan-verifier":
         return _verdict("FAILED", "parent_child_mismatch", child_created="yes")
     model, effort = child_context.get("model"), child_context.get("effort")
     if not isinstance(model, str) or not isinstance(effort, str):
+        if correlation_mode == "session_metadata":
+            return _verdict("FAILED", "policy_violation", child_created="yes")
         return _verdict("SKIPPED", "child_binding_unobservable", child_created="yes")
     if model != expected_role.model:
         return _verdict("FAILED", "child_model_mismatch", child_created="yes")
@@ -750,6 +880,7 @@ def inspect_autoroute(
         child_ref=_short_ref(child_id),
         model=model,
         reasoning_effort=effort,
+        correlation_mode=correlation_mode,
     )
 
 
@@ -814,22 +945,39 @@ def inspect_autoroute_available_evidence(
     try:
         parent_id = parse_exec_thread_id(stdout)
         parent_events = load_jsonl(locate_rollout(home / "sessions", parent_id))
+        transport_calls = [
+            payload
+            for payload in _payloads(parent_events, "response_item")
+            if payload.get("type") == "function_call"
+            and "spawn" in str(payload.get("name", ""))
+        ]
         activities = [
             payload
             for payload in _payloads(parent_events, "event_msg")
             if payload.get("type") == "sub_agent_activity"
-            and payload.get("kind") == "started"
-            and isinstance(payload.get("agent_thread_id"), str)
         ]
-        children = {
-            activity["agent_thread_id"]: load_jsonl(
-                locate_rollout(home / "sessions", activity["agent_thread_id"])
-            )
-            for activity in activities
-        }
-        if not children:
+        transport_present = bool(transport_calls or activities)
+        children: dict[str, list[dict]] = {}
+        if transport_present:
+            for activity in activities:
+                child_id = activity.get("agent_thread_id")
+                if not isinstance(child_id, str) or not child_id or child_id in children:
+                    continue
+                try:
+                    children[child_id] = load_jsonl(
+                        locate_rollout(home / "sessions", child_id)
+                    )
+                except EvidenceError:
+                    continue
+        else:
             children = child_rollouts_for_parent(home / "sessions", parent_id)
-        return inspect_autoroute(parent_events, children, expected_role=binding), bool(children)
+        verdict = inspect_autoroute(
+            parent_events,
+            children,
+            expected_role=binding,
+            parent_rollout_id=parent_id,
+        )
+        return verdict, transport_present or bool(children)
     except EvidenceError:
         return None, False
 
@@ -937,7 +1085,7 @@ def receipt_payload(verdict: Verdict, *, codex_version: str, active: dict[str, s
         "active_config_sha256": active["config"], "active_role_manifest_sha256": active["role_manifest"], "active_policy_sha256": active["policy"],
         "target_config_sha256": target["config"], "target_role_manifest_sha256": target["role_manifest"], "target_policy_sha256": target["policy"],
     }
-    for key in ("role", "task_name", "fork_turns", "parent_ref", "child_ref", "model", "reasoning_effort"):
+    for key in ("role", "task_name", "fork_turns", "parent_ref", "child_ref", "model", "reasoning_effort", "correlation_mode"):
         value = getattr(verdict, key)
         if value is not None: payload[key] = value
     validate_receipt(payload)
@@ -960,7 +1108,7 @@ def validate_receipt(payload: dict) -> None:
     hashes = [key for key in required if key.endswith("sha256")]
     if any(not isinstance(payload[key], str) or not re.fullmatch(r"[0-9a-f]{64}", payload[key]) for key in hashes):
         raise ReceiptError("receipt hashes are invalid")
-    evidence = {"role", "task_name", "fork_turns", "parent_ref", "child_ref", "model", "reasoning_effort", "sandbox"}
+    evidence = {"role", "task_name", "fork_turns", "parent_ref", "child_ref", "model", "reasoning_effort", "sandbox", "correlation_mode"}
     if payload["phase"] in {"preflight", "execution-pre-child"} and evidence & set(payload):
         raise ReceiptError("pre-child receipt contains observed child evidence")
     if payload["phase"] == "preflight" and payload["child_created"] != "no":
@@ -995,6 +1143,11 @@ def validate_receipt(payload: dict) -> None:
         raise ReceiptError("sandbox evidence is invalid")
     if "sandbox" in payload and not payload["sandbox"]:
         raise ReceiptError("sandbox must be observed")
+    if "correlation_mode" in payload and (
+        not isinstance(payload["correlation_mode"], str)
+        or payload["correlation_mode"] not in CORRELATION_MODES
+    ):
+        raise ReceiptError("receipt correlation mode is invalid")
     for ref in ("parent_ref", "child_ref"):
         if ref in payload and (not isinstance(payload[ref], str) or not payload[ref] or not re.fullmatch(r"[0-9a-f]{16}", payload[ref])):
             raise ReceiptError("receipt reference leaks runtime data")
@@ -1004,9 +1157,11 @@ def validate_receipt(payload: dict) -> None:
         if isinstance(value, str) and ("/" in value or "\\" in value or "secret" in value.lower()):
             raise ReceiptError("receipt contains path or secret data")
     if payload["status"] == "NATIVE_OK":
-        needed = {"role", "parent_ref", "child_ref", "model", "reasoning_effort"}
+        needed = {"role", "parent_ref", "child_ref", "model", "reasoning_effort", "correlation_mode"}
         if payload["phase"] != "post-spawn" or payload["child_created"] != "yes" or not needed <= set(payload) or payload["role"] not in ROLES or not isinstance(payload["model"], str) or not payload["model"].strip() or not isinstance(payload["reasoning_effort"], str) or not payload["reasoning_effort"].strip():
             raise ReceiptError("NATIVE_OK receipt lacks core evidence")
+        if payload["correlation_mode"] == "session_metadata" and payload["role"] != "plan-verifier":
+            raise ReceiptError("session metadata receipt is not autoroute evidence")
 
 
 def receipt_destination(home: Path, requested: Path | None, role: str) -> Path:
@@ -1058,7 +1213,7 @@ def _preflight(args: argparse.Namespace) -> tuple[dict[str, str], dict[str, str]
         active_home, staged_home = validate_home_pair(args.active_codex_home, args.codex_home)
         reason = validate_stage_layout(active_home, active_home=True)
         if reason: return _verdict("FAILED", reason, phase="preflight", child_created="no")
-        active_hash = hash_inputs(active_home)
+        active_hash = hash_inputs(active_home, active_home=True)
         reason = validate_stage_layout(staged_home)
         if reason: return _verdict("FAILED", reason, phase="preflight", child_created="no")
         target_hash = hash_inputs(staged_home)

@@ -22,6 +22,14 @@ import tomllib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hook_registration import (
+    CURRENT_PROJECTION_ID,
+    HookRegistrationError,
+    semantic_projection_digest,
+    strict_json_loads,
+    validate_projection_state,
+    validate_source_registration,
+)
 from validate_agents import ROLES, validate_dir
 
 HASHED_TOP_LEVEL = frozenset({
@@ -35,6 +43,7 @@ HASHED_TOP_LEVEL = frozenset({
 REQUIRED_RUNTIME_FILES = frozenset({"auth.json"})
 PROJECTED_TOP_LEVEL = HASHED_TOP_LEVEL | REQUIRED_RUNTIME_FILES
 HOOK_SCRIPT = Path("hooks/pilotfish_autoroute_gate.py")
+SOURCE_HOOK_REGISTRATION = Path(__file__).resolve().parents[1] / "templates" / "hooks.json"
 ROLLBACK_STAMP_RE = re.compile(r"^(?:\d{8}-\d{6}|\d{8}-\d{6}-\d{6})$")
 SMOKE_CONFIG = (
     b'model = "gpt-5.6-luna"\n'
@@ -185,6 +194,86 @@ def _copy_regular(
     return source, _stat_fingerprint(before)
 
 
+def _read_proven_policy_symlink(
+    source: Path,
+    active: Path,
+    expected_digest: str | None,
+) -> tuple[bytes, tuple[tuple[Path, tuple[int, ...]], ...]]:
+    """Read the effective external policy only when installer state owns it."""
+    try:
+        relative = source.relative_to(active)
+        link_before = source.lstat()
+    except (OSError, ValueError) as exc:
+        raise StageError("effective policy symlink is unavailable") from exc
+    if (
+        relative.parent != Path(".")
+        or relative.name not in {"AGENTS.md", "AGENTS.override.md"}
+        or not stat.S_ISLNK(link_before.st_mode)
+    ):
+        raise StageError("unapproved policy symlink")
+    if expected_digest is None:
+        raise StageError("effective policy symlink requires committed provenance")
+
+    fd: int | None = None
+    try:
+        link_value = os.readlink(source)
+        target = source.resolve(strict=True)
+        target_before = target.lstat()
+        if stat.S_ISLNK(target_before.st_mode) or not stat.S_ISREG(target_before.st_mode):
+            raise StageError("effective policy symlink target is not a regular file")
+        if not os.access(target, os.R_OK):
+            raise StageError("effective policy symlink target is unreadable")
+        fd = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        opened = os.fstat(fd)
+        if _stat_fingerprint(opened) != _stat_fingerprint(target_before):
+            raise StageError("effective policy target changed while staging")
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            payload = handle.read()
+        if (
+            _stat_fingerprint(os.fstat(fd)) != _stat_fingerprint(target_before)
+            or _stat_fingerprint(target.lstat()) != _stat_fingerprint(target_before)
+            or _stat_fingerprint(source.lstat()) != _stat_fingerprint(link_before)
+            or os.readlink(source) != link_value
+            or source.resolve(strict=True) != target
+        ):
+            raise StageError("effective policy target changed while staging")
+    except OSError as exc:
+        raise StageError("effective policy target changed while staging") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+    if hashlib.sha256(payload).hexdigest() != expected_digest:
+        raise StageError("effective policy does not match committed provenance")
+    return payload, (
+        (source, _stat_fingerprint(link_before)),
+        (target, _stat_fingerprint(target_before)),
+    )
+
+
+def _copy_proven_policy_symlink(
+    source: Path,
+    destination: Path,
+    active: Path,
+    expected_digest: str,
+) -> tuple[tuple[Path, tuple[int, ...]], ...]:
+    payload, snapshots = _read_proven_policy_symlink(
+        source,
+        active,
+        expected_digest,
+    )
+    try:
+        with destination.open("xb") as writer:
+            writer.write(payload)
+            writer.flush()
+            os.fsync(writer.fileno())
+        os.chmod(destination, 0o600)
+    except (FileExistsError, OSError) as exc:
+        raise StageError("staging effective policy failed") from exc
+    _revalidate_sources(snapshots)
+    return snapshots
+
+
 def _copy_projected_config(
     source: Path,
     destination: Path,
@@ -225,6 +314,136 @@ def _copy_projected_config(
     return source, _stat_fingerprint(before)
 
 
+def _read_stable_regular(source: Path) -> tuple[bytes, tuple[int, ...]]:
+    """Read a trusted source/sidecar without following a replacement symlink."""
+    try:
+        before = source.lstat()
+    except OSError as exc:
+        raise StageError("required external input is unavailable") from exc
+    if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
+        raise StageError("required external input must be a regular file")
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    fd: int | None = None
+    try:
+        fd = os.open(source, flags)
+        opened = os.fstat(fd)
+        if _stat_fingerprint(opened) != _stat_fingerprint(before):
+            raise StageError("required external input changed while reading")
+        with os.fdopen(fd, "rb", closefd=False) as handle:
+            payload = handle.read()
+        if (
+            _stat_fingerprint(os.fstat(fd)) != _stat_fingerprint(before)
+            or _stat_fingerprint(source.lstat()) != _stat_fingerprint(before)
+        ):
+            raise StageError("required external input changed while reading")
+        return payload, _stat_fingerprint(before)
+    except OSError as exc:
+        raise StageError("required external input changed while reading") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _active_hook_state(
+    active: Path,
+    active_hooks: bytes,
+) -> tuple[
+    str,
+    tuple[Path, tuple[int, ...]] | None,
+    dict[str, object] | None,
+]:
+    state_path = active.with_name(f"{active.name}.pilotfish-install-state.json")
+    if not state_path.exists():
+        source_hooks, _ = _read_stable_regular(SOURCE_HOOK_REGISTRATION)
+        if active_hooks != source_hooks:
+            raise StageError("co-owned active hooks.json requires committed state")
+        return CURRENT_PROJECTION_ID, None, None
+    payload, fingerprint = _read_stable_regular(state_path)
+    try:
+        state = strict_json_loads(payload, source="install state")
+        expected_keys = {
+            "state_version",
+            "status",
+            "target_fingerprints",
+            "original_targets",
+            "owned_legacy",
+            "hook_registration",
+        }
+        if (
+            not isinstance(state, dict)
+            or set(state) != expected_keys
+            or type(state.get("state_version")) is not int
+            or state["state_version"] != 2
+            or state.get("status") != "committed"
+        ):
+            raise HookRegistrationError("install state is not committed v2")
+        projection_id = validate_projection_state(state["hook_registration"])
+        if projection_id != CURRENT_PROJECTION_ID:
+            raise HookRegistrationError("active hook projection is not current")
+    except HookRegistrationError as exc:
+        raise StageError(f"active hook ownership state is invalid: {exc}") from exc
+    return projection_id, (state_path, fingerprint), state
+
+
+def _state_policy_digest(
+    state: dict[str, object] | None,
+    policy_name: str,
+) -> str:
+    if state is None:
+        raise StageError("effective policy symlink requires committed provenance")
+    targets = state.get("target_fingerprints")
+    originals = state.get("original_targets")
+    expected_targets = {
+        "config.toml",
+        policy_name,
+        HOOK_SCRIPT.as_posix(),
+        *(f"agents/{role}.toml" for role in ROLES),
+    }
+    if (
+        not isinstance(targets, dict)
+        or not isinstance(originals, dict)
+        or set(targets) != expected_targets
+        or set(originals) != expected_targets
+    ):
+        raise StageError("effective policy provenance manifest is invalid")
+    digest = targets.get(policy_name)
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise StageError("effective policy provenance fingerprint is invalid")
+    return digest
+
+
+def _active_policy_digest(active: Path, policy_name: str) -> str:
+    try:
+        active_hooks, _ = _read_stable_required(active / "hooks.json", active)
+    except StageError as exc:
+        raise StageError("effective policy provenance is unavailable") from exc
+    _, _, state = _active_hook_state(active, active_hooks)
+    return _state_policy_digest(state, policy_name)
+
+
+def _stage_clean_hook_registration(
+    destination: Path,
+) -> tuple[tuple[Path, tuple[int, ...]], str]:
+    payload, fingerprint = _read_stable_regular(SOURCE_HOOK_REGISTRATION)
+    try:
+        validate_source_registration(payload)
+    except HookRegistrationError as exc:
+        raise StageError(f"source hooks.json is invalid: {exc}") from exc
+    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    try:
+        with destination.open("xb") as writer:
+            writer.write(payload)
+            writer.flush()
+            os.fsync(writer.fileno())
+        os.chmod(destination, 0o600)
+    except (FileExistsError, OSError) as exc:
+        raise StageError("staging clean hooks.json failed") from exc
+    return (
+        (SOURCE_HOOK_REGISTRATION, fingerprint),
+        hashlib.sha256(payload).hexdigest(),
+    )
+
+
 def _rollback_backup(relative: Path) -> bool:
     name = relative.name
     marker = ".pilotfish-v1.2-pristine"
@@ -236,6 +455,11 @@ def _rollback_backup(relative: Path) -> bool:
     if len(relative.parts) == 1:
         return base in {"config.toml", "AGENTS.md", "AGENTS.override.md"} and (
             not relative.name.endswith(marker) or base == "config.toml"
+        )
+    if relative.parent == HOOK_SCRIPT.parent:
+        return (
+            base == HOOK_SCRIPT.name
+            and not relative.name.endswith(marker)
         )
     return (
         relative.parts[0] == "agents"
@@ -326,12 +550,27 @@ def explicit_layout_error(
             return f"unapproved entry: {relative.as_posix()}"
         except OSError:
             return f"unapproved entry: {relative.as_posix()}"
+        is_active_policy_symlink = (
+            project_active_root
+            and len(relative.parts) == 1
+            and relative.name in {"AGENTS.md", "AGENTS.override.md"}
+            and stat.S_ISLNK(source_stat.st_mode)
+        )
         try:
-            if stat.S_ISLNK(source_stat.st_mode) or not entry.resolve(strict=True).is_relative_to(root):
+            resolved = entry.resolve(strict=True)
+            if is_active_policy_symlink:
+                resolved_stat = resolved.lstat()
+                if (
+                    stat.S_ISLNK(resolved_stat.st_mode)
+                    or not stat.S_ISREG(resolved_stat.st_mode)
+                    or not os.access(resolved, os.R_OK)
+                ):
+                    return f"unapproved entry: {relative.as_posix()}"
+            elif stat.S_ISLNK(source_stat.st_mode) or not resolved.is_relative_to(root):
                 return f"unapproved entry: {relative.as_posix()}"
         except OSError:
             return f"unapproved entry: {relative.as_posix()}"
-        is_file = stat.S_ISREG(source_stat.st_mode)
+        is_file = stat.S_ISREG(source_stat.st_mode) or is_active_policy_symlink
         is_directory = stat.S_ISDIR(source_stat.st_mode)
         if not is_file and not is_directory:
             return f"unapproved entry: {relative.as_posix()}"
@@ -356,6 +595,8 @@ def explicit_layout_error(
         if relative.parts[0] == "hooks":
             if is_directory:
                 return f"unapproved entry: {relative.as_posix()}"
+            if allow_rollback_backups and _rollback_backup(relative):
+                continue
             if relative != HOOK_SCRIPT:
                 return f"unapproved entry: {relative.as_posix()}"
             hook_files.add(relative)
@@ -442,6 +683,18 @@ def _copy_inputs(
     )
     if layout_error:
         raise StageError(layout_error)
+    try:
+        active_hooks, _ = _read_stable_required(active / "hooks.json", active)
+    except StageError as exc:
+        raise StageError("source replaced while staging") from exc
+    projection_id, state_snapshot, install_state = _active_hook_state(
+        active,
+        active_hooks,
+    )
+    try:
+        semantic_projection_digest(active_hooks, projection_id)
+    except HookRegistrationError as exc:
+        raise StageError(f"active hooks.json ownership is invalid: {exc}") from exc
     projection_snapshot = _projection_snapshot(active)
     policies = [
         name
@@ -450,14 +703,27 @@ def _copy_inputs(
     ]
     if len(policies) != 1:
         raise StageError("exactly one effective policy file is required")
+    policy = active / policies[0]
+    policy_digest: str | None = None
     snapshots = [
         _copy_projected_config(
             active / "config.toml",
             temporary / "config.toml",
             active,
         ),
-        _copy_regular(active / policies[0], temporary / policies[0], active),
     ]
+    if policy.is_symlink():
+        policy_digest = _state_policy_digest(install_state, policies[0])
+        snapshots.extend(
+            _copy_proven_policy_symlink(
+                policy,
+                temporary / policies[0],
+                active,
+                policy_digest,
+            )
+        )
+    else:
+        snapshots.append(_copy_regular(policy, temporary / policies[0], active))
     snapshots.extend(
         _copy_tree(
             active / "agents",
@@ -466,10 +732,20 @@ def _copy_inputs(
             omit_rollback_backups=True,
         )
     )
-    snapshots.append(
-        _copy_regular(active / "hooks.json", temporary / "hooks.json", active)
+    clean_hook_snapshot, _ = _stage_clean_hook_registration(
+        temporary / "hooks.json"
     )
-    snapshots.extend(_copy_tree(active / "hooks", temporary / "hooks", active))
+    if state_snapshot is not None:
+        snapshots.append(state_snapshot)
+    snapshots.append(clean_hook_snapshot)
+    snapshots.extend(
+        _copy_tree(
+            active / "hooks",
+            temporary / "hooks",
+            active,
+            omit_rollback_backups=True,
+        )
+    )
     problems = validate_dir(temporary / "agents", expected_names=ROLES)
     if problems:
         raise StageError("invalid role manifest: " + "; ".join(problems))
@@ -567,10 +843,18 @@ def _required_input_projection(root: Path) -> tuple[str, str, str, str, str, str
         root / "config.toml",
         root,
     )
-    policy_content, policy_fingerprint = _read_stable_required(
-        policies[0],
-        root,
-    )
+    if policies[0].is_symlink():
+        policy_content, policy_snapshots = _read_proven_policy_symlink(
+            policies[0],
+            root,
+            _active_policy_digest(root, policies[0].name),
+        )
+    else:
+        policy_content, policy_fingerprint = _read_stable_required(
+            policies[0],
+            root,
+        )
+        policy_snapshots = ((policies[0], policy_fingerprint),)
     hooks_content, hooks_fingerprint = _read_stable_required(
         root / "hooks.json",
         root,
@@ -627,7 +911,7 @@ def _required_input_projection(root: Path) -> tuple[str, str, str, str, str, str
     _revalidate_sources(
         (
             (root / "config.toml", config_fingerprint),
-            (policies[0], policy_fingerprint),
+            *policy_snapshots,
             (root / "hooks.json", hooks_fingerprint),
             (root / HOOK_SCRIPT, hook_script_fingerprint),
             (hooks_root, hooks_root_fingerprint),
@@ -655,12 +939,19 @@ def _required_input_projection(root: Path) -> tuple[str, str, str, str, str, str
         manifest_digest.update(encoded)
         manifest_digest.update(len(content).to_bytes(8, "big"))
         manifest_digest.update(content)
+    try:
+        hooks_projection = semantic_projection_digest(
+            hooks_content,
+            CURRENT_PROJECTION_ID,
+        )
+    except HookRegistrationError as exc:
+        raise StageError(f"required hook registration is invalid: {exc}") from exc
     return (
         hashlib.sha256(project_config_bytes(config_content)).hexdigest(),
         policies[0].name,
         hashlib.sha256(policy_content).hexdigest(),
         manifest_digest.hexdigest(),
-        hashlib.sha256(hooks_content).hexdigest(),
+        hooks_projection,
         hashlib.sha256(hook_script_content).hexdigest(),
     )
 
@@ -691,6 +982,13 @@ def publish_no_replace(
         raise StageError("required inputs changed before publication") from exc
     if active_required != staged_required:
         raise StageError("required inputs changed before publication")
+    staged_hooks, _ = _read_stable_required(
+        temporary / "hooks.json",
+        temporary,
+    )
+    source_hooks, _ = _read_stable_regular(SOURCE_HOOK_REGISTRATION)
+    if staged_hooks != source_hooks:
+        raise StageError("clean staged hooks.json changed before publication")
     _revalidate_sources(source_snapshots)
     result = renameatx_np(-2, os.fsencode(temporary), -2, os.fsencode(destination), 0x00000004)
     if result != 0:

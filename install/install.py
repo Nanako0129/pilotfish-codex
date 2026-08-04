@@ -24,6 +24,18 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hook_registration import (
+    CURRENT_PROJECTION_ID,
+    HookRegistrationError,
+    legacy_projection_id,
+    load_registration,
+    merge_registration,
+    projection_state,
+    strict_json_loads,
+    validate_owned_projection,
+    validate_projection_state,
+    validate_source_registration,
+)
 from validate_agents import ROLES, validate_agent, validate_agents_config
 
 PINNED_CODEX_VERSION = (0, 146, 0)
@@ -251,8 +263,8 @@ def _load_state(home: Path) -> dict | None:
     if not path.exists():
         return None
     try:
-        state = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        state = strict_json_loads(path.read_bytes(), source="install state")
+    except (OSError, HookRegistrationError) as exc:
         raise InstallAbort("install state is invalid; resolve it before writing") from exc
     if not isinstance(state, dict) or state.get("status") != "committed":
         raise InstallAbort("install state is not a committed transaction")
@@ -274,6 +286,10 @@ def _required_state_targets(
     if include_hooks:
         targets.update({"hooks.json", "hooks/pilotfish_autoroute_gate.py"})
     return frozenset(targets)
+
+
+def _required_v2_state_targets(policy_path: Path, home: Path) -> frozenset[str]:
+    return _required_state_targets(policy_path, home) - {"hooks.json"}
 
 
 def _config_value(config: dict, dotted: str) -> tuple[bool, object | None]:
@@ -314,28 +330,56 @@ def _validate_committed_state(
     home: Path,
     policy_path: Path,
     config_snapshot: bytes | None,
-) -> tuple[frozenset[str], bool]:
-    """Validate sidecar provenance and return ownership plus migration proof."""
+) -> tuple[frozenset[str], bool, str, bool, str | None]:
+    """Validate sidecar provenance, including event-bound hook ownership."""
     if not isinstance(state, dict) or state.get("status") != "committed":
         raise InstallAbort("install state is not a committed transaction")
-    allowed_top = {"status", "target_fingerprints", "original_targets", "owned_legacy"}
+    legacy_allowed = {"status", "target_fingerprints", "original_targets", "owned_legacy"}
+    v2_allowed = legacy_allowed | {"state_version", "hook_registration"}
+    is_v2 = "state_version" in state
+    allowed_top = v2_allowed if is_v2 else legacy_allowed
     if set(state) != allowed_top:
         raise InstallAbort("install state has missing or unknown fields")
+    if is_v2 and (
+        type(state["state_version"]) is not int or state["state_version"] != 2
+    ):
+        raise InstallAbort("install state version is malformed")
     targets = state.get("target_fingerprints")
     originals = state.get("original_targets")
     if not isinstance(targets, dict) or not isinstance(originals, dict):
         raise InstallAbort("install state target evidence is malformed")
-    required = _required_state_targets(policy_path, home)
-    legacy = _required_state_targets(policy_path, home, include_hooks=False)
     recorded = frozenset(targets)
-    if recorded not in {required, legacy} or set(originals) != recorded:
+    required = (
+        _required_v2_state_targets(policy_path, home)
+        if is_v2
+        else _required_state_targets(policy_path, home)
+    )
+    if recorded != required or set(originals) != recorded:
         raise InstallAbort("install state target manifest is stale or incomplete")
+    try:
+        if is_v2:
+            hook_projection_id = validate_projection_state(state["hook_registration"])
+        else:
+            raw_fingerprint = targets.get("hooks.json")
+            if not isinstance(raw_fingerprint, str):
+                raise HookRegistrationError("legacy hooks.json fingerprint is malformed")
+            hook_projection_id = legacy_projection_id(raw_fingerprint)
+        hooks_path = home / "hooks.json"
+        if not hooks_path.is_file():
+            raise HookRegistrationError("owned hooks.json is missing")
+        registration = load_registration(
+            hooks_path.read_bytes(), source="existing hooks.json"
+        )
+        validate_owned_projection(registration, hook_projection_id)
+    except (OSError, HookRegistrationError) as exc:
+        raise InstallAbort(f"committed hook registration is invalid: {exc}") from exc
     config_path = home / "config.toml"
     config_on_disk = config_path.read_bytes() if config_path.is_file() else None
     if config_on_disk != config_snapshot:
         raise InstallAbort("config.toml changed during state validation")
     sha_re = re.compile(r"^[0-9a-f]{64}$")
     original_payloads: dict[str, bytes | None] = {}
+    hook_script_fingerprint: str | None = None
     for relative in sorted(recorded):
         fingerprint = targets.get(relative)
         evidence = originals.get(relative)
@@ -361,10 +405,12 @@ def _validate_committed_state(
         else:
             original_payloads[relative] = None
         target = home / relative
-        if relative == "config.toml":
+        if relative in {"config.toml", "hooks.json"}:
             continue
         if not target.is_file() or _sha256_bytes(target.read_bytes()) != fingerprint:
             raise InstallAbort("committed install state is stale; operator resolution required")
+        if relative == "hooks/pilotfish_autoroute_gate.py":
+            hook_script_fingerprint = fingerprint
     ownership = state.get("owned_legacy", {})
     if not isinstance(ownership, dict):
         raise InstallAbort("install state ownership evidence is malformed")
@@ -421,7 +467,13 @@ def _validate_committed_state(
             expected_parsed, owned
         ):
             raise InstallAbort("committed config routing projection is stale")
-    return owned, migration_proven
+    return (
+        owned,
+        migration_proven,
+        hook_projection_id,
+        not is_v2,
+        hook_script_fingerprint,
+    )
 
 
 def _config_path_present(data: dict, dotted: str) -> bool:
@@ -567,9 +619,38 @@ def _atomic_write(path: Path, payload: bytes, mode: int) -> None:
         temp.unlink(missing_ok=True)
 
 
+def _replace_staged(
+    temp: Path,
+    destination: Path,
+    expected_original: bytes | None,
+    *,
+    role_directory_fd: int | None,
+) -> None:
+    """Last-moment compare-and-replace seam used by transaction race tests."""
+    actual = destination.read_bytes() if destination.is_file() else None
+    if actual != expected_original:
+        raise InstallAbort(f"{destination} changed immediately before replacement")
+    if role_directory_fd is None:
+        os.replace(temp, destination)
+    else:
+        os.replace(temp, destination.name, dst_dir_fd=role_directory_fd)
+
+
+def _atomic_write_if_unchanged(
+    path: Path,
+    payload: bytes,
+    mode: int,
+    expected_original: bytes | None,
+) -> None:
+    current = path.read_bytes() if path.is_file() else None
+    if current != expected_original:
+        raise InstallAbort(f"{path} changed immediately before state publication")
+    _atomic_write(path, payload, mode)
+
+
 def _commit(writes: list[tuple[Path, bytes, int, bytes | None]], stamp: str,
             *, agents_root: Path, hooks_root: Path, codex_home: Path,
-            policy_path: Path) -> None:
+            policy_path: Path) -> list[tuple[Path, bytes | None, bytes, int]]:
     _assert_active_instruction_file(codex_home, policy_path)
     _assert_hook_targets(codex_home)
     staged: list[tuple[Path, Path, bytes | None, bool, bool]] = []
@@ -605,26 +686,38 @@ def _commit(writes: list[tuple[Path, bytes, int, bytes | None]], stamp: str,
         for dest, _, original, _, _ in staged:
             if original is not None:
                 shutil.copy2(dest, dest.with_name(f"{dest.name}.pilotfish-codex-{stamp}"))
-        applied: list[tuple[Path, bytes | None]] = []
+        applied: list[tuple[Path, bytes | None, bytes, int]] = []
         try:
             for dest, temp, original, is_role, is_hook in staged:
+                payload = expected_post[dest]
+                mode = stat.S_IMODE(dest.stat().st_mode) if dest.is_file() else 0o600
                 if is_role:
                     _assert_agents_root(agents_root, codex_home)
-                    os.replace(temp, dest.name, dst_dir_fd=agents_fd)
                 else:
                     if is_hook:
                         _assert_hook_targets(codex_home)
-                    os.replace(temp, dest)
-                applied.append((dest, original))
+                _replace_staged(
+                    temp,
+                    dest,
+                    original,
+                    role_directory_fd=agents_fd if is_role else None,
+                )
+                applied.append((dest, original, payload, mode))
             for destination, expected in expected_post.items():
                 if not destination.is_file() or destination.read_bytes() != expected:
                     raise InstallAbort("post-write target fingerprint mismatch")
             _assert_active_instruction_file(codex_home, policy_path)
         except (OSError, InstallAbort):
-            for dest, original in reversed(applied):
-                if original is None: dest.unlink(missing_ok=True)
-                else: _atomic_write(dest, original, stat.S_IMODE(dest.stat().st_mode))
+            for dest, original, payload, mode in reversed(applied):
+                current = dest.read_bytes() if dest.is_file() else None
+                if current != payload:
+                    continue
+                if original is None:
+                    dest.unlink(missing_ok=True)
+                else:
+                    _atomic_write(dest, original, mode)
             raise
+        return applied
     finally:
         os.close(agents_fd)
         for _, temp, _, _, _ in staged:
@@ -653,10 +746,19 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
     state = _load_state(codex_home)
     owned = frozenset()
     migration_proven = False
+    owned_hook_projection: str | None = None
+    legacy_state = False
+    proven_hook_script_fingerprint: str | None = None
     features = parsed_config.get("features", {}) if isinstance(parsed_config, dict) else {}
     legacy_v2 = isinstance(features, dict) and "multi_agent_v2" in features
     if state is not None:
-        owned, migration_proven = _validate_committed_state(
+        (
+            owned,
+            migration_proven,
+            owned_hook_projection,
+            legacy_state,
+            proven_hook_script_fingerprint,
+        ) = _validate_committed_state(
             state,
             home=codex_home,
             policy_path=policy_path,
@@ -698,19 +800,43 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
     hooks_root = codex_home / "hooks"
     hook_script = hooks_root / "pilotfish_autoroute_gate.py"
     _assert_hook_targets(codex_home)
-    hook_sources = (
-        (hooks_registration, source_root / "templates" / "hooks.json"),
-        (hook_script, source_root / "hooks" / "pilotfish_autoroute_gate.py"),
+    source_registration = (source_root / "templates" / "hooks.json").read_bytes()
+    current_registration = (
+        hooks_registration.read_bytes() if hooks_registration.is_file() else None
     )
-    for target, source in hook_sources:
-        payload = source.read_bytes()
-        current = target.read_bytes() if target.is_file() else None
-        if current is not None and current != payload:
-            if target == hooks_registration:
-                raise InstallAbort("unowned hooks.json collision; refusing replacement")
-            raise InstallAbort("installed_hook_drift: hook script requires explicit replacement approval")
-        if current is None:
-            writes.append((target, payload, 0o600, None))
+    try:
+        validate_source_registration(source_registration)
+        merged_registration, desired_hook_projection = merge_registration(
+            current_registration,
+            source_registration,
+            owned_projection_id=owned_hook_projection,
+        )
+    except HookRegistrationError as exc:
+        raise InstallAbort(f"hook registration rejected: {exc}") from exc
+    if current_registration != merged_registration:
+        writes.append(
+            (
+                hooks_registration,
+                merged_registration,
+                0o600,
+                current_registration,
+            )
+        )
+    source_hook_script = source_root / "hooks" / "pilotfish_autoroute_gate.py"
+    hook_script_payload = source_hook_script.read_bytes()
+    current_hook_script = hook_script.read_bytes() if hook_script.is_file() else None
+    if current_hook_script is not None and current_hook_script != hook_script_payload:
+        if (
+            proven_hook_script_fingerprint is None
+            or _sha256_bytes(current_hook_script) != proven_hook_script_fingerprint
+        ):
+            raise InstallAbort(
+                "installed_hook_drift: hook script requires explicit replacement approval"
+            )
+        writes.append((hook_script, hook_script_payload, 0o600, current_hook_script))
+        notes.append("upgraded state-proven hook script")
+    elif current_hook_script is None:
+        writes.append((hook_script, hook_script_payload, 0o600, None))
     planned_roles = {p.stem for p in existing} | set(ROLES)
     extras = planned_roles - ROLES
     if extras:
@@ -738,6 +864,7 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
         hooks_registration,
         hook_script,
     ]
+    state_inventory = [path for path in inventory if path != hooks_registration]
     pre_targets: dict[str, dict[str, object]] = {}
     for path in inventory:
         relative = path.relative_to(codex_home).as_posix()
@@ -756,10 +883,25 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
         )
         for path in inventory
     }
+    state_pre_targets = {
+        path.relative_to(codex_home).as_posix(): pre_targets[
+            path.relative_to(codex_home).as_posix()
+        ]
+        for path in state_inventory
+    }
+    expected_state_inventory = {
+        path.relative_to(codex_home).as_posix(): expected_inventory[
+            path.relative_to(codex_home).as_posix()
+        ]
+        for path in state_inventory
+    }
+    state_needs_publication = state is None or legacy_state or (
+        owned_hook_projection != desired_hook_projection
+    )
     if dry_run:
         for note in notes:
             print(f"note: {note}")
-        if not writes:
+        if not writes and not state_needs_publication:
             print("already up to date; nothing to change")
             return 0
         for path, _, _, _ in writes:
@@ -769,13 +911,14 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
         print(f"allowed transaction artifact: {state_path.name}")
         for path, _, _, original in writes:
             if original is not None:
-                print(f"allowed transaction artifact: {path.name}.pilotfish-codex-<timestamp>")
+                relative = path.relative_to(codex_home).as_posix()
+                print(f"allowed transaction artifact: {relative}.pilotfish-codex-<timestamp>")
         return 0
-    if writes:
+    if writes or state_needs_publication:
         pending = _state_path(codex_home).with_suffix(".json.pending")
         pending_record = {
             "status": "pending",
-            "original_targets": pre_targets,
+            "original_targets": state_pre_targets,
             "owned_legacy": {
                 path: {
                     "original_present": True,
@@ -785,11 +928,14 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
                 for path in owned
             },
         }
-        _atomic_write(pending, json.dumps(pending_record, sort_keys=True).encode() + b"\n", 0o600)
+        pending_payload = json.dumps(pending_record, sort_keys=True).encode() + b"\n"
+        _atomic_write(pending, pending_payload, 0o600)
         state_path = _state_path(codex_home)
-        state_published = False
+        state_original = state_path.read_bytes() if state_path.is_file() else None
+        applied: list[tuple[Path, bytes | None, bytes, int]] = []
+        state_payload: bytes | None = None
         try:
-            _commit(
+            applied = _commit(
                 writes,
                 _stamp(),
                 agents_root=agents,
@@ -808,27 +954,50 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
                 if not path.is_file() or _sha256_bytes(path.read_bytes()) != expected_inventory[relative]:
                     raise InstallAbort("post-write state publication fingerprint mismatch")
             ownership = dict(pending_record["owned_legacy"])
-            record = {"status": "committed", "target_fingerprints": expected_inventory,
-                      "original_targets": pre_targets, "owned_legacy": ownership}
+            record = {
+                "state_version": 2,
+                "status": "committed",
+                "target_fingerprints": expected_state_inventory,
+                "original_targets": state_pre_targets,
+                "owned_legacy": ownership,
+                "hook_registration": projection_state(desired_hook_projection),
+            }
+            state_payload = json.dumps(record, sort_keys=True).encode() + b"\n"
             _assert_active_instruction_file(codex_home, policy_path)
-            _atomic_write(state_path, json.dumps(record, sort_keys=True).encode() + b"\n", 0o600)
-            state_published = True
+            _atomic_write_if_unchanged(
+                state_path,
+                state_payload,
+                0o600,
+                state_original,
+            )
+            if not state_path.is_file() or state_path.read_bytes() != state_payload:
+                raise InstallAbort("published install state changed before verification")
             _assert_active_instruction_file(codex_home, policy_path)
             if any(not path.is_file() or _sha256_bytes(path.read_bytes()) != expected_inventory[path.relative_to(codex_home).as_posix()] for path in inventory):
                 raise InstallAbort("post-sidecar transaction fingerprint mismatch")
+            if not pending.is_file() or pending.read_bytes() != pending_payload:
+                raise InstallAbort("pending install state changed before removal")
+            pending.unlink()
         except BaseException as exc:
-            if state_published:
-                state_path.unlink(missing_ok=True)
-            for path in inventory:
-                evidence = pre_targets[path.relative_to(codex_home).as_posix()]
-                if evidence["present"]:
-                    _atomic_write(path, base64.b64decode(evidence["bytes_b64"]), 0o600)
+            current_state = state_path.read_bytes() if state_path.is_file() else None
+            if state_payload is not None and current_state == state_payload:
+                if state_original is None:
+                    state_path.unlink(missing_ok=True)
                 else:
+                    _atomic_write(state_path, state_original, 0o600)
+            for path, original, payload, mode in reversed(applied):
+                current = path.read_bytes() if path.is_file() else None
+                if current != payload:
+                    continue
+                if original is None:
                     path.unlink(missing_ok=True)
+                else:
+                    _atomic_write(path, original, mode)
             aborted = dict(pending_record, status="aborted", error=type(exc).__name__)
-            _atomic_write(pending, json.dumps(aborted, sort_keys=True).encode() + b"\n", 0o600)
+            aborted_payload = json.dumps(aborted, sort_keys=True).encode() + b"\n"
+            if pending.is_file() and pending.read_bytes() == pending_payload:
+                _atomic_write(pending, aborted_payload, 0o600)
             raise
-        pending.unlink()
     for note in notes:
         print(f"note: {note}")
     print("changed native target" if writes else "already up to date; nothing to change")

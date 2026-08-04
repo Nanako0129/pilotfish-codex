@@ -47,8 +47,8 @@ targets the selected home. Show the user:
 - the policy and hook changes;
 - existing files that will receive a timestamped
   `*.pilotfish-codex-<timestamp>` backup; and
-- any role drift, extra role, pending transaction, or unowned hook collision
-  that caused an abort.
+- any role drift, extra role, pending transaction, or unresolved hook
+  registration ownership that caused an abort.
 
 Ask for explicit approval to back up and write that home. Approval must name
 the path and does not authorize replacing customized same-name roles,
@@ -184,11 +184,40 @@ grep -F 'Pilotfish automatic typed Plan-review gate.' \
   "$PILOTFISH_TARGET_HOME/hooks.json"
 ```
 
-Trust the hook once in an interactive Codex session. Inspect `hooks.json`,
-start Codex, and use `/hooks` to inspect and trust the exact description
-`Pilotfish automatic typed Plan-review gate.`. Codex records trust against the
-hook definition hash; repeat this only when that definition changes. Do not
-use a bypass flag for normal active-runtime work.
+### Prove the hook can launch
+
+Registration and trust do not prove that the registered command runs. A hook
+whose interpreter is missing fails silently and open: no enforcement, and no
+signal that enforcement is gone. Run the registered command's own launch probe
+before trusting the result of any later gate check.
+
+On macOS and Linux:
+
+```bash
+/usr/bin/env python3 \
+  "$PILOTFISH_TARGET_HOME/hooks/pilotfish_autoroute_gate.py" --selftest
+```
+
+On native Windows, `python` is frequently the Microsoft Store alias stub, which
+opens the Store instead of running the script. Run the probe through the same
+command the `commandWindows` entry uses and require real output:
+
+```powershell
+python -c "import os,runpy; from pathlib import Path; runpy.run_path(str(Path(os.environ.get('CODEX_HOME', Path.home()/'.codex'))/'hooks'/'pilotfish_autoroute_gate.py'), run_name='__main__')" --selftest
+```
+
+Both must print `pilotfish-autoroute-gate schema=<n> launchable`. Any other
+result — no output, a Store window, `ModuleNotFoundError` — means the gate is
+not enforcing anything on this machine. Fix the interpreter or record the gate
+as unenforced; do not report the install as gated.
+
+Trust the Pilotfish registration once in an interactive Codex session. Inspect
+the group that runs `hooks/pilotfish_autoroute_gate.py`, start Codex, and use
+`/hooks` to review and trust it. A pre-existing user-level `hooks.json` can
+have its own top-level description, so do not rely on one global description as
+the registration identity. Codex records trust against the hook definition
+hash; repeat this only when that definition changes. Do not use a bypass flag
+for normal active-runtime work.
 
 If the UI exposes trust only as a prompt while a session is starting, close
 that session and start a fresh one. Approve the exact hook at session start,
@@ -203,15 +232,18 @@ un-pinned validator or claim validation from a different ref.
 ## Safe rerun and update
 
 Rerunning the same command at the same ref is intended to be idempotent. It
-preserves unrelated config, custom same-name role bytes, and user files. Run a
-new dry-run and obtain approval again before changing to another visible tag
-or commit. Review every changed role, policy, hook, and backup path before the
-real update.
+preserves unrelated config, custom same-name role bytes, user files, and
+complete unrelated native hook groups. Pilotfish only owns its exact,
+event-bound hook groups and its script. A sidecar-proven Pilotfish script can
+upgrade to the selected source; a changed, missing, duplicated, or unproven
+Pilotfish group or script stops the update. Run a new dry-run and obtain
+approval again before changing to another visible tag or commit. Review every
+changed role, policy, hook, and backup path before the real update.
 
-The installer fails closed for customized role drift, an unowned `hooks.json`
-collision, extra roles, malformed config, or stale transaction evidence. Do
-not force those cases by deleting state or passing an unsupported option to
-`install.py`.
+The installer fails closed for customized role drift, malformed or ambiguous
+hook registration, an unproven current or historical Pilotfish group, extra
+roles, malformed config, or stale transaction evidence. Do not force those
+cases by deleting state or passing an unsupported option to `install.py`.
 
 ## Recovery and rollback
 
@@ -224,11 +256,14 @@ unless the operator deliberately handles them.
 
 The installer stages writes, creates backups before replacement, verifies
 post-write fingerprints, and records committed ownership in a mode-`0600`
-sidecar. Use those records and
+sidecar. Its isolated smoke candidate uses the clean Pilotfish registration,
+not any unrelated active-home hook group. If a concurrent edit is detected, the
+installer preserves that content and leaves an aborted sidecar for operator
+resolution. Use those records and
 [`install/AGENT-INSTALL.md`](install/AGENT-INSTALL.md) to decide a targeted
-restoration. A customized same-name role or an unowned hook collision requires
-an explicit operator decision; this playbook does not authorize deletion or an
-uninstall shortcut.
+restoration. A customized same-name role or an unproven Pilotfish hook group
+requires an explicit operator decision; this playbook does not authorize
+deletion or an uninstall shortcut.
 
 ## Final report
 

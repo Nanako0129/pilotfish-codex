@@ -27,9 +27,12 @@ priority: high
    cannot be reported as a successful policy-only check.
 5. Passing evidence binds one fresh parent rollout to its exact
    `plan-verifier` child. The verifier records the submitted no-directive
-   prompt, checks the parent `spawn_agent` arguments, follows the matching
-   activity event to the child ID, and then checks the child model and effort.
-   Stale, unlinked, ambiguous, or extra-role-only evidence fails closed.
+   prompt. Generic probes require the parent `spawn_agent` arguments and the
+   matching activity event. `--autoroute` may instead use direct session
+   metadata only when all spawn/activity transport evidence is absent; it
+   requires exactly one Luna/medium root and one directly linked Sol/high
+   child. Stale, mixed, unlinked, ambiguous, duplicate, or extra-role-only
+   evidence fails closed, and every success records its correlation mode.
 6. The quota-spending smoke runs against a newly installed isolated Codex home.
    The active global policy is updated only after a passing result, and then
    its policy and role digests must match the tested candidate.
@@ -52,9 +55,33 @@ priority: high
    source-owned constant directive, no transcript/path/body text, logs, or
    temporary copies. It validates a regular non-symlink transcript under the
    configured session root and reads a bounded tail/current segment.
-11. Candidate-to-active integrity covers the policy, role manifest, hook
-    registration, and hook script bytes. Missing, stale, or changed hook files
-    abort propagation before active-home writes.
+11. Candidate integrity covers the policy, role manifest, exact clean hook
+    registration, and hook script bytes. Active-home propagation validates the
+    canonical event-bound Pilotfish registration projection and hook script
+    bytes, so unrelated valid native groups can coexist. Missing, stale, or
+    changed owned artifacts abort before active-home writes.
+12. Environment noise never decides whether a review is proven. The session
+    scan prunes dated subtrees that predate the current turn and skips entries
+    that cannot be transcript evidence. A current regular transcript that
+    cannot be classified, an ambiguous linked child, or an exhausted budget
+    remains fail-closed.
+13. The registered hook command exposes a `--selftest` launch probe. Trust and
+    registration do not prove a hook runs, and a missing interpreter fails open
+    and silently, so an install is reported as gated only after that probe
+    prints its launchable line.
+14. A user-level `hooks.json` may contain unrelated hook groups. Candidate
+    staging must use the exact clean source registration; active-home validation
+    proves only the event-bound, canonical Pilotfish group projection. Foreign
+    groups never enter a Pilotfish smoke candidate.
+15. Hook-registration ownership is a versioned, allowlisted canonical group
+    projection, not the mutable full `hooks.json` bytes. The installer accepts
+    exactly one owned full group in each bound event, rejects copies in another
+    event, and preserves structurally unrelated groups.
+16. An unowned document that contains any current or historical canonical
+    Pilotfish group fails closed. The installer must not adopt that group or
+    append a second copy without committed ownership provenance.
+17. A failed update never overwrites a concurrent foreign hook edit during
+    rollback. It retains an aborted transaction record for operator resolution.
 
 ## Non-goals
 
@@ -104,6 +131,20 @@ priority: high
     a bounded policy matcher; Stop consumes the marker plus runtime envelopes
     and never infers a trigger from transcript text.
   - **By:** Miyago (2026-08-04)
+- **Decision:** Co-own `hooks.json` structurally, using exact event-bound
+  matcher groups as the Pilotfish unit of ownership.
+  - **Reason:** Raw-byte ownership blocks installation into a home with an
+    unrelated hook and makes later unrelated additions look like stale state.
+    A handler-only comparison is unsafe because the surrounding matcher group
+    determines whether Codex runs it.
+  - **By:** Miyago (2026-08-04)
+- **Decision:** Keep clean candidate bytes separate from active-home semantic
+  validation, and make rollback conditional on the bytes written by this
+  transaction.
+  - **Reason:** Copying a co-owned active registration into a smoke candidate
+    would execute foreign commands, while unconditional rollback can overwrite
+    a concurrent foreign edit.
+  - **By:** Miyago (2026-08-04)
 
 ### Sequence
 
@@ -143,6 +184,23 @@ priority: high
 - [x] Record the observed result and update affected documentation.
 - [x] Preserve installer state when Codex records native hook trust, while
       rejecting drift in Pilotfish-owned routing fields.
+- [x] Separate untrusted evidence from exhausted scan budgets, prune stale
+      dated session subtrees, and cover both with negative controls.
+- [x] Add the `--selftest` launch probe and document the Windows interpreter
+      failure mode in both installation playbooks.
+- [x] Narrow the security trigger so generic Chinese `驗證` no longer buys a
+      Sol review, and pin the trigger surface with a prompt corpus.
+- [x] Add strict, duplicate-key-safe JSON parsing and type-strict canonical
+      group comparison for hook registration and installer state.
+- [x] Replace raw `hooks.json` ownership with versioned allowlisted,
+      event-bound group ownership; migrate only recognized legacy state.
+- [x] Stage the clean source registration after validating the active semantic
+      projection, so foreign hooks never enter the smoke candidate.
+- [x] Guard transaction commit and rollback against concurrent foreign edits.
+- [x] Cover coexistence, historical/no-state collision, state tampering,
+      template upgrades, staging races, and rollback races with focused tests.
+- [x] Update the installation playbooks and changelog with the co-ownership
+      boundary and verified behavior.
 
 ## Files
 
@@ -152,8 +210,12 @@ priority: high
 - `install/verify_dispatch.py` - Live auto-route evidence verifier.
 - `tests/test_verify_dispatch.py` - Offline parser and command coverage.
 - `install/install.py` - Candidate and active hook/policy propagation.
+- `install/hook_registration.py` - Strict registration projection, ownership,
+  and merge helpers.
 - `install/stage_smoke_home.py` - Candidate hook artifact projection.
 - `tests/test_install.py` - Hook artifact transaction coverage.
+- `tests/test_stage_smoke_home.py` - Candidate projection and staging-race
+  coverage.
 - `tests/test_autoroute_hook.py` - Hook parser and continuation boundaries.
 - `tests/test_install.py` - Existing temporary-home propagation coverage.
 - `docs/specs/automatic-sol-escalation/SPEC.md` - This decision and progress.
@@ -179,3 +241,18 @@ Codex then recorded its native hook trust in `[hooks.state]`. The installer now
 accepts that non-routing state without rewriting `config.toml`, while a changed
 model, effort, Plan mode, role table, or legacy routing value still aborts before
 any write. The active-home dry run completed with `already up to date`.
+
+### Planned hook-registration hardening
+
+The 2026-08-04 review and re-review found that the raw-byte `hooks.json`
+ownership model is safely fail-closed but cannot coexist with unrelated native
+Codex hooks. The approved Plan shape is: preserve unrelated complete groups,
+prove Pilotfish groups by an allowlisted historical projection bound to their
+events, reject every ambiguous/no-provenance copy, and retain foreign bytes when
+a transaction races. Same-event ordering of separate groups is user-owned and
+is intentionally not treated as Pilotfish ownership evidence. A fresh
+Plan-reviewer returned `READY` after the Plan incorporated security findings for
+JSON parsing, state provenance/migration, source staging, and rollback races.
+The completed implementation rejects finite-overflow JSON numbers as well as
+literal non-finite constants. Independent outcome verification reproduced the
+overflow case, confirmed its fail-closed repair, and returned `CONFIRMED`.

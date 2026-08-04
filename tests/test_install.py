@@ -17,8 +17,95 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "install"))
 import install as installer  # noqa: E402
+import hook_registration  # noqa: E402
 import stage_smoke_home  # noqa: E402
+from hook_registration import (  # noqa: E402
+    CURRENT_PROJECTION_ID,
+    HookRegistrationError,
+    TRUSTED_PROJECTIONS,
+    load_registration,
+    merge_registration,
+    projection_digest,
+    strict_json_loads,
+)
 from install import InstallAbort, install, merge_config_text, parse_codex_version  # noqa: E402
+
+
+def _foreign_group(command: str = "/bin/foreign") -> dict[str, object]:
+    return {"matcher": "foreign", "hooks": [{"type": "command", "command": command}]}
+
+
+def _write_registration(path: Path, document: dict[str, object]) -> None:
+    path.write_text(json.dumps(document, indent=2) + "\n")
+
+
+class HookRegistrationTests(unittest.TestCase):
+    def test_strict_parser_rejects_duplicates_non_finite_and_malformed_shapes(self) -> None:
+        invalid = (
+            '{"hooks":{},"hooks":{}}',
+            '{"hooks":{"Stop":[{"hooks":[{"timeout":NaN}]}]}}',
+            '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/x","timeout":1e309}]}]}}',
+            '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"/x","timeout":-1e309}]}]}}',
+            '[]',
+            '{"hooks":[]}',
+            '{"hooks":{"Stop":{}}}',
+            '{"hooks":{"Stop":[[]]}}',
+            '{"hooks":{"Stop":[{"hooks":{}}]}}',
+            '{"hooks":{"Stop":[{"hooks":[[]]}]}}',
+        )
+        for payload in invalid:
+            with self.subTest(payload=payload), self.assertRaises(HookRegistrationError):
+                load_registration(payload, source="test hooks.json")
+
+        with self.assertRaises(HookRegistrationError):
+            strict_json_loads('{"outer":{"x":1,"x":2}}', source="state")
+        self.assertEqual(strict_json_loads('{"value":1.5}', source="state"), {"value": 1.5})
+        for overflow in ("1e309", "-1e309"):
+            with self.subTest(overflow=overflow), self.assertRaises(HookRegistrationError):
+                strict_json_loads(f'{{"value":{overflow}}}', source="state")
+
+    def test_comparison_is_type_strict(self) -> None:
+        source = (ROOT / "templates" / "hooks.json").read_bytes()
+        document = json.loads(source)
+        document["hooks"]["Stop"][0]["hooks"][0]["timeout"] = 10.0
+        with self.assertRaises(HookRegistrationError):
+            merge_registration(
+                json.dumps(document).encode(),
+                source,
+                owned_projection_id=CURRENT_PROJECTION_ID,
+            )
+
+    def test_historical_projection_updates_in_place_and_rejects_desired_collision(self) -> None:
+        source = (ROOT / "templates" / "hooks.json").read_bytes()
+        old_id = "test-historical-v0"
+        old_group = {"matcher": "old", "hooks": [{"type": "command", "command": "/old"}]}
+        TRUSTED_PROJECTIONS[old_id] = {
+            "UserPromptSubmit": old_group,
+            "Stop": old_group,
+        }
+        try:
+            document = {
+                "hooks": {
+                    "UserPromptSubmit": [_foreign_group("/before"), old_group],
+                    "Stop": [old_group, _foreign_group("/after")],
+                }
+            }
+            merged, projection_id = merge_registration(
+                json.dumps(document).encode(), source, owned_projection_id=old_id
+            )
+            parsed = json.loads(merged)
+            self.assertEqual(projection_id, CURRENT_PROJECTION_ID)
+            self.assertEqual(parsed["hooks"]["UserPromptSubmit"][0], _foreign_group("/before"))
+            self.assertEqual(parsed["hooks"]["Stop"][1], _foreign_group("/after"))
+
+            desired_group = TRUSTED_PROJECTIONS[CURRENT_PROJECTION_ID]["Stop"]
+            document["hooks"]["Other"] = [desired_group]
+            with self.assertRaisesRegex(HookRegistrationError, "collides"):
+                merge_registration(
+                    json.dumps(document).encode(), source, owned_projection_id=old_id
+                )
+        finally:
+            del TRUSTED_PROJECTIONS[old_id]
 
 
 class NativeConfigMergeTests(unittest.TestCase):
@@ -181,7 +268,16 @@ class NativeInstallTests(unittest.TestCase):
                 (home / "hooks" / "pilotfish_autoroute_gate.py").read_bytes(),
                 (ROOT / "hooks" / "pilotfish_autoroute_gate.py").read_bytes(),
             )
-            self.assertIn("hooks.json", recorded["target_fingerprints"])
+            self.assertEqual(recorded["state_version"], 2)
+            self.assertNotIn("hooks.json", recorded["target_fingerprints"])
+            self.assertEqual(
+                recorded["hook_registration"]["projection_id"],
+                CURRENT_PROJECTION_ID,
+            )
+            self.assertEqual(
+                recorded["hook_registration"]["projection_sha256"],
+                projection_digest(CURRENT_PROJECTION_ID),
+            )
             self.assertIn(
                 "hooks/pilotfish_autoroute_gate.py",
                 recorded["target_fingerprints"],
@@ -294,37 +390,305 @@ class NativeInstallTests(unittest.TestCase):
                 self.run_install(home)
             self.assertEqual(config.read_bytes(), before)
 
-    def test_unowned_hooks_json_collision_aborts_before_any_primary_write(self) -> None:
+    def test_fresh_foreign_hooks_are_preserved_and_rerun_accepts_later_addition(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"
             home.mkdir()
             hooks = home / "hooks.json"
-            hooks.write_bytes(b'{"hooks":{"Stop":[]}}\n')
+            first_foreign = _foreign_group("/first")
+            _write_registration(hooks, {"description": "keep", "hooks": {"Stop": [first_foreign]}})
 
-            with self.assertRaisesRegex(InstallAbort, "unowned hooks.json collision"):
+            self.assertEqual(self.run_install(home), 0)
+            installed = json.loads(hooks.read_text())
+            self.assertEqual(installed["description"], "keep")
+            self.assertEqual(installed["hooks"]["Stop"][0], first_foreign)
+
+            second_foreign = _foreign_group("/second")
+            installed["hooks"]["Stop"].insert(1, second_foreign)
+            _write_registration(hooks, installed)
+            expected = hooks.read_bytes()
+            self.assertEqual(self.run_install(home), 0)
+            self.assertEqual(hooks.read_bytes(), expected)
+
+    def test_committed_state_binds_group_semantics_and_hook_script_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            hooks = home / "hooks.json"
+            hooks.write_bytes(hooks.read_bytes() + b"\n")
+            self.assertEqual(self.run_install(home), 0)
+
+            document = json.loads(hooks.read_text())
+            document["hooks"]["Stop"][0]["matcher"] = "tampered-wrapper"
+            _write_registration(hooks, document)
+            with self.assertRaisesRegex(InstallAbort, "committed hook registration"):
                 self.run_install(home)
 
-            self.assertEqual(hooks.read_bytes(), b'{"hooks":{"Stop":[]}}\n')
-            self.assertFalse((home / "config.toml").exists())
-            self.assertFalse((home / "agents").exists())
-            self.assertFalse((home / "AGENTS.md").exists())
-            self.assertFalse(
-                home.with_name(f"{home.name}.pilotfish-install-state.json").exists()
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            script = home / "hooks" / "pilotfish_autoroute_gate.py"
+            script.write_bytes(script.read_bytes() + b"\n")
+            before = {
+                path.relative_to(home): path.read_bytes()
+                for path in home.rglob("*")
+                if path.is_file()
+            }
+            state_path = home.with_name(f"{home.name}.pilotfish-install-state.json")
+            state_before = state_path.read_bytes()
+            with self.assertRaisesRegex(InstallAbort, "committed install state is stale"):
+                self.run_install(home)
+            after = {
+                path.relative_to(home): path.read_bytes()
+                for path in home.rglob("*")
+                if path.is_file()
+            }
+            self.assertEqual(after, before)
+            self.assertEqual(state_path.read_bytes(), state_before)
+            self.assertFalse(state_path.with_suffix(".json.pending").exists())
+
+    def test_state_proven_legacy_hook_script_upgrades_and_commits(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            script = home / "hooks" / "pilotfish_autoroute_gate.py"
+            previous_payload = b"# previously installed trusted hook payload\n"
+            script.write_bytes(previous_payload)
+
+            state_path = home.with_name(f"{home.name}.pilotfish-install-state.json")
+            state = json.loads(state_path.read_text())
+            state.pop("state_version")
+            state.pop("hook_registration")
+            state["target_fingerprints"][
+                "hooks/pilotfish_autoroute_gate.py"
+            ] = hashlib.sha256(previous_payload).hexdigest()
+            registration_payload = (ROOT / "templates" / "hooks.json").read_bytes()
+            state["target_fingerprints"]["hooks.json"] = hashlib.sha256(
+                registration_payload
+            ).hexdigest()
+            state["original_targets"]["hooks.json"] = {
+                "present": False,
+                "sha256": None,
+                "bytes_b64": None,
+            }
+            state_path.write_text(json.dumps(state, sort_keys=True) + "\n")
+
+            self.assertEqual(self.run_install(home), 0)
+            selected_payload = (
+                ROOT / "hooks" / "pilotfish_autoroute_gate.py"
+            ).read_bytes()
+            self.assertEqual(script.read_bytes(), selected_payload)
+            committed = json.loads(state_path.read_text())
+            self.assertEqual(committed["state_version"], 2)
+            self.assertEqual(
+                committed["target_fingerprints"][
+                    "hooks/pilotfish_autoroute_gate.py"
+                ],
+                hashlib.sha256(selected_payload).hexdigest(),
             )
 
-    def test_committed_state_binds_registration_and_hook_script_bytes(self) -> None:
-        for relative in (
-            Path("hooks.json"),
-            Path("hooks/pilotfish_autoroute_gate.py"),
-        ):
-            with self.subTest(relative=relative.as_posix()), tempfile.TemporaryDirectory() as directory:
+            committed_before = state_path.read_bytes()
+            self.assertEqual(self.run_install(home), 0)
+            self.assertEqual(script.read_bytes(), selected_payload)
+            self.assertEqual(state_path.read_bytes(), committed_before)
+
+    def test_hook_script_mutation_after_state_validation_aborts_before_writes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            script = home / "hooks" / "pilotfish_autoroute_gate.py"
+            state_path = home.with_name(f"{home.name}.pilotfish-install-state.json")
+            state_before = state_path.read_bytes()
+            mutated_payload = b"# concurrent custom hook payload\n"
+            original_validate = installer._validate_committed_state
+
+            def validate_then_mutate(*args, **kwargs):
+                result = original_validate(*args, **kwargs)
+                script.write_bytes(mutated_payload)
+                return result
+
+            with mock.patch.object(
+                installer,
+                "_validate_committed_state",
+                side_effect=validate_then_mutate,
+            ):
+                with self.assertRaisesRegex(InstallAbort, "installed_hook_drift"):
+                    self.run_install(home)
+
+            self.assertEqual(script.read_bytes(), mutated_payload)
+            self.assertEqual(state_path.read_bytes(), state_before)
+            self.assertFalse(state_path.with_suffix(".json.pending").exists())
+
+    def test_owned_group_missing_duplicate_cross_event_and_handler_tamper_abort(self) -> None:
+        mutations = {}
+
+        def missing(document: dict) -> None:
+            document["hooks"]["Stop"].pop()
+
+        def duplicate(document: dict) -> None:
+            document["hooks"]["Stop"].append(document["hooks"]["Stop"][0])
+
+        def cross_event(document: dict) -> None:
+            document["hooks"]["Other"] = [document["hooks"]["Stop"][0]]
+
+        def handler_tamper(document: dict) -> None:
+            document["hooks"]["Stop"][0]["hooks"][0]["timeout"] = True
+
+        mutations.update(
+            missing=missing,
+            duplicate=duplicate,
+            cross_event=cross_event,
+            handler_tamper=handler_tamper,
+        )
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
                 home = Path(directory) / "home"
                 self.assertEqual(self.run_install(home), 0)
-                target = home / relative
-                target.write_bytes(target.read_bytes() + b"\n")
-
-                with self.assertRaisesRegex(InstallAbort, "committed install state is stale"):
+                hooks = home / "hooks.json"
+                document = json.loads(hooks.read_text())
+                mutate(document)
+                _write_registration(hooks, document)
+                before = hooks.read_bytes()
+                with self.assertRaisesRegex(InstallAbort, "committed hook registration"):
                     self.run_install(home)
+                self.assertEqual(hooks.read_bytes(), before)
+
+    def test_same_event_foreign_group_reordering_is_allowed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            hooks = home / "hooks.json"
+            document = json.loads(hooks.read_text())
+            document["hooks"]["Stop"].insert(0, _foreign_group())
+            _write_registration(hooks, document)
+            expected = hooks.read_bytes()
+            self.assertEqual(self.run_install(home), 0)
+            self.assertEqual(hooks.read_bytes(), expected)
+
+    def test_no_state_canonical_collision_aborts_in_bound_or_wrong_event(self) -> None:
+        source = json.loads((ROOT / "templates" / "hooks.json").read_text())
+        group = source["hooks"]["Stop"][0]
+        registrations = (
+            source,
+            {"hooks": {"Other": [group]}},
+        )
+        for document in registrations:
+            with self.subTest(events=tuple(document["hooks"])), tempfile.TemporaryDirectory() as directory:
+                home = Path(directory) / "home"
+                home.mkdir()
+                _write_registration(home / "hooks.json", document)
+                with self.assertRaisesRegex(InstallAbort, "unowned hooks.json"):
+                    self.run_install(home)
+                self.assertFalse((home / "config.toml").exists())
+
+    def test_state_rejects_duplicate_keys_and_projection_body_injection(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            state_path = home.with_name(f"{home.name}.pilotfish-install-state.json")
+            raw = state_path.read_text()
+            state_path.write_text('{"status":"committed",' + raw.lstrip()[1:])
+            with self.assertRaisesRegex(InstallAbort, "install state is invalid"):
+                self.run_install(home)
+
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            state_path = home.with_name(f"{home.name}.pilotfish-install-state.json")
+            state = json.loads(state_path.read_text())
+            state["hook_registration"]["groups"] = json.loads(
+                (ROOT / "templates" / "hooks.json").read_text()
+            )["hooks"]
+            state_path.write_text(json.dumps(state))
+            with self.assertRaisesRegex(InstallAbort, "projection state"):
+                self.run_install(home)
+
+    def test_exact_legacy_raw_state_migrates_with_foreign_groups(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            hooks = home / "hooks.json"
+            document = json.loads(hooks.read_text())
+            foreign = _foreign_group("/legacy-foreign")
+            document["hooks"]["Stop"].insert(0, foreign)
+            _write_registration(hooks, document)
+
+            state_path = home.with_name(f"{home.name}.pilotfish-install-state.json")
+            state = json.loads(state_path.read_text())
+            state.pop("state_version")
+            state.pop("hook_registration")
+            source_payload = (ROOT / "templates" / "hooks.json").read_bytes()
+            state["target_fingerprints"]["hooks.json"] = hashlib.sha256(
+                source_payload
+            ).hexdigest()
+            state["original_targets"]["hooks.json"] = {
+                "present": False,
+                "sha256": None,
+                "bytes_b64": None,
+            }
+            state_path.write_text(json.dumps(state, sort_keys=True) + "\n")
+            before = hooks.read_bytes()
+
+            self.assertEqual(self.run_install(home), 0)
+            self.assertEqual(hooks.read_bytes(), before)
+            migrated = json.loads(state_path.read_text())
+            self.assertEqual(migrated["state_version"], 2)
+            self.assertNotIn("hooks.json", migrated["target_fingerprints"])
+            self.assertEqual(self.run_install(home), 0)
+
+    def test_transaction_preserves_foreign_hook_race_before_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            home.mkdir()
+            hooks = home / "hooks.json"
+            _write_registration(hooks, {"hooks": {"Stop": [_foreign_group("/original")]}})
+            original_replace = installer._replace_staged
+            injected = False
+
+            def replace_with_race(temp, destination, expected_original, *, role_directory_fd):
+                nonlocal injected
+                if destination == hooks and not injected:
+                    document = json.loads(hooks.read_text())
+                    document["hooks"]["Stop"].append(_foreign_group("/concurrent"))
+                    _write_registration(hooks, document)
+                    injected = True
+                return original_replace(
+                    temp,
+                    destination,
+                    expected_original,
+                    role_directory_fd=role_directory_fd,
+                )
+
+            with mock.patch.object(installer, "_replace_staged", side_effect=replace_with_race):
+                with self.assertRaisesRegex(InstallAbort, "immediately before replacement"):
+                    self.run_install(home)
+            self.assertTrue(injected)
+            self.assertIn("/concurrent", hooks.read_text())
+            pending = home.with_name(f"{home.name}.pilotfish-install-state.json.pending")
+            self.assertEqual(json.loads(pending.read_text())["status"], "aborted")
+
+    def test_transaction_preserves_foreign_hook_race_after_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            home.mkdir()
+            hooks = home / "hooks.json"
+            _write_registration(hooks, {"hooks": {"Stop": [_foreign_group("/original")]}})
+            original_commit = installer._commit
+
+            def commit_then_race(*args, **kwargs):
+                receipts = original_commit(*args, **kwargs)
+                document = json.loads(hooks.read_text())
+                document["hooks"]["Stop"].append(_foreign_group("/concurrent"))
+                _write_registration(hooks, document)
+                return receipts
+
+            with mock.patch.object(installer, "_commit", side_effect=commit_then_race):
+                with self.assertRaisesRegex(InstallAbort, "post-write transaction"):
+                    self.run_install(home)
+            self.assertIn("/concurrent", hooks.read_text())
+            self.assertFalse(home.with_name(f"{home.name}.pilotfish-install-state.json").exists())
+            pending = home.with_name(f"{home.name}.pilotfish-install-state.json.pending")
+            self.assertEqual(json.loads(pending.read_text())["status"], "aborted")
 
     def test_staged_layout_requires_exact_owned_hook_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
