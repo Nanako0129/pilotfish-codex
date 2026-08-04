@@ -305,6 +305,18 @@ class NativeInstallTests(unittest.TestCase):
                 {"executor", "mech-executor", "plan-verifier", "scout", "security-executor", "security-reviewer", "verifier"},
             )
 
+    def test_windows_crlf_policy_preserves_original_bytes_for_commit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            home.mkdir()
+            policy = home / "AGENTS.md"
+            policy.write_bytes(b"# Existing policy\r\n")
+            with mock.patch.object(installer, "IS_WINDOWS", True):
+                self.assertEqual(self.run_install(home), 0)
+            installed = policy.read_bytes()
+            self.assertIn(b"# Existing policy\r\n", installed)
+            self.assertNotIn(b"# Existing policy\n", installed.replace(b"\r\n", b""))
+
     def test_codex_hooks_state_append_is_accepted_and_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"

@@ -203,7 +203,7 @@ opens the Store instead of running the script. Run the probe through the same
 command the `commandWindows` entry uses and require real output:
 
 ```powershell
-python -c "import os,runpy; from pathlib import Path; runpy.run_path(str(Path(os.environ.get('CODEX_HOME', Path.home()/'.codex'))/'hooks'/'pilotfish_autoroute_gate.py'), run_name='__main__')" --selftest
+uv run --no-project python -c "import os,runpy; from pathlib import Path; runpy.run_path(str(Path(os.environ.get('CODEX_HOME', Path.home()/'.codex'))/'hooks'/'pilotfish_autoroute_gate.py'), run_name='__main__')" --selftest
 ```
 
 Both must print `pilotfish-autoroute-gate schema=<n> launchable`. Any other

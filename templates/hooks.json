@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "/usr/bin/env python3 \"${CODEX_HOME:-$HOME/.codex}/hooks/pilotfish_autoroute_gate.py\"",
-            "commandWindows": "python -c \"import os,runpy; from pathlib import Path; runpy.run_path(str(Path(os.environ.get('CODEX_HOME', Path.home()/'.codex'))/'hooks'/'pilotfish_autoroute_gate.py'), run_name='__main__')\"",
+            "commandWindows": "uv run --no-project python -c \"import os,runpy; from pathlib import Path; runpy.run_path(str(Path(os.environ.get('CODEX_HOME', Path.home()/'.codex'))/'hooks'/'pilotfish_autoroute_gate.py'), run_name='__main__')\"",
             "timeout": 10
           }
         ]
@@ -19,7 +19,7 @@
           {
             "type": "command",
             "command": "/usr/bin/env python3 \"${CODEX_HOME:-$HOME/.codex}/hooks/pilotfish_autoroute_gate.py\"",
-            "commandWindows": "python -c \"import os,runpy; from pathlib import Path; runpy.run_path(str(Path(os.environ.get('CODEX_HOME', Path.home()/'.codex'))/'hooks'/'pilotfish_autoroute_gate.py'), run_name='__main__')\"",
+            "commandWindows": "uv run --no-project python -c \"import os,runpy; from pathlib import Path; runpy.run_path(str(Path(os.environ.get('CODEX_HOME', Path.home()/'.codex'))/'hooks'/'pilotfish_autoroute_gate.py'), run_name='__main__')\"",
             "timeout": 10
           }
         ]

@@ -233,6 +233,20 @@ def merge_instruction_text(text: str, block: str) -> tuple[str, str]:
     return (text.rstrip("\n") + "\n\n" if text else "") + block + "\n", "appended"
 
 
+def _decode_instruction_bytes(raw: bytes | None) -> tuple[str, str]:
+    if raw is None:
+        return "", "\n"
+    text = raw.decode("utf-8")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    return text.replace("\r\n", "\n").replace("\r", "\n"), newline
+
+
+def _encode_instruction_text(text: str, newline: str) -> bytes:
+    if newline == "\r\n":
+        text = text.replace("\n", "\r\n")
+    return text.encode("utf-8")
+
+
 def active_instruction_file(home: Path) -> Path:
     agents = home / "AGENTS.md"
     override = home / "AGENTS.override.md"
@@ -754,7 +768,8 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
     )
     policy_template = (source_root / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
     policy_path = active_instruction_file(codex_home)
-    policy_text = policy_path.read_text(encoding="utf-8") if policy_path.is_file() else ""
+    policy_bytes = policy_path.read_bytes() if policy_path.is_file() else None
+    policy_text, policy_newline = _decode_instruction_bytes(policy_bytes)
     state = _load_state(codex_home)
     owned = frozenset()
     migration_proven = False
@@ -787,6 +802,7 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
         migration_proven=migration_proven,
     )
     new_policy, policy_action = merge_instruction_text(policy_text, policy_template)
+    policy_payload = _encode_instruction_text(new_policy, policy_newline)
     writes: list[tuple[Path, bytes, int, bytes | None]] = []
     if new_config != config_text:
         writes.append((config_path, new_config.encode(), 0o600, config_snapshot))
@@ -806,8 +822,8 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
             notes.append(f"upgraded canonical role {role}")
         elif current is None:
             writes.append((target, payload, 0o600, None))
-    if new_policy != policy_text:
-        writes.append((policy_path, new_policy.encode(), 0o644, policy_text.encode() if policy_path.is_file() else None))
+    if policy_payload != policy_bytes:
+        writes.append((policy_path, policy_payload, 0o644, policy_bytes))
     hooks_registration = codex_home / "hooks.json"
     hooks_root = codex_home / "hooks"
     hook_script = hooks_root / "pilotfish_autoroute_gate.py"

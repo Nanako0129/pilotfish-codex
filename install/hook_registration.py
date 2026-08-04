@@ -13,18 +13,35 @@ class HookRegistrationError(ValueError):
     """Hook registration or ownership evidence is malformed or ambiguous."""
 
 
-CURRENT_PROJECTION_ID = "pilotfish-autoroute-v1"
+_LEGACY_PROJECTION_ID = "pilotfish-autoroute-v1"
+CURRENT_PROJECTION_ID = "pilotfish-autoroute-v2"
 
 _COMMAND = (
     '/usr/bin/env python3 "${CODEX_HOME:-$HOME/.codex}/hooks/'
     'pilotfish_autoroute_gate.py"'
 )
-_WINDOWS_COMMAND = (
+_LEGACY_WINDOWS_COMMAND = (
     "python -c \"import os,runpy; from pathlib import Path; "
     "runpy.run_path(str(Path(os.environ.get('CODEX_HOME', "
     "Path.home()/'.codex'))/'hooks'/'pilotfish_autoroute_gate.py'), "
     "run_name='__main__')\""
 )
+_WINDOWS_COMMAND = (
+    "uv run --no-project python -c \"import os,runpy; from pathlib import Path; "
+    "runpy.run_path(str(Path(os.environ.get('CODEX_HOME', "
+    "Path.home()/'.codex'))/'hooks'/'pilotfish_autoroute_gate.py'), "
+    "run_name='__main__')\""
+)
+_LEGACY_GROUP: dict[str, Any] = {
+    "hooks": [
+        {
+            "type": "command",
+            "command": _COMMAND,
+            "commandWindows": _LEGACY_WINDOWS_COMMAND,
+            "timeout": 10,
+        }
+    ]
+}
 _CURRENT_GROUP: dict[str, Any] = {
     "hooks": [
         {
@@ -39,6 +56,10 @@ _CURRENT_GROUP: dict[str, Any] = {
 # Registry entries are immutable trust anchors.  Future releases add a new
 # current entry and retain old entries here for migration/collision detection.
 TRUSTED_PROJECTIONS: dict[str, dict[str, dict[str, Any]]] = {
+    _LEGACY_PROJECTION_ID: {
+        "UserPromptSubmit": _LEGACY_GROUP,
+        "Stop": _LEGACY_GROUP,
+    },
     CURRENT_PROJECTION_ID: {
         "UserPromptSubmit": _CURRENT_GROUP,
         "Stop": _CURRENT_GROUP,
@@ -49,7 +70,7 @@ TRUSTED_PROJECTIONS: dict[str, dict[str, dict[str, Any]]] = {
 # Group bodies are still derived from TRUSTED_PROJECTIONS, never from state.
 LEGACY_RAW_REGISTRATIONS: dict[str, str] = {
     "a219000323daa83242acd03e1d23342b3cc19d04e36d8e53af1114f4f4f8ee56": (
-        CURRENT_PROJECTION_ID
+        _LEGACY_PROJECTION_ID
     ),
 }
 
