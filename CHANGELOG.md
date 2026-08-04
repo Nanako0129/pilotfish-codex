@@ -5,6 +5,13 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
+## v1.4.1 — 2026-08-04
+
+- Fix native installer role-file replacement on Windows by avoiding directory
+  file descriptors that Windows cannot open through `os.open`.
+- Add platform-independent regression coverage for the Windows replacement
+  path.
+
 ## v1.4.0 — 2026-08-04
 
 - Retire Terra from the active role bindings. Luna now owns Plan-mode and
