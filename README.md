@@ -181,7 +181,7 @@ python3 install/validate_agents.py \
 
 The install also registers `hooks.json` and the automatic Plan-review hook.
 After the first successful install, trust exactly `Pilotfish automatic typed
-Plan-review gate` in an interactive Codex session. Use `/hooks` when it is
+Plan-review gate.` in an interactive Codex session. Use `/hooks` when it is
 available; otherwise restart a session and confirm the launch-time trust
 prompt. Re-trust only when the hook definition changes. The resulting
 `[hooks.state]` entry is expected and an update dry-run should report

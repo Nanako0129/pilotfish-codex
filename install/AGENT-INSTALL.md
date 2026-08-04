@@ -102,7 +102,7 @@ Do not add `[agents.<role>] config_file` declarations. Native recursive
 role discovery loads the seven TOMLs directly.
 
 After the installer adds `hooks.json`, open an interactive Codex session and
-use `/hooks` to inspect and trust `Pilotfish automatic typed Plan-review gate`.
+use `/hooks` to inspect and trust `Pilotfish automatic typed Plan-review gate.`
 If `/hooks` is unavailable, start a new interactive session and confirm the
 launch-time trust prompt for that exact label. Codex records trust against the
 hook definition hash; repeat this one-time step only when the hook definition
