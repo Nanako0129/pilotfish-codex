@@ -69,10 +69,13 @@ The policy has both a grounding floor and a stopping ceiling:
 - A `direction_checkpoint` makes the next decision explicit: `CONTINUE`,
   `PIVOT`, `ROLLBACK`, or `INCONCLUSIVE`.
 
-The experiment is intentionally qualitative. Its first offline run matched all
-three expected interaction shapes, but it is directional evidence rather than a
-statistically significant result or proof of live model dispatch. See the
-[full experiment report](./docs/specs/adaptive-intent-routing/EXPERIMENT-RESULTS.md).
+The experiment is intentionally scoped. The initial smoke and expanded offline
+reference run established the rubric; the registered live cohort then selected
+the correct initial mode in 60 / 60 cases, preserved every required approval
+boundary, and selected the correct direction checkpoint in 59 / 60 cases. The
+strict full interaction contract passed 48 / 60, so first-move and grounding
+details remain a separate follow-up. See the [experiment design](./docs/specs/adaptive-intent-routing/EXPERIMENT.md)
+and [full experiment report](./docs/specs/adaptive-intent-routing/EXPERIMENT-RESULTS.md).
 
 ## How it works
 
