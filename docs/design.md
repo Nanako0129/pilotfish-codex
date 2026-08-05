@@ -79,6 +79,37 @@ Other bounded in-acceptance P2 is fixed, while lower-priority findings may be
 reported with a narrowed claim. An inconclusive gate is retried once only after
 its prerequisite materially changes.
 
+### Adaptive intent routing
+
+The orchestration policy now selects among three initial interaction shapes:
+`execute` for clear bounded work, `explore_then_plan` for clear but broad or
+high-impact work, and `co_discover` for an idea without a stable product
+boundary. These are descriptive starting points, not a keyword classifier or
+an exhaustive scenario list. Route selection records intent confidence,
+five-band change impact, reversibility, discovery budget, blocking decisions,
+and the next gate.
+
+Discovery has a grounding floor and a stopping ceiling. The default bands are
+`none`, `minimum`, `bounded`, and `deep`, measured in logical inspections,
+searches, and reversible probes. A missing floor causes the session to state
+uncertainty; an exhausted ceiling causes it to narrow, pause, or ask rather
+than silently authorize writes.
+
+Material choices use an AskUserQuestion-style decision card. It is a concise
+user checkpoint containing the current interpretation, recommended default,
+relevant scope and exclusions, decision options, and the next reversible
+slice. It is adaptive and does not replace the internal Plan; low-risk work
+without a blocking choice need not show one.
+
+Direction checks reuse the existing `verifier` role through an explicit
+`direction_checkpoint` contract. `CONTINUE` preserves the path, `PIVOT`
+requires a bounded re-plan, and `ROLLBACK` stops new writes and identifies the
+latest verified good checkpoint. Missing evidence remains `INCONCLUSIVE`.
+External, destructive, release, security-sensitive, and irreversible actions
+retain their existing approval and containment gates. The offline route and
+checkpoint evaluators are semantic behavior evidence only; they do not prove
+live model routing or native dispatch.
+
 ### Long autonomous runs
 
 Before likely long work, the main session announces `AUTO` or `ASK`; absence is

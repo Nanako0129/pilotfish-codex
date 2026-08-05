@@ -72,6 +72,9 @@ LEGACY_RAW_REGISTRATIONS: dict[str, str] = {
     "a219000323daa83242acd03e1d23342b3cc19d04e36d8e53af1114f4f4f8ee56": (
         _LEGACY_PROJECTION_ID
     ),
+    "eebb414251f5dc9630b2c7c0d8feec08f902f0102b2a45bbd45ef89229406af2": (
+        CURRENT_PROJECTION_ID
+    ),
 }
 
 

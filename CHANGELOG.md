@@ -5,6 +5,20 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
+## v1.5.0 — 2026-08-05
+
+- Add adaptive intent routing for clear execution, broad changes, and open-ended
+  discovery, with grounding floors, stopping ceilings, and explicit
+  `direction_checkpoint` decisions.
+- Add concise English, Traditional Chinese, and Simplified Chinese entry docs
+  covering the routing modes, role paths, installation, and measured evidence.
+- Add deterministic Rough.js-generated SVG charts for the usage-routing benchmark
+  without adding a browser runtime to the documentation.
+- Fix legacy installer-state migration so the exact current hook registration
+  remains recognized while unknown fingerprints still fail closed.
+- Document a native PowerShell installation path for Windows and keep the
+  Windows-specific hook launch behavior explicit.
+
 ## v1.4.1 — 2026-08-04
 
 - Fix native installer role-file replacement on Windows by avoiding directory

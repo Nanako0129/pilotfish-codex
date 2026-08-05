@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 760" role="img" aria-labelledby="title desc">
+  <title id="title">Adaptive intent routing</title>
+  <desc id="desc">The policy chooses execute, explore_then_plan, or co_discover from a user request, then uses a direction checkpoint. The live cohort measured 60 of 60 mode routes, 59 of 60 checkpoints, and 48 of 60 strict full route contracts.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" class="arrow"/>
+    </marker>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .fg { fill: #152238; }
+      .muted { fill: #66758a; }
+      .line { stroke: #d8e0ea; }
+      .route { stroke: #9aaabd; }
+      .blue { fill: #3f6fe5; }
+      .purple { fill: #7954c6; }
+      .amber { fill: #cf8427; }
+      .green { fill: #26986d; }
+      .soft-blue { fill: #eaf0ff; stroke: #b9cbfa; }
+      .soft-purple { fill: #f1ecff; stroke: #d3c2f4; }
+      .soft-amber { fill: #fff3e2; stroke: #efd2a5; }
+      .soft-green { fill: #e7f7ef; stroke: #b8e3ce; }
+      .kicker { font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 1.8px; }
+      .title { font: 600 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .section { font: 600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 1.2px; }
+      .label { font: 600 19px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .small { font: 400 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .stat { font: 600 34px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .value { font: 600 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .tiny { font: 400 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .arrow { fill: #9aaabd; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #101827; }
+        .fg { fill: #f3f6fb; }
+        .muted { fill: #a6b3c5; }
+        .line { stroke: #314054; }
+        .route { stroke: #708198; }
+        .soft-blue { fill: #1b2d59; stroke: #4768af; }
+        .soft-purple { fill: #302347; stroke: #6d55a2; }
+        .soft-amber { fill: #49341d; stroke: #9d743f; }
+        .soft-green { fill: #1b4233; stroke: #438f6d; }
+        .arrow { fill: #708198; }
+      }
+    </style>
+  </defs>
+
+  <rect width="1400" height="760" class="bg"/>
+  <text x="48" y="45" class="kicker muted">PILOTFISH-CODEX / ADAPTIVE ROUTING</text>
+  <text x="48" y="88" class="title fg">Adaptive intent routing</text>
+  <text x="48" y="118" class="small muted">Choose the first move by certainty, impact, and reversibility.</text>
+  <line x1="48" y1="145" x2="1352" y2="145" class="line"/>
+
+  <text x="48" y="180" class="section muted">01 / USER REQUEST</text>
+  <rect x="48" y="202" width="286" height="228" rx="12" class="soft-blue"/>
+  <text x="72" y="242" class="label fg">Three signals</text>
+  <text x="72" y="280" class="small fg">How certain is the user?</text>
+  <text x="72" y="326" class="small fg">How large is the change?</text>
+  <text x="72" y="372" class="small fg">What is the cost of being wrong?</text>
+  <text x="72" y="411" class="tiny muted">The answer sets the interaction mode.</text>
+
+  <path d="M334 316 H376" fill="none" stroke-width="2" class="route" marker-end="url(#arrow)"/>
+  <text x="376" y="180" class="section muted">02 / INITIAL MODE</text>
+
+  <rect x="376" y="202" width="496" height="70" rx="10" class="soft-green"/>
+  <circle cx="402" cy="237" r="7" class="green"/>
+  <text x="422" y="235" class="label fg">execute</text>
+  <text x="422" y="258" class="small muted">Clear and bounded → take the smallest direct step.</text>
+
+  <rect x="376" y="288" width="496" height="70" rx="10" class="soft-purple"/>
+  <circle cx="402" cy="323" r="7" class="purple"/>
+  <text x="422" y="321" class="label fg">explore_then_plan</text>
+  <text x="422" y="344" class="small muted">Broad or high-impact → inspect the boundary and risks.</text>
+
+  <rect x="376" y="374" width="496" height="70" rx="10" class="soft-amber"/>
+  <circle cx="402" cy="409" r="7" class="amber"/>
+  <text x="422" y="407" class="label fg">co_discover</text>
+  <text x="422" y="430" class="small muted">Open-ended idea → ask focused questions.</text>
+
+  <path d="M872 323 H914" fill="none" stroke-width="2" class="route" marker-end="url(#arrow)"/>
+  <text x="914" y="180" class="section muted">03 / DIRECTION CHECKPOINT</text>
+  <rect x="914" y="202" width="438" height="242" rx="12" class="soft-blue"/>
+  <text x="942" y="242" class="label fg">direction_checkpoint</text>
+  <text x="942" y="274" class="small muted">After evidence or a user decision:</text>
+  <rect x="942" y="300" width="174" height="42" rx="8" class="soft-green"/>
+  <text x="1029" y="327" text-anchor="middle" class="value fg">CONTINUE</text>
+  <rect x="1132" y="300" width="174" height="42" rx="8" class="soft-purple"/>
+  <text x="1219" y="327" text-anchor="middle" class="value fg">PIVOT</text>
+  <rect x="942" y="358" width="174" height="42" rx="8" class="soft-amber"/>
+  <text x="1029" y="385" text-anchor="middle" class="value fg">ROLLBACK</text>
+  <rect x="1132" y="358" width="174" height="42" rx="8" class="soft-blue"/>
+  <text x="1219" y="385" text-anchor="middle" class="value fg">ASK</text>
+  <text x="942" y="416" class="tiny muted">Grounding floor prevents guessing.</text>
+  <text x="942" y="435" class="tiny muted">Stopping ceiling limits runaway analysis.</text>
+
+  <line x1="48" y1="480" x2="1352" y2="480" class="line"/>
+  <text x="48" y="516" class="section muted">LIVE COHORT / 60 CASES</text>
+  <rect x="48" y="542" width="390" height="132" rx="12" class="soft-green"/>
+  <text x="76" y="580" class="stat fg">60 / 60</text>
+  <text x="76" y="610" class="label fg">Initial mode</text>
+  <text x="76" y="638" class="small muted">100.0% selected the expected mode.</text>
+
+  <rect x="466" y="542" width="390" height="132" rx="12" class="soft-blue"/>
+  <text x="494" y="580" class="stat fg">59 / 60</text>
+  <text x="494" y="610" class="label fg">Direction checkpoint</text>
+  <text x="494" y="638" class="small muted">98.3% selected the expected direction.</text>
+
+  <rect x="884" y="542" width="468" height="132" rx="12" class="soft-amber"/>
+  <text x="912" y="580" class="stat fg">48 / 60</text>
+  <text x="912" y="610" class="label fg">Strict full route contract</text>
+  <text x="912" y="638" class="small muted">80.0%; first-move and grounding details need follow-up.</text>
+  <text x="48" y="720" class="tiny muted">The cohort supports the narrower mode, approval, and checkpoint claims.</text>
+</svg>

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_mode",
+    "intent_confidence",
+    "change_impact",
+    "first_move",
+    "grounding",
+    "direction_checkpoint",
+    "approval_required",
+    "rationale"
+  ],
+  "properties": {
+    "task_mode": {
+      "type": "string",
+      "enum": [
+        "execute",
+        "explore_then_plan",
+        "co_discover",
+        "full_plan",
+        "generic_advice"
+      ]
+    },
+    "intent_confidence": {
+      "type": "string",
+      "enum": ["clear", "partial", "unclear"]
+    },
+    "change_impact": {
+      "type": "string",
+      "enum": ["trivial", "low", "material", "high", "critical"]
+    },
+    "first_move": {
+      "type": "string",
+      "minLength": 1
+    },
+    "grounding": {
+      "type": "string",
+      "enum": ["none", "minimum", "bounded", "deep"]
+    },
+    "direction_checkpoint": {
+      "type": "string",
+      "enum": ["CONTINUE", "PIVOT", "ROLLBACK", "INCONCLUSIVE"]
+    },
+    "approval_required": {"type": "boolean"},
+    "rationale": {"type": "string", "minLength": 1}
+  }
+}

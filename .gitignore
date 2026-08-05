@@ -3,3 +3,6 @@ __pycache__/
 node_modules/
 *.py[cod]
 artifacts/usage-routing/
+
+# Generated live experiment reports stay local evidence.
+docs/specs/adaptive-intent-routing/live-run-*.json

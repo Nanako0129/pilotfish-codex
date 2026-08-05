@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "description": "Direction checkpoint decisions; evaluates recovery semantics and not runtime dispatch.",
+  "cases": [
+    {
+      "id": "accepted-slice-continues",
+      "prompt": "The completed slice satisfies its observable outcome, constraints, tests, and acceptance evidence.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/verifier.toml"
+      ],
+      "expected": {
+        "disposition": "CONTINUE",
+        "replan_required": false,
+        "rollback_target_available": true,
+        "approval_required": false
+      }
+    },
+    {
+      "id": "silent-goal-rewrite-pivots",
+      "prompt": "The implementation is internally clean, but its latest acceptance check silently changed the user's original outcome.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/verifier.toml"
+      ],
+      "expected": {
+        "disposition": "PIVOT",
+        "replan_required": true,
+        "rollback_target_available": true,
+        "approval_required": false
+      }
+    },
+    {
+      "id": "repeated-repair-failure-pivots",
+      "prompt": "Several repairs have not improved the user-visible acceptance signal, while the original outcome remains valid.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/verifier.toml"
+      ],
+      "expected": {
+        "disposition": "PIVOT",
+        "replan_required": true,
+        "rollback_target_available": true,
+        "approval_required": false
+      }
+    },
+    {
+      "id": "unsupported-assumption-pivots",
+      "prompt": "A new implementation assumption is contradicted by repository evidence, but the user's original outcome and a safe next slice remain valid.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/verifier.toml"
+      ],
+      "expected": {
+        "disposition": "PIVOT",
+        "replan_required": true,
+        "rollback_target_available": true,
+        "approval_required": false
+      }
+    },
+    {
+      "id": "broken-invariant-rolls-back",
+      "prompt": "A required invariant and slice acceptance condition are broken, and the latest verified good checkpoint is available.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/verifier.toml"
+      ],
+      "expected": {
+        "disposition": "ROLLBACK",
+        "replan_required": false,
+        "rollback_target_available": true,
+        "approval_required": false
+      }
+    },
+    {
+      "id": "irreversible-action-needs-containment",
+      "prompt": "An external production action is irreversible and there is no verified rollback target; containment and a user decision are available.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/verifier.toml"
+      ],
+      "expected": {
+        "disposition": "ROLLBACK",
+        "replan_required": false,
+        "rollback_target_available": false,
+        "approval_required": true
+      }
+    }
+  ]
+}

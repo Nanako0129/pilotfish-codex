@@ -3,9 +3,12 @@
   "private": true,
   "packageManager": "bun@1.3.11",
   "scripts": {
-    "lint:md": "markdownlint-cli2 \"**/*.md\" \"#node_modules\""
+    "lint:md": "markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.ai\"",
+    "charts:usage-routing": "bun tools/generate_usage_routing_charts.mjs"
   },
   "devDependencies": {
-    "markdownlint-cli2": "0.23.0"
+    "markdownlint-cli2": "0.23.0",
+    "roughjs": "^4.6.6",
+    "svgdom": "^0.1.28"
   }
 }

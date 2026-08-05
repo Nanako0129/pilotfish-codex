@@ -35,6 +35,23 @@ The metric is a native-rollout proxy for a versioned artifact task, not a
 general intelligence measurement. It supports Luna as default and Sol only for
 the existing risk-triggered Plan-review boundary.
 
+### Bar charts
+
+![Weighted token usage per 12-trial cohort](../../assets/v6-weighted-tokens.svg)
+
+![Equivalent cost per 12-trial cohort](../../assets/v6-equivalent-cost.svg)
+
+![Median wall time per candidate](../../assets/v6-median-wall-time.svg)
+
+The charts are generated from the checked-in aggregate summary with Rough.js:
+
+```bash
+bun run charts:usage-routing
+```
+
+Rough.js is used at generation time only. README pages consume static SVG
+assets and do not need a browser-side chart runtime.
+
 The chart-safe aggregate data is checked in as
 [`live-v6-summary.json`](./live-v6-summary.json). It deliberately excludes raw
 rollouts, prompts, session IDs, and credentials.
