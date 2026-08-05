@@ -1,0 +1,200 @@
+{
+  "version": 1,
+  "description": "Adaptive route decisions; evaluates semantic policy behavior and not runtime dispatch.",
+  "cases": [
+    {
+      "id": "direct-context-answer",
+      "prompt": "Explain what a git working tree is in one short paragraph; no repository facts are needed.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md"
+      ],
+      "expected": {
+        "task_mode": "execute",
+        "intent_confidence": "clear",
+        "change_impact": "trivial",
+        "discovery_budget": "none",
+        "reversible": "yes",
+        "next_gate": "execution",
+        "abstain": false,
+        "approval_required": false,
+        "role": null,
+        "budget_exhausted": false,
+        "evidence_sufficient": true,
+        "decision_card": false
+      }
+    },
+    {
+      "id": "clear-bounded-local-edit",
+      "prompt": "Fix the already-understood typo in one README paragraph and run the markdown check.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md"
+      ],
+      "expected": {
+        "task_mode": "execute",
+        "intent_confidence": "clear",
+        "change_impact": "low",
+        "discovery_budget": "minimum",
+        "reversible": "yes",
+        "next_gate": "execution",
+        "abstain": false,
+        "approval_required": false,
+        "role": null,
+        "budget_exhausted": false,
+        "evidence_sufficient": true,
+        "decision_card": false
+      }
+    },
+    {
+      "id": "bounded-api-slice",
+      "prompt": "Implement the approved API validation change in the named module, update its tests, and run the named command.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/executor.toml"
+      ],
+      "expected": {
+        "task_mode": "execute",
+        "intent_confidence": "clear",
+        "change_impact": "material",
+        "discovery_budget": "bounded",
+        "reversible": "partial",
+        "next_gate": "execution",
+        "abstain": false,
+        "approval_required": false,
+        "role": "executor",
+        "budget_exhausted": false,
+        "evidence_sufficient": true,
+        "decision_card": false
+      }
+    },
+    {
+      "id": "broad-framework-migration",
+      "prompt": "Migrate the application from its current framework major version across routing, data fetching, tests, and deployment configuration.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/scout.toml",
+        "templates/agents/plan-verifier.toml"
+      ],
+      "expected": {
+        "task_mode": "execute",
+        "intent_confidence": "clear",
+        "change_impact": "high",
+        "discovery_budget": "minimum",
+        "reversible": "partial",
+        "next_gate": "approval",
+        "abstain": false,
+        "approval_required": true,
+        "role": "scout",
+        "budget_exhausted": false,
+        "evidence_sufficient": true,
+        "decision_card": true
+      }
+    },
+    {
+      "id": "irreversible-release-operation",
+      "prompt": "Release the database migration and delete the old production records after deployment.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/security-reviewer.toml"
+      ],
+      "expected": {
+        "task_mode": "explore_then_plan",
+        "intent_confidence": "clear",
+        "change_impact": "critical",
+        "discovery_budget": "deep",
+        "reversible": "no",
+        "next_gate": "approval",
+        "abstain": false,
+        "approval_required": true,
+        "role": null,
+        "budget_exhausted": false,
+        "evidence_sufficient": true,
+        "decision_card": true
+      }
+    },
+    {
+      "id": "underspecified-product-idea",
+      "prompt": "Build something that helps teams understand why users leave, with a polished dashboard and all the important integrations.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md"
+      ],
+      "expected": {
+        "task_mode": "co_discover",
+        "intent_confidence": "unclear",
+        "change_impact": "material",
+        "discovery_budget": "minimum",
+        "reversible": "yes",
+        "next_gate": "discovery",
+        "abstain": true,
+        "approval_required": false,
+        "role": null,
+        "budget_exhausted": false,
+        "evidence_sufficient": true,
+        "decision_card": true
+      }
+    },
+    {
+      "id": "misleading-keyword-context",
+      "prompt": "The request says 'migrate', but the task is only to rename one local test fixture and run its existing test.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md"
+      ],
+      "expected": {
+        "task_mode": "execute",
+        "intent_confidence": "clear",
+        "change_impact": "low",
+        "discovery_budget": "minimum",
+        "reversible": "yes",
+        "next_gate": "execution",
+        "abstain": false,
+        "approval_required": false,
+        "role": null,
+        "budget_exhausted": false,
+        "evidence_sufficient": true,
+        "decision_card": false
+      }
+    },
+    {
+      "id": "competing-product-directions",
+      "prompt": "Make the onboarding better; either focus on activation or reduce support tickets, whichever seems right.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md"
+      ],
+      "expected": {
+        "task_mode": "co_discover",
+        "intent_confidence": "partial",
+        "change_impact": "material",
+        "discovery_budget": "bounded",
+        "reversible": "yes",
+        "next_gate": "discovery",
+        "abstain": true,
+        "approval_required": false,
+        "role": null,
+        "budget_exhausted": false,
+        "evidence_sufficient": true,
+        "decision_card": true
+      }
+    },
+    {
+      "id": "budget-exhausted-insufficient-evidence",
+      "prompt": "Investigate a high-impact cross-component change, but the bounded reconnaissance budget is exhausted and the available evidence still cannot establish a safe next slice.",
+      "policy_basis": [
+        "templates/agents-md.orchestration.md",
+        "templates/agents/scout.toml"
+      ],
+      "expected": {
+        "task_mode": "explore_then_plan",
+        "intent_confidence": "partial",
+        "change_impact": "high",
+        "discovery_budget": "deep",
+        "reversible": "partial",
+        "next_gate": "discovery",
+        "abstain": true,
+        "approval_required": false,
+        "role": "scout",
+        "budget_exhausted": true,
+        "evidence_sufficient": false,
+        "decision_card": true
+      }
+    }
+  ]
+}

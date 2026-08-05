@@ -1,14 +1,43 @@
 # pilotfish-codex
 
-Codex-native role orchestration inspired by
-[Pilotfish](https://github.com/Nanako0129/pilotfish). This is an independent
-Codex CLI adaptation maintained by Miyago.
+> A Codex-native orchestration layer that chooses a realistic first move:
+> execute clear work, explore broad work, and co-discover open-ended ideas.
+
+Pilotfish-Codex is an independent Codex CLI adaptation inspired by
+[Pilotfish](https://github.com/Nanako0129/pilotfish). It turns the orchestration
+policy into a small set of typed roles, explicit approval boundaries, and
+fresh-context verification. The current branch also experiments with adaptive
+intent routing to reduce the tunnel vision of treating every request as either
+"execute now" or "write a full Plan".
+
+![Pilotfish-Codex routing overview](./docs/assets/routing-evidence.svg)
+
+The guiding rule is simple: the first move should match the user's certainty,
+the size of the change, and the cost of being wrong. This repository contains
+the policy, role templates, installer, offline tests, and the evidence behind
+that decision.
+
+## At a glance
+
+| Request shape | Initial mode | First move |
+| --- | --- | --- |
+| Clear and bounded | `execute` | Confirm the target and required approval, then take the smallest direct step. |
+| Clear but broad or high-impact | `explore_then_plan` | Inspect the current boundary, surface migration choices, and propose a reversible slice. |
+| Idea without a stable product boundary | `co_discover` | Ask focused questions and define the smallest useful experiment. |
+
+These are starting shapes, not an exhaustive classifier. The route also records
+confidence, change impact, reversibility, grounding budget, blocking decisions,
+and the next gate.
 
 ## Contents
 
+- [At a glance](#at-a-glance)
+- [Adaptive intent routing](#adaptive-intent-routing)
+- [How it works](#how-it-works)
 - [Native target](#native-target)
 - [Roles](#roles)
-- [Routing evidence](#routing-evidence)
+- [Model routing evidence](#model-routing-evidence)
+- [Adaptive routing experiment](#adaptive-routing-experiment)
 - [Plan readiness](#plan-readiness)
 - [Outcome verification](#outcome-verification)
 - [Continuation across user input](#continuation-across-user-input)
@@ -18,6 +47,60 @@ Codex CLI adaptation maintained by Miyago.
 - [Native verification](#native-verification)
 - [Development](#development)
 - [License](#license)
+
+## Adaptive intent routing
+
+Adaptive routing is designed around three concrete examples from the initial
+experiment:
+
+| Example prompt | Expected mode | What the policy should do |
+| --- | --- | --- |
+| 「幫我把專案上版並加 tag 和 release」 | `execute` | Keep the route direct, but confirm the release target and approval before an external action. |
+| 「想把 Nuxt 的專案改成 Angular」 | `explore_then_plan` | Establish the application boundary and migration decisions before proposing a bulk rewrite. |
+| 「我想做一個音樂播放器，怎麼開始」 | `co_discover` | Discuss the user, MVP, platform, and acceptance criteria before choosing implementation work. |
+
+The policy has both a grounding floor and a stopping ceiling:
+
+- The floor prevents a response from guessing through missing facts. Depending
+  on risk, grounding is `none`, `minimum`, `bounded`, or `deep`.
+- The ceiling prevents unbounded analysis. When the discovery budget is spent,
+  the session narrows the question, pauses, or asks the user instead of
+  expanding into unrelated research.
+- A `direction_checkpoint` makes the next decision explicit: `CONTINUE`,
+  `PIVOT`, `ROLLBACK`, or `INCONCLUSIVE`.
+
+The experiment is intentionally qualitative. Its first offline run matched all
+three expected interaction shapes, but it is directional evidence rather than a
+statistically significant result or proof of live model dispatch. See the
+[full experiment report](./docs/specs/adaptive-intent-routing/EXPERIMENT-RESULTS.md).
+
+## How it works
+
+```mermaid
+flowchart LR
+    U[User request] --> R{Intent route}
+    R -->|clear and bounded| E[execute]
+    R -->|broad or high impact| P[explore_then_plan]
+    R -->|open-ended idea| D[co_discover]
+    E --> A[Approval or execution gate]
+    P --> G[Grounding budget and decision card]
+    D --> Q[Focused questions and smallest experiment]
+    A --> C[direction_checkpoint]
+    G --> C
+    Q --> C
+    C -->|CONTINUE| V[Proceed and verify]
+    C -->|PIVOT| P
+    C -->|ROLLBACK| S[Stop new writes]
+```
+
+The user checkpoint is modeled after an AskUserQuestion-style decision card:
+current interpretation, recommended default, relevant scope and exclusions,
+options, and the next reversible slice. It appears when a material choice is
+blocking progress; low-risk work can continue without an artificial question.
+
+The checkpoint does not replace the internal Plan. External, destructive,
+release, security-sensitive, and irreversible actions retain their existing
+approval and containment gates.
 
 ## Native target
 
@@ -58,7 +141,7 @@ for security review/execution and the existing risk-triggered Plan review.
 Mechanical roles retain their existing Luna low/medium bindings; the review
 trigger and its two-`REVISE` budget are unchanged.
 
-## Routing evidence
+## Model routing evidence
 
 The current decision uses the checked-in
 [36-trial v6 aggregate](./docs/benchmarks/usage-routing-v1/live-v6-summary.json):
@@ -121,6 +204,27 @@ The release gate is tracked separately from the 36-trial cohort. The
 one non-bypass live run: a Luna/medium root produced the required Sol/high
 Plan-review child. It proves the installed dispatch path, not a cost or quality
 improvement.
+
+## Adaptive routing experiment
+
+The first adaptive-routing smoke compares the candidate policy with the
+pre-adaptive binary control using the three prompts above. Tools and writes are
+disabled so the comparison focuses on the response's first move and thinking
+shape.
+
+| Scenario | Candidate | Pre-adaptive control |
+| --- | --- | --- |
+| Release, tag, and release | `execute`; minimum grounding and approval retained | `full_plan`; over-plans a clear request |
+| Nuxt to Angular | `explore_then_plan`; bounded discovery and migration questions | `full_plan`; jumps to a complete migration plan |
+| Music player idea | `co_discover`; focused MVP and platform questions | `generic_advice`; useful questions without an explicit discovery mode |
+
+All three candidate routes matched their expected interaction shape. This is
+directional evidence only: one completed run per arm and case is not enough to
+estimate a rate, establish statistical significance, or prove live model
+compliance. The [experiment design](./docs/specs/adaptive-intent-routing/EXPERIMENT.md),
+[input cases](./docs/specs/adaptive-intent-routing/experiment-cases.json), and
+[observed results](./docs/specs/adaptive-intent-routing/EXPERIMENT-RESULTS.md)
+are checked in for review and replication.
 
 ## Plan readiness
 

@@ -39,6 +39,88 @@ ALLOWED_ROLES = frozenset(
 ALLOWED_DECISIONS = frozenset({"delegate", "local"})
 LIVE_CASE_CAP = 3
 
+ALLOWED_TASK_MODES = frozenset({"execute", "explore_then_plan", "co_discover"})
+ALLOWED_INTENT_CONFIDENCE = frozenset({"clear", "partial", "unclear"})
+ALLOWED_CHANGE_IMPACT = frozenset({"trivial", "low", "material", "high", "critical"})
+ALLOWED_DISCOVERY_BUDGETS = frozenset({"none", "minimum", "bounded", "deep"})
+ALLOWED_REVERSIBILITY = frozenset({"yes", "partial", "no"})
+ALLOWED_NEXT_GATES = frozenset({"discovery", "approval", "execution", "direction_check"})
+ALLOWED_CHECKPOINT_DISPOSITIONS = frozenset({"CONTINUE", "PIVOT", "ROLLBACK"})
+ROUTE_FIELDS = frozenset(
+    {
+        "id",
+        "task_mode",
+        "intent_confidence",
+        "change_impact",
+        "discovery_budget",
+        "reversible",
+        "blocking_decisions",
+        "next_gate",
+        "abstain",
+        "approval_required",
+        "role",
+        "budget_exhausted",
+        "evidence_sufficient",
+        "rationale",
+        "decision_card",
+    }
+)
+ROUTE_EXPECTED_FIELDS = frozenset(
+    {
+        "task_mode",
+        "intent_confidence",
+        "change_impact",
+        "discovery_budget",
+        "reversible",
+        "next_gate",
+        "budget_exhausted",
+        "evidence_sufficient",
+        "abstain",
+        "approval_required",
+        "role",
+        "decision_card",
+    }
+)
+CARD_FIELDS = frozenset(
+    {
+        "current_interpretation",
+        "proposed_default",
+        "included_scope",
+        "excluded_scope",
+        "material_risk",
+        "questions",
+        "next_reversible_slice",
+    }
+)
+CARD_REQUIRED_FIELDS = frozenset(
+    {
+        "current_interpretation",
+        "proposed_default",
+        "included_scope",
+        "excluded_scope",
+        "questions",
+        "next_reversible_slice",
+    }
+)
+CHECKPOINT_FIELDS = frozenset(
+    {
+        "id",
+        "disposition",
+        "replan_required",
+        "rollback_target_available",
+        "approval_required",
+        "rationale",
+    }
+)
+CHECKPOINT_EXPECTED_FIELDS = frozenset(
+    {
+        "disposition",
+        "replan_required",
+        "rollback_target_available",
+        "approval_required",
+    }
+)
+
 
 class EvaluationError(ValueError):
     """Raised when evaluator input or live evidence violates its contract."""
@@ -264,6 +346,504 @@ def evaluate(
     }
 
 
+def _validate_string_list(value: Any, *, allow_empty: bool = True) -> bool:
+    return (
+        isinstance(value, list)
+        and (allow_empty or bool(value))
+        and all(_is_nonempty_string(item) for item in value)
+    )
+
+
+def _validate_route_expected(expected: Any, case_id: str) -> None:
+    if not isinstance(expected, dict) or set(expected) != ROUTE_EXPECTED_FIELDS:
+        raise EvaluationError(
+            f"case {case_id}: route expected must contain "
+            "task signals, role, approval, abstention, and card expectation"
+        )
+    for field, allowed in (
+        ("task_mode", ALLOWED_TASK_MODES),
+        ("intent_confidence", ALLOWED_INTENT_CONFIDENCE),
+        ("change_impact", ALLOWED_CHANGE_IMPACT),
+        ("discovery_budget", ALLOWED_DISCOVERY_BUDGETS),
+        ("reversible", ALLOWED_REVERSIBILITY),
+        ("next_gate", ALLOWED_NEXT_GATES),
+    ):
+        if expected[field] not in allowed:
+            raise EvaluationError(f"case {case_id}: invalid expected {field}")
+    if type(expected["abstain"]) is not bool:
+        raise EvaluationError(f"case {case_id}: expected abstain must be boolean")
+    if type(expected["approval_required"]) is not bool:
+        raise EvaluationError(f"case {case_id}: expected approval_required must be boolean")
+    for field in ("budget_exhausted", "evidence_sufficient"):
+        if type(expected[field]) is not bool:
+            raise EvaluationError(f"case {case_id}: expected {field} must be boolean")
+    if expected["discovery_budget"] == "none" and expected["budget_exhausted"]:
+        raise EvaluationError(f"case {case_id}: none budget cannot be exhausted")
+    if expected["budget_exhausted"] and not expected["evidence_sufficient"]:
+        if not expected["abstain"] or expected["next_gate"] not in {"discovery", "approval"}:
+            raise EvaluationError(
+                f"case {case_id}: exhausted insufficient evidence must abstain at a gate"
+            )
+    if expected["role"] is not None and expected["role"] not in ALLOWED_ROLES:
+        raise EvaluationError(f"case {case_id}: invalid expected role")
+    if type(expected["decision_card"]) is not bool:
+        raise EvaluationError(f"case {case_id}: expected decision_card must be boolean")
+
+
+def validate_route_corpus(corpus: Any) -> dict[str, Any]:
+    """Validate the versioned adaptive route corpus."""
+    if not isinstance(corpus, dict):
+        raise EvaluationError("route corpus must be an object")
+    if type(corpus.get("version")) is not int or corpus["version"] < 1:
+        raise EvaluationError("route corpus version must be a positive integer")
+    cases = corpus.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise EvaluationError("route corpus cases must be a non-empty list")
+
+    ids: set[str] = set()
+    modes: set[str] = set()
+    impacts: set[str] = set()
+    abstention_values: set[bool] = set()
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != {
+            "id",
+            "prompt",
+            "policy_basis",
+            "expected",
+        }:
+            raise EvaluationError(
+                "each route corpus case must have id, prompt, policy_basis, expected"
+            )
+        case_id = case["id"]
+        if not _is_nonempty_string(case_id):
+            raise EvaluationError("route corpus case id must be a non-empty string")
+        if case_id in ids:
+            raise EvaluationError(f"duplicate route corpus case id: {case_id}")
+        ids.add(case_id)
+        if not _is_nonempty_string(case["prompt"]):
+            raise EvaluationError(f"case {case_id}: prompt must be a non-empty string")
+        if not isinstance(case["policy_basis"], list) or not case["policy_basis"]:
+            raise EvaluationError(f"case {case_id}: policy_basis must be a non-empty list")
+        if not all(_is_nonempty_string(item) for item in case["policy_basis"]):
+            raise EvaluationError(f"case {case_id}: policy_basis must be non-empty strings")
+        _validate_route_expected(case["expected"], case_id)
+        modes.add(case["expected"]["task_mode"])
+        impacts.add(case["expected"]["change_impact"])
+        abstention_values.add(case["expected"]["abstain"])
+
+    if modes != ALLOWED_TASK_MODES:
+        raise EvaluationError("route corpus must cover all three task modes")
+    if not {True, False}.issubset(abstention_values):
+        raise EvaluationError("route corpus must contain abstaining and non-abstaining cases")
+    if not {"trivial", "low", "material", "high", "critical"}.issubset(impacts):
+        raise EvaluationError("route corpus must cover the five impact bands")
+    return corpus
+
+
+def load_route_corpus(path: Path) -> dict[str, Any]:
+    """Load and validate one adaptive route corpus."""
+    return validate_route_corpus(_load_json(path, "route corpus"))
+
+
+def _validate_question(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != {
+        "id",
+        "question",
+        "options",
+        "recommended",
+    }:
+        return False
+    options = value["options"]
+    return (
+        _is_nonempty_string(value["id"])
+        and _is_nonempty_string(value["question"])
+        and isinstance(options, list)
+        and len(options) >= 2
+        and all(_is_nonempty_string(option) for option in options)
+        and _is_nonempty_string(value["recommended"])
+        and value["recommended"] in options
+    )
+
+
+def _route_card_error(card: Any) -> str | None:
+    if not isinstance(card, dict) or not CARD_REQUIRED_FIELDS.issubset(card):
+        return "decision_card_malformed"
+    if set(card) - CARD_FIELDS:
+        return "decision_card_malformed"
+    for field in ("current_interpretation", "proposed_default", "next_reversible_slice"):
+        if not _is_nonempty_string(card[field]):
+            return "decision_card_malformed"
+    for field in ("included_scope", "excluded_scope"):
+        if not _validate_string_list(card[field]):
+            return "decision_card_malformed"
+    if "material_risk" in card and not _validate_string_list(card["material_risk"]):
+        return "decision_card_malformed"
+    if not isinstance(card["questions"], list) or not card["questions"]:
+        return "decision_card_malformed"
+    if not all(_validate_question(question) for question in card["questions"]):
+        return "decision_card_malformed"
+    return None
+
+
+def _route_decision_error(decision: Any) -> str | None:
+    if not isinstance(decision, dict) or set(decision) != ROUTE_FIELDS:
+        return "malformed"
+    if not _is_nonempty_string(decision["id"]):
+        return "malformed"
+    for field, allowed in (
+        ("task_mode", ALLOWED_TASK_MODES),
+        ("intent_confidence", ALLOWED_INTENT_CONFIDENCE),
+        ("change_impact", ALLOWED_CHANGE_IMPACT),
+        ("discovery_budget", ALLOWED_DISCOVERY_BUDGETS),
+        ("reversible", ALLOWED_REVERSIBILITY),
+        ("next_gate", ALLOWED_NEXT_GATES),
+    ):
+        if decision[field] not in allowed:
+            return "malformed"
+    if not _validate_string_list(decision["blocking_decisions"]):
+        return "malformed"
+    for field in (
+        "abstain",
+        "approval_required",
+        "budget_exhausted",
+        "evidence_sufficient",
+    ):
+        if type(decision[field]) is not bool:
+            return "malformed"
+    if decision["role"] is not None and decision["role"] not in ALLOWED_ROLES:
+        return "malformed"
+    if not _is_nonempty_string(decision["rationale"]):
+        return "empty_rationale"
+    if decision["approval_required"] and decision["next_gate"] != "approval":
+        return "malformed"
+    if decision["discovery_budget"] == "none" and decision["budget_exhausted"]:
+        return "malformed"
+    if decision["budget_exhausted"] and not decision["evidence_sufficient"]:
+        if not decision["abstain"]:
+            return "overconfident"
+        if decision["next_gate"] not in {"discovery", "approval"}:
+            return "malformed"
+        if decision["decision_card"] is None:
+            return "decision_card_missing"
+    if decision["abstain"] != (decision["intent_confidence"] != "clear"):
+        return "overconfident"
+    if decision["abstain"] and not decision["blocking_decisions"]:
+        return "malformed"
+    if decision["task_mode"] == "co_discover" and decision["intent_confidence"] == "clear":
+        return "overconfident"
+    if decision["task_mode"] == "execute" and (
+        decision["change_impact"] in {"high", "critical"}
+        or decision["reversible"] == "no"
+    ) and not (decision["approval_required"] and decision["next_gate"] == "approval"):
+        return "overconfident"
+    if decision["blocking_decisions"] and decision["decision_card"] is None:
+        return "decision_card_missing"
+    if decision["decision_card"] is not None:
+        return _route_card_error(decision["decision_card"])
+    return None
+
+
+def evaluate_route(
+    corpus: dict[str, Any],
+    decisions: list[Any],
+    *,
+    min_route_accuracy: float = 1.0,
+    min_abstention_accuracy: float = 1.0,
+    min_card_accuracy: float = 1.0,
+) -> dict[str, Any]:
+    """Score adaptive route signals, abstention, cards, roles, and approvals."""
+    for value, name in (
+        (min_route_accuracy, "min_route_accuracy"),
+        (min_abstention_accuracy, "min_abstention_accuracy"),
+        (min_card_accuracy, "min_card_accuracy"),
+    ):
+        _threshold(value, name)
+    if not isinstance(decisions, list):
+        raise EvaluationError("route decisions must be a list")
+
+    expected_by_id = {case["id"]: case["expected"] for case in corpus["cases"]}
+    invalid = {
+        "malformed": 0,
+        "empty_rationale": 0,
+        "overconfident": 0,
+        "decision_card_missing": 0,
+        "decision_card_malformed": 0,
+        "duplicate_ids": 0,
+        "unknown_ids": 0,
+    }
+    accepted: dict[str, dict[str, Any]] = {}
+    submitted_ids: set[str] = set()
+    for submitted in decisions:
+        case_id = submitted.get("id") if isinstance(submitted, dict) else None
+        duplicate = _is_nonempty_string(case_id) and case_id in submitted_ids
+        if _is_nonempty_string(case_id):
+            submitted_ids.add(case_id)
+        error = _route_decision_error(submitted)
+        if error is not None:
+            invalid[error] += 1
+        if duplicate:
+            invalid["duplicate_ids"] += 1
+        if error is not None or duplicate:
+            continue
+        assert isinstance(case_id, str)
+        if case_id not in expected_by_id:
+            invalid["unknown_ids"] += 1
+            continue
+        accepted[case_id] = submitted
+
+    expected_ids = set(expected_by_id)
+    coverage_complete = (
+        submitted_ids == expected_ids
+        and invalid["duplicate_ids"] == 0
+        and invalid["unknown_ids"] == 0
+    )
+    signal_fields = (
+        "task_mode",
+        "intent_confidence",
+        "change_impact",
+        "discovery_budget",
+        "reversible",
+        "next_gate",
+        "budget_exhausted",
+        "evidence_sufficient",
+    )
+    route_correct = sum(
+        accepted.get(case_id, {}).get("task_mode") == expected["task_mode"]
+        for case_id, expected in expected_by_id.items()
+    )
+    signal_correct = sum(
+        all(accepted.get(case_id, {}).get(field) == expected[field] for field in signal_fields)
+        for case_id, expected in expected_by_id.items()
+    )
+    abstention_correct = sum(
+        accepted.get(case_id, {}).get("abstain") == expected["abstain"]
+        for case_id, expected in expected_by_id.items()
+    )
+    card_correct = sum(
+        (accepted.get(case_id, {}).get("decision_card") is not None) == expected["decision_card"]
+        for case_id, expected in expected_by_id.items()
+    )
+    role_correct = sum(
+        accepted.get(case_id, {}).get("role") == expected["role"]
+        for case_id, expected in expected_by_id.items()
+    )
+    approval_correct = sum(
+        accepted.get(case_id, {}).get("approval_required") == expected["approval_required"]
+        for case_id, expected in expected_by_id.items()
+    )
+    total = len(expected_ids)
+    false_direct = sum(
+        accepted.get(case_id, {}).get("task_mode") == "execute"
+        and expected["task_mode"] != "execute"
+        for case_id, expected in expected_by_id.items()
+    )
+    false_overexploration = sum(
+        accepted.get(case_id, {}).get("task_mode") in {"explore_then_plan", "co_discover"}
+        and expected["task_mode"] == "execute"
+        for case_id, expected in expected_by_id.items()
+    )
+    invalid["total"] = sum(invalid.values())
+    route_accuracy = route_correct / total if total else 1.0
+    abstention_accuracy = abstention_correct / total if total else 1.0
+    card_accuracy = card_correct / total if total else 1.0
+    passed = (
+        coverage_complete
+        and invalid["total"] == 0
+        and route_accuracy >= min_route_accuracy
+        and abstention_accuracy >= min_abstention_accuracy
+        and card_accuracy >= min_card_accuracy
+        and role_correct == total
+        and approval_correct == total
+    )
+    return {
+        "evaluator": "adaptive-route-behavioral-not-runtime-enforcement",
+        "corpus_version": corpus["version"],
+        "coverage": {
+            "expected": total,
+            "submitted": len(decisions),
+            "complete": coverage_complete,
+        },
+        "route_selection": {
+            "correct": route_correct,
+            "total": total,
+            "accuracy": route_accuracy,
+        },
+        "signal_bundle": {
+            "correct": signal_correct,
+            "total": total,
+            "accuracy": signal_correct / total if total else 1.0,
+        },
+        "abstention": {
+            "correct": abstention_correct,
+            "total": total,
+            "accuracy": abstention_accuracy,
+        },
+        "decision_card": {
+            "correct": card_correct,
+            "total": total,
+            "accuracy": card_accuracy,
+        },
+        "role_expectation": {"correct": role_correct, "total": total},
+        "approval_expectation": {"correct": approval_correct, "total": total},
+        "false_direct_execution": false_direct,
+        "false_overexploration": false_overexploration,
+        "measurements": {
+            "latency_ms": None,
+            "token_cost_proxy": None,
+            "status": "not measured by offline semantic route evaluation",
+        },
+        "invalid_decisions": invalid,
+        "thresholds": {
+            "min_route_accuracy": min_route_accuracy,
+            "min_abstention_accuracy": min_abstention_accuracy,
+            "min_card_accuracy": min_card_accuracy,
+        },
+        "passed": passed,
+    }
+
+
+def _validate_checkpoint_expected(expected: Any, case_id: str) -> None:
+    if not isinstance(expected, dict) or set(expected) != CHECKPOINT_EXPECTED_FIELDS:
+        raise EvaluationError(f"case {case_id}: invalid checkpoint expected shape")
+    if expected["disposition"] not in ALLOWED_CHECKPOINT_DISPOSITIONS:
+        raise EvaluationError(f"case {case_id}: invalid checkpoint disposition")
+    for field in ("replan_required", "rollback_target_available", "approval_required"):
+        if type(expected[field]) is not bool:
+            raise EvaluationError(f"case {case_id}: checkpoint {field} must be boolean")
+
+
+def validate_checkpoint_corpus(corpus: Any) -> dict[str, Any]:
+    """Validate direction-checkpoint fixtures."""
+    if not isinstance(corpus, dict):
+        raise EvaluationError("checkpoint corpus must be an object")
+    if type(corpus.get("version")) is not int or corpus["version"] < 1:
+        raise EvaluationError("checkpoint corpus version must be a positive integer")
+    cases = corpus.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise EvaluationError("checkpoint corpus cases must be a non-empty list")
+    ids: set[str] = set()
+    dispositions: set[str] = set()
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != {
+            "id",
+            "prompt",
+            "policy_basis",
+            "expected",
+        }:
+            raise EvaluationError("each checkpoint case has an invalid shape")
+        case_id = case["id"]
+        if not _is_nonempty_string(case_id) or case_id in ids:
+            raise EvaluationError(f"invalid or duplicate checkpoint case id: {case_id}")
+        ids.add(case_id)
+        if not _is_nonempty_string(case["prompt"]):
+            raise EvaluationError(f"case {case_id}: prompt must be non-empty")
+        if not isinstance(case["policy_basis"], list) or not case["policy_basis"]:
+            raise EvaluationError(f"case {case_id}: policy_basis must be non-empty")
+        _validate_checkpoint_expected(case["expected"], case_id)
+        dispositions.add(case["expected"]["disposition"])
+    if dispositions != ALLOWED_CHECKPOINT_DISPOSITIONS:
+        raise EvaluationError("checkpoint corpus must cover CONTINUE, PIVOT, and ROLLBACK")
+    return corpus
+
+
+def load_checkpoint_corpus(path: Path) -> dict[str, Any]:
+    """Load and validate direction-checkpoint fixtures."""
+    return validate_checkpoint_corpus(_load_json(path, "checkpoint corpus"))
+
+
+def _checkpoint_decision_error(decision: Any) -> str | None:
+    if not isinstance(decision, dict) or set(decision) != CHECKPOINT_FIELDS:
+        return "malformed"
+    if not _is_nonempty_string(decision["id"]):
+        return "malformed"
+    if decision["disposition"] not in (*ALLOWED_CHECKPOINT_DISPOSITIONS, "INCONCLUSIVE"):
+        return "malformed"
+    for field in ("replan_required", "rollback_target_available", "approval_required"):
+        if type(decision[field]) is not bool:
+            return "malformed"
+    if not _is_nonempty_string(decision["rationale"]):
+        return "empty_rationale"
+    if decision["disposition"] == "PIVOT" and not decision["replan_required"]:
+        return "unsafe_disposition"
+    if decision["disposition"] == "ROLLBACK" and (
+        not decision["rollback_target_available"] and not decision["approval_required"]
+    ):
+        return "unsafe_disposition"
+    if decision["disposition"] == "INCONCLUSIVE" and not decision["approval_required"]:
+        return "unsafe_disposition"
+    return None
+
+
+def evaluate_checkpoints(corpus: dict[str, Any], decisions: list[Any]) -> dict[str, Any]:
+    """Score direction dispositions independently from completed outcomes."""
+    if not isinstance(decisions, list):
+        raise EvaluationError("checkpoint decisions must be a list")
+    expected_by_id = {case["id"]: case["expected"] for case in corpus["cases"]}
+    invalid = {"malformed": 0, "empty_rationale": 0, "unsafe_disposition": 0, "duplicate_ids": 0, "unknown_ids": 0}
+    accepted: dict[str, dict[str, Any]] = {}
+    submitted_ids: set[str] = set()
+    for submitted in decisions:
+        case_id = submitted.get("id") if isinstance(submitted, dict) else None
+        duplicate = _is_nonempty_string(case_id) and case_id in submitted_ids
+        if _is_nonempty_string(case_id):
+            submitted_ids.add(case_id)
+        error = _checkpoint_decision_error(submitted)
+        if error is not None:
+            invalid[error] += 1
+        if duplicate:
+            invalid["duplicate_ids"] += 1
+        if error is not None or duplicate:
+            continue
+        assert isinstance(case_id, str)
+        if case_id not in expected_by_id:
+            invalid["unknown_ids"] += 1
+            continue
+        accepted[case_id] = submitted
+
+    expected_ids = set(expected_by_id)
+    coverage_complete = submitted_ids == expected_ids and not any(
+        invalid[field] for field in ("duplicate_ids", "unknown_ids")
+    )
+    total = len(expected_ids)
+    disposition_correct = sum(
+        accepted.get(case_id, {}).get("disposition") == expected["disposition"]
+        for case_id, expected in expected_by_id.items()
+    )
+    replan_correct = sum(
+        accepted.get(case_id, {}).get("replan_required") == expected["replan_required"]
+        for case_id, expected in expected_by_id.items()
+    )
+    rollback_correct = sum(
+        accepted.get(case_id, {}).get("rollback_target_available")
+        == expected["rollback_target_available"]
+        for case_id, expected in expected_by_id.items()
+    )
+    approval_correct = sum(
+        accepted.get(case_id, {}).get("approval_required") == expected["approval_required"]
+        for case_id, expected in expected_by_id.items()
+    )
+    invalid["total"] = sum(invalid.values())
+    passed = (
+        coverage_complete
+        and invalid["total"] == 0
+        and disposition_correct == total
+        and replan_correct == total
+        and rollback_correct == total
+        and approval_correct == total
+    )
+    return {
+        "evaluator": "direction-checkpoint-behavioral-not-runtime-enforcement",
+        "corpus_version": corpus["version"],
+        "coverage": {"expected": total, "submitted": len(decisions), "complete": coverage_complete},
+        "disposition": {"correct": disposition_correct, "total": total},
+        "replan": {"correct": replan_correct, "total": total},
+        "rollback_target": {"correct": rollback_correct, "total": total},
+        "approval": {"correct": approval_correct, "total": total},
+        "invalid_decisions": invalid,
+        "passed": passed,
+    }
+
+
 def _contains_forbidden_live_evidence(value: Any) -> bool:
     if isinstance(value, dict):
         for key, child in value.items():
@@ -398,13 +978,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--corpus",
         type=Path,
-        default=repository_root / "docs" / "specs" / "dispatch-verification" / "task-class-corpus.json",
+        default=None,
     )
+    parser.add_argument("--route", action="store_true")
+    parser.add_argument("--checkpoint", action="store_true")
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--decisions", type=Path)
     source.add_argument("--live", action="store_true")
     parser.add_argument("--min-role-accuracy", type=float, default=1.0)
     parser.add_argument("--min-abstention-accuracy", type=float, default=1.0)
+    parser.add_argument("--min-route-accuracy", type=float, default=1.0)
+    parser.add_argument("--min-card-accuracy", type=float, default=1.0)
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--task-eval-yes", action="store_true")
     parser.add_argument("--case-id", action="append", default=[])
@@ -412,17 +996,63 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        corpus = load_corpus(args.corpus)
+        if args.route and args.checkpoint:
+            raise EvaluationError("--route and --checkpoint are mutually exclusive")
+        if args.corpus is None:
+            if args.route:
+                args.corpus = (
+                    repository_root
+                    / "docs"
+                    / "specs"
+                    / "adaptive-intent-routing"
+                    / "route-corpus.json"
+                )
+            elif args.checkpoint:
+                args.corpus = (
+                    repository_root
+                    / "docs"
+                    / "specs"
+                    / "adaptive-intent-routing"
+                    / "checkpoint-corpus.json"
+                )
+            else:
+                args.corpus = (
+                    repository_root
+                    / "docs"
+                    / "specs"
+                    / "dispatch-verification"
+                    / "task-class-corpus.json"
+                )
+        if args.route:
+            corpus = load_route_corpus(args.corpus)
+        elif args.checkpoint:
+            corpus = load_checkpoint_corpus(args.corpus)
+        else:
+            corpus = load_corpus(args.corpus)
         if args.decisions is not None:
             if args.yes or args.case_id:
                 raise EvaluationError("--yes and --case-id are only valid with --live")
-            report = evaluate(
-                corpus,
-                load_decisions(args.decisions),
-                min_role_accuracy=args.min_role_accuracy,
-                min_abstention_accuracy=args.min_abstention_accuracy,
-            )
+            decisions = load_decisions(args.decisions)
+            if args.route:
+                report = evaluate_route(
+                    corpus,
+                    decisions,
+                    min_route_accuracy=args.min_route_accuracy,
+                    min_abstention_accuracy=args.min_abstention_accuracy,
+                    min_card_accuracy=args.min_card_accuracy,
+                )
+            elif args.checkpoint:
+                report = evaluate_checkpoints(corpus, decisions)
+            else:
+                report = evaluate(
+                    corpus,
+                    decisions,
+                    min_role_accuracy=args.min_role_accuracy,
+                    min_abstention_accuracy=args.min_abstention_accuracy,
+                )
         else:
+            if args.route or args.checkpoint:
+                raise EvaluationError("live evaluation is only available for dispatch corpus")
             if not args.yes or not args.task_eval_yes:
                 raise EvaluationError(
                     "live evaluation requires --yes and --task-eval-yes"

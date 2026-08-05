@@ -110,6 +110,31 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertIn("smallest coherent integration boundary", policy)
         self.assertIn("`spawn_agent` calls back-to-back", policy)
 
+    def test_policy_exposes_adaptive_route_and_discovery_contract(self) -> None:
+        policy = " ".join(
+            (ROOT / "templates" / "agents-md.orchestration.md").read_text().split()
+        )
+        for phrase in (
+            "Adaptive intent routing",
+            "`execute`",
+            "`explore_then_plan`",
+            "`co_discover`",
+            "`change_impact`: `trivial`, `low`, `material`, `high`, or `critical`",
+            "`discovery_budget`",
+            "`budget_exhausted`",
+            "`evidence_sufficient`",
+            "`none`",
+            "`minimum`",
+            "`bounded`",
+            "`deep`",
+            "AskUserQuestion",
+            "`direction_checkpoint`",
+            "`CONTINUE`",
+            "`PIVOT`",
+            "`ROLLBACK`",
+        ):
+            self.assertIn(phrase, policy)
+
     def test_policy_preserves_risk_triggered_plan_review(self) -> None:
         policy = " ".join(
             (ROOT / "templates" / "agents-md.orchestration.md").read_text().split()
@@ -192,6 +217,22 @@ class NativeTemplateTests(unittest.TestCase):
             instructions.lower(),
             r"assume (?:it|the change) is broken|do not trust|finding[- ]volume pressure",
         )
+
+    def test_verifier_supports_direction_checkpoint_contract(self) -> None:
+        with (ROOT / "templates" / "agents" / "verifier.toml").open("rb") as handle:
+            verifier = tomllib.load(handle)
+        description = verifier["description"]
+        instructions = " ".join(verifier["developer_instructions"].split())
+        for phrase in (
+            "direction-checkpoint",
+            "`direction_checkpoint`",
+            "`CONTINUE`",
+            "`PIVOT`",
+            "`ROLLBACK`",
+            "`INCONCLUSIVE`",
+            "latest verified good checkpoint",
+        ):
+            self.assertIn(phrase, f"{description} {instructions}")
 
     def test_runbook_is_native_only(self) -> None:
         runbook = (ROOT / "install" / "AGENT-INSTALL.md").read_text()

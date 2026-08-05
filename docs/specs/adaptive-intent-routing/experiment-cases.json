@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "release-tag-and-release",
+      "prompt": "幫我把專案上版並加 tag 和 release",
+      "expected_mode": "execute",
+      "expected_first_move": "Confirm the release target and required approval before any external release action.",
+      "must_preserve_approval": true
+    },
+    {
+      "id": "nuxt-to-angular",
+      "prompt": "想把 Nuxt 的專案改成 Angular",
+      "expected_mode": "explore_then_plan",
+      "expected_first_move": "Inspect the current application boundary and ask or expose migration decisions before bulk implementation.",
+      "must_preserve_approval": false
+    },
+    {
+      "id": "music-player-start",
+      "prompt": "我想做一個音樂播放器，怎麼開始",
+      "expected_mode": "co_discover",
+      "expected_first_move": "Ask focused questions about user, MVP, platform, and acceptance, then propose a smallest useful experiment.",
+      "must_preserve_approval": false
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 <!-- pilotfish-codex:begin -->
-<!-- pilotfish-codex v1.4.0 -->
+<!-- pilotfish-codex v1.4.1 -->
 <!-- markdownlint-disable-next-line MD041 -->
 ### Orchestration
 
@@ -50,6 +50,82 @@ integrates writes, resolves conflicts, and makes final judgment. Delegation is
 not required for a small, local, already-stable edit or a tightly coupled
 unknown bug; keep those in the parent when coordination would cost more than
 direct work.
+
+#### Adaptive intent routing
+
+Before choosing a Plan shape or role, classify the request on intent,
+impact, reversibility, and authority. Use the following initial modes as
+descriptive upstream-style names, not as a closed keyword classifier:
+
+| Mode | Use when | First safe move |
+|---|---|---|
+| `execute` | Outcome and scope are clear; the next step is bounded, even when an existing authority gate still blocks it | Execute locally or delegate the least expensive matching role, then stop at the required gate |
+| `explore_then_plan` | Direction is clear, but the change is broad, cross-component, migration-heavy, high-impact, or costly to reverse | Inspect the repository, record assumptions, and form a provisional Plan for one slice |
+| `co_discover` | The request is an idea or broad outcome without a stable problem, target user, MVP, or acceptance boundary | Ask focused questions and run only low-cost reconnaissance or a smallest useful experiment |
+
+These modes cover the first implementation examples, not every future
+scenario. Use evidence and context rather than keywords, and keep semantic
+ambiguity separate from technical uncertainty and authority/risk uncertainty.
+Clear intent does not require `explore_then_plan` by itself: a bounded release
+request may remain `execute` with `next_gate=approval`. The approval gate
+controls authority; the route controls the interaction shape.
+
+Record these logical signals in the internal route decision:
+
+- `intent_confidence`: `clear`, `partial`, or `unclear`.
+- `change_impact`: `trivial`, `low`, `material`, `high`, or `critical`.
+  `trivial` is a direct answer or no-write task; `low` is isolated and
+  reversible; `material` crosses a module or user-behavior boundary; `high`
+  is migration, release, or expensive to reverse; `critical` is destructive,
+  external, security-sensitive, or otherwise irreversible.
+- `reversible`: `yes`, `partial`, or `no`.
+- `discovery_budget`: `none`, `minimum`, `bounded`, or `deep`.
+- `budget_exhausted`: whether the selected discovery ceiling was reached.
+- `evidence_sufficient`: whether the evidence supports the next gate.
+- `blocking_decisions`: a bounded list of user choices that can change the
+  outcome, authority, risk, or acceptance.
+- `next_gate`: `discovery`, `approval`, `execution`, or `direction_check`.
+
+Discovery has both a grounding floor and a stopping ceiling. Use one logical
+discovery unit for a targeted inspection, search, or reversible probe; combine
+mechanical reads from one command into one unit. The default bands are:
+
+| Budget | Minimum evidence | Maximum default |
+|---|---|---|
+| `none` | Context or common sense is sufficient; no repository or external fact is needed | Zero discovery units |
+| `minimum` | At least one grounding check when the answer depends on local state | Two units |
+| `bounded` | Enough targeted evidence to compare the next safe options | Six units and one cheap reversible probe |
+| `deep` | Evidence for cross-component, high-impact, or costly-to-reverse work | Ten units and two cheap probes, then narrow, pause, or ask |
+
+The bands are defaults, not permission to guess. Stop early when evidence no
+longer changes the route or a cheaper reversible probe answers the question.
+When the floor cannot be met, state the uncertainty. When the ceiling is
+exhausted, narrow, pause, or ask; never turn exhaustion into write
+authorization.
+
+When a material choice is required, present a concise decision card in the
+same interactive style as Claude's `AskUserQuestion`: show the current
+interpretation, recommended default, relevant scope and exclusions, and only
+the questions whose answers can change the next gate. Offer clear options when
+they exist and identify the recommended option. Low-risk work may omit the
+card; product, authority, risk, irreversible-cost, or unresolved-direction
+choices require it. A decision card is a user checkpoint, not a replacement
+for the internal Plan or an approval bypass.
+
+At each stable slice boundary, the existing `verifier` may receive the
+explicit `direction_checkpoint` contract. It compares the original outcome,
+non-negotiable constraints, slice acceptance, and current evidence, then
+returns one disposition:
+
+- `CONTINUE`: the evidence supports the intent and next slice.
+- `PIVOT`: the outcome still stands, but the path or assumption must change;
+  preserve useful evidence and require a bounded re-plan.
+- `ROLLBACK`: an invariant or acceptance condition is broken; stop new writes
+  and return to the latest verified good checkpoint.
+
+Insufficient evidence remains `INCONCLUSIVE` under the verifier's calibrated
+contract. External, destructive, release, security-sensitive, and other
+irreversible operations retain their existing approval and containment gates.
 
 Independent review is risk-triggered, not a synonym for non-trivial. Use it
 when the user requests it or the claim crosses a security or trust boundary,

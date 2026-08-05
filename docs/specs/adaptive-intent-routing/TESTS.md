@@ -1,14 +1,15 @@
 # TESTS — adaptive-intent-routing
 
-> Acceptance cases for the proposed routing policy. These cases are design
-> gates; implementation tests are not being run in this review-only phase.
+> Acceptance cases for the approved routing policy. Offline route and
+> checkpoint fixtures are implemented under this spec directory; they measure
+> behavioral policy evidence separately from native dispatch evidence.
 
 ## Route selection
 
-- **AC-IR-001:** When a request has a clear bounded outcome, low or material
-  impact, and a reversible next action, Pilotfish shall select `execute` or
-  abstain only when an existing authority gate requires it; it shall not add an
-  unconditional discovery round.
+- **AC-IR-001:** When a request has a clear bounded outcome, Pilotfish shall
+  select `execute`, including when an existing authority gate is required for
+  a release or external action; it shall stop at that gate and shall not add
+  an unconditional discovery round.
 - **AC-IR-002:** When a request has a clear direction but broad migration,
   cross-component, high-impact, or costly-to-reverse scope, Pilotfish shall
   select `explore_then_plan` and shall not admit bulk implementation before the

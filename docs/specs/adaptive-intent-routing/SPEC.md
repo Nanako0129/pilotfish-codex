@@ -1,10 +1,10 @@
 # SPEC — Adaptive intent routing
 
 - **ID:** `spec-adaptive-intent-routing`
-- **Status:** Draft — awaiting Miyago review
+- **Status:** Approved for implementation
 - **Owner:** Miyago
 - **Created:** 2026-08-05
-- **Implementation approval:** Not granted
+- **Implementation approval:** Granted by Miyago on 2026-08-05
 
 ## Goal
 
@@ -35,7 +35,7 @@ treated as authorization for a large implementation.
 
 ## Scope
 
-- Add an orchestration-level route decision with three proposed modes:
+- Add an orchestration-level route decision with three initial modes:
   `execute`, `explore_then_plan`, and `co_discover`.
 - Base the decision on semantic intent confidence, change impact, and
   reversibility, with rationale and unresolved decisions visible to the main
@@ -77,7 +77,10 @@ fields:
 |---|---|---|
 | `task_mode` | `execute`, `explore_then_plan`, `co_discover` | Interaction and delegation shape |
 | `intent_confidence` | `clear`, `partial`, `unclear` | How much product intent is actually determined |
-| `change_impact` | `low`, `material`, `high` | Expected blast radius and decision density |
+| `change_impact` | `trivial`, `low`, `material`, `high`, `critical` | Expected blast radius and decision density |
+| `discovery_budget` | `none`, `minimum`, `bounded`, `deep` | Grounding floor and exploration ceiling |
+| `budget_exhausted` | `yes`, `no` | Whether the selected discovery ceiling was reached |
+| `evidence_sufficient` | `yes`, `no` | Whether evidence supports the next gate |
 | `reversible` | `yes`, `no`, `partial` | Whether the next action can be safely undone |
 | `blocking_decisions` | bounded list | User choices that materially change the result |
 | `next_gate` | discovery, approval, execution, direction_check | The next required control point |
@@ -87,15 +90,32 @@ remain separate. The agent handles technical uncertainty through repository
 inspection and bounded experiments; it surfaces product or authority choices
 when no safe default exists.
 
+The first implementation uses the three route modes as representative cases,
+not an exhaustive classifier. `change_impact` uses five qualitative bands:
+`trivial` for direct answers or no-write tasks, `low` for isolated reversible
+work, `material` for module or user-behavior boundaries, `high` for migration,
+release, or expensive-to-reverse work, and `critical` for destructive,
+external, security-sensitive, or otherwise irreversible work.
+
+Discovery has a grounding floor and a stopping ceiling. One logical discovery
+unit is one targeted inspection, search, or reversible probe. The default
+budgets are `none` (zero units), `minimum` (at least one grounding check and
+up to two units), `bounded` (up to six units and one cheap probe), and `deep`
+(up to ten units and two cheap probes). The agent may stop earlier when new
+evidence no longer changes the decision. It must narrow, pause, or ask when
+the floor cannot be met or the ceiling is exhausted.
+
 ## Route behavior
 
 ### `execute`
 
-Use when the desired outcome is clear, the scope is bounded, and the next work
-is low-risk or reversible. The main session may use a lightweight internal
-Plan and dispatch the least expensive matching role. External writes,
-destructive operations, release actions, and other existing approval gates are
-unchanged; intent clarity does not grant authority.
+Use when the desired outcome and scope are clear. The next move may be a
+bounded local action or an approval-gated external action; a clear release
+request does not become an exploration route merely because authority is still
+required. The main session may use a lightweight internal Plan and dispatch the
+least expensive matching role. External writes, destructive operations,
+release actions, and other existing approval gates remain mandatory; intent
+clarity does not grant authority.
 
 ### `explore_then_plan`
 
@@ -120,9 +140,12 @@ Pilotfish shall maintain two views of planning:
 
 - **Internal Plan:** assumptions, evidence, candidate interpretations,
   dependencies, risks, slices, acceptance, rollback, and open decisions.
-- **User decision card:** current interpretation, proposed default, included and
-  excluded scope, material risk, the small set of decisions required now, and
-  the next reversible slice.
+- **User decision card:** an interactive, AskUserQuestion-style checkpoint with
+  the current interpretation, proposed default, included and excluded scope,
+  relevant material risk, a small set of questions with options and a
+  recommendation, and the next reversible slice. Low-risk work may omit the
+  card; material product, authority, risk, irreversible-cost, or unresolved
+  direction choices require it.
 
 The next executable slice must have a falsifiable outcome, exclusive ownership,
 constraints, acceptance evidence, rollback or containment, and a stop
@@ -195,10 +218,14 @@ evaluator, and use existing roles for evidence and gates.
 checkpoint, or recovery behavior. A new role would add coordination and make
 the router less self-directed.
 
+The existing `verifier` role also owns the narrowly named
+`direction_checkpoint` contract; no new checkpoint role is added.
+
 ### ADR-3: Internal full Plan, external decision cards
 
 **Decision:** Maintain complete internal planning evidence, but expose only
-material decisions and the next slice to the user.
+material decisions and the next slice to the user through an
+AskUserQuestion-style interactive card.
 
 **Reason:** Users should not need to review an exhaustive spec to collaborate,
 but they must see decisions that change product outcome, authority, or
@@ -254,23 +281,32 @@ cost. The system must stop when additional information is not decision-relevant.
 - Do not claim that offline route evaluation proves live model behavior or that
   a successful dispatch receipt proves semantic route quality.
 
-## Open questions for review
+## Resolved review decisions
 
-1. Keep the proposed mode names `execute`, `explore_then_plan`, and
-   `co_discover`, or use shorter names in receipts and evaluator fixtures?
-2. Should `change_impact` remain qualitative (`low/material/high`) or use a
-   small rubric with explicit examples?
-3. What default discovery budget should the first implementation expose for
-   low-, material-, and high-impact work?
-4. Should a direction checkpoint reuse the existing `verifier` contract
-   directly, or add a narrowly named checkpoint disposition inside that same
-   role without creating a new role?
-5. Which user-facing decision-card fields are mandatory, and which can remain
-   adaptive to avoid interrupting low-risk work?
+1. Keep the upstream-style descriptive mode names `execute`,
+   `explore_then_plan`, and `co_discover`. They are the first implementation
+   examples, not an exhaustive scenario list.
+2. Use five qualitative impact bands: `trivial`, `low`, `material`, `high`,
+   and `critical`, with explicit examples instead of pseudo-precise scoring.
+3. Use four bounded discovery budgets: `none`, `minimum`, `bounded`, and
+   `deep`. Each has a grounding floor and a default ceiling measured in
+   logical discovery units and cheap reversible probes.
+4. Keep the existing `verifier` role and add the explicit
+   `direction_checkpoint` contract with `CONTINUE`, `PIVOT`, and `ROLLBACK`.
+   Insufficient evidence remains `INCONCLUSIVE` under the calibrated verifier
+   boundary.
+5. Use an AskUserQuestion-style decision card. Always show the current
+   interpretation, proposed default, included and excluded scope, questions
+   with options and a recommendation, and the next reversible slice when the
+   card is required. Show material risk and authority or approval details only
+   when relevant; omit the card for low-risk work with no blocking decision.
+
+Miyago approved these decisions and the implementation scope on 2026-08-05.
 
 ## Approval gate
 
-This specification is intentionally a review artifact. No source template,
-role TOML, hook, evaluator, or installed Codex home may be changed until
-Miyago reviews and approves the above design and resolves any blocking open
-questions.
+The review gate is complete. Implementation may update the source policy,
+existing verifier contract, offline evaluator, fixtures, tests, and supporting
+documentation within this specification. It must not change the installed
+Codex home, the role manifest, native typed dispatch contract, or existing
+security and external-mutation approval boundaries.
