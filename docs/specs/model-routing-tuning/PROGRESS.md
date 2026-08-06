@@ -20,9 +20,10 @@
 - [x] P5. Remove Terra, move outcome verification to Luna/xhigh, and bind the
       existing Nanako risk-triggered Plan review to Sol/high without changing
       its invocation timing.
-- [x] P6. Migrate the native routing contract to Codex `0.146.0`: use the
-      documented `[agents]` child concurrency contract, preserve the Nanako
-      risk trigger, migrate only an exact state-owned V2 table, and emit an
+- [x] P6. Migrate the native routing contract to a `>=0.146.0`
+      compatibility floor: use the documented `[agents]` child concurrency
+      contract, preserve the Nanako risk trigger, migrate only an exact
+      state-owned V2 table, and emit an
       auditable per-path dry-run manifest including transaction artifacts.
 - [x] P7. With explicit operator authorization, back up and reconcile the
       stale active install state, then migrate the active Codex home. The

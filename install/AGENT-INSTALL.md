@@ -5,8 +5,9 @@ support an adapter fallback.
 
 ## Preconditions
 
-- Require exactly Codex `0.146.0`. Lower, higher, ambiguous, suffixed, or
-  nonzero `codex --version` output fails before writes.
+- Parse exactly one Codex semantic version from `codex --version`. Version
+  numbers are recorded for evidence but are not hard-pinned; native schema,
+  role binding, and receipt checks determine compatibility.
 - The native configuration is exactly:
 
 ```toml
@@ -26,7 +27,8 @@ max_concurrent_threads_per_session = 3
 ## Preflight and approval
 
 1. Run `codex --version` and stop unless its one standalone version token is
-   exactly `0.146.0`.
+   a single parseable semantic version; do not hard-pin a release in the
+   installer.
 2. Read the active `config.toml`, effective global policy (`AGENTS.override.md`
    wins over `AGENTS.md`), and recursively discovered role files. Preserve all
    unrelated content.
@@ -90,9 +92,9 @@ curl -fsSL \
   | bash -s -- --ref "$REF" --dry-run --codex-home "$ACTIVE_CODEX_HOME"
 ```
 
-The shell requires Bash, Python 3.11+, and the pinned Codex CLI. Inspect it
-with `bash install/install.sh --help` before using a remote copy. The direct
-Python route is equivalent for a checked-out repository:
+The shell requires Bash, Python 3.11+, and a parseable Codex CLI version.
+Inspect it with `bash install/install.sh --help` before using a remote copy.
+The direct Python route is equivalent for a checked-out repository:
 
 ```bash
 python3 install/install.py --codex-home "$ACTIVE_CODEX_HOME"
@@ -200,7 +202,8 @@ containment escapes, and mutation or TOCTOU. Before launch,
 runtime state there only after preflight succeeds.
 
 After separate quota approval, run from the clean `SMOKE_DIR` in a fresh,
-authenticated `rust-v0.146.0` session:
+authenticated Codex session. The verifier records the actual CLI version and
+lets the native evidence contract decide compatibility:
 
 ```bash
 cd "$SMOKE_DIR"
@@ -219,7 +222,8 @@ The active verifier has no `--mode` or `--all-roles` route. Supplying either is
 `cli_input_invalid` before authentication, quota use, child creation, or
 receipt creation. It compares all active/staged config, role-manifest, and
 policy hashes before child creation and freezes the staged hash snapshot.
-The internal `codex exec` command uses `--skip-git-repo-check` because the
+The internal `codex exec` command enables the native `multi_agent_v2` feature
+and uses `--skip-git-repo-check` because the
 verified clean smoke cwd is intentionally outside every repository.
 
 Generic role probes require one typed `spawn_agent` call with exactly

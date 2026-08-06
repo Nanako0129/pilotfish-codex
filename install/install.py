@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Install the one native Codex rust-v0.146.0 Pilotfish target.
+"""Install the native Codex Pilotfish contract without a release lock.
 
-This route refuses unsupported versions and ambiguous ownership.  It never
-selects the retired adapter route.  Existing user bytes are preserved unless a
+This route refuses malformed version output and ambiguous ownership. It never
+selects the retired adapter route. Existing user bytes are preserved unless a
 committed Pilotfish sidecar proves that a legacy path is installer-owned.
 """
 
@@ -38,7 +38,6 @@ from hook_registration import (
 )
 from validate_agents import ROLES, validate_agent, validate_agents_config
 
-PINNED_CODEX_VERSION = (0, 146, 0)
 IS_WINDOWS = sys.platform == "win32"
 MARKER_BEGIN = "<!-- pilotfish-codex:begin -->"
 MARKER_END = "<!-- pilotfish-codex:end -->"
@@ -72,12 +71,36 @@ class InstallAbort(Exception):
     """The caller must resolve this state before any target write."""
 
 
+MIN_COMPATIBLE_CODEX_VERSION = (0, 146, 0)
+
+
+def codex_version_token(output: str) -> str | None:
+    """Extract exactly one semantic version token for evidence recording."""
+    tokens = re.findall(
+        r"(?<![0-9A-Za-z_.-])(\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)(?![0-9A-Za-z_.-])",
+        output,
+    )
+    return tokens[0] if len(tokens) == 1 else None
+
+
 def parse_codex_version(output: str) -> tuple[int, int, int] | None:
-    """Accept exactly one bare generic semantic version with no suffix."""
-    tokens = re.findall(r"(?<![0-9A-Za-z_.-])(\d+)\.(\d+)\.(\d+)(?![0-9A-Za-z_.-])", output)
-    if len(tokens) != 1:
+    """Parse exactly one semantic version, retaining only its numeric base."""
+    token = codex_version_token(output)
+    if token is None:
         return None
-    return tuple(int(part) for part in tokens[0])  # type: ignore[return-value]
+    return tuple(int(part) for part in token.split("-", 1)[0].split("."))  # type: ignore[return-value]
+
+
+def is_parseable_codex_output(output: str) -> bool:
+    """Validate one version token without imposing a release pin."""
+    version = parse_codex_version(output)
+    return codex_version_token(output) is not None and version is not None
+
+
+def is_compatible_codex_output(output: str) -> bool:
+    """Accept the minimum native contract version and every later release."""
+    version = parse_codex_version(output)
+    return version is not None and version >= MIN_COMPATIBLE_CODEX_VERSION
 
 
 def _newline(text: str) -> str:
@@ -759,8 +782,9 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
         version = parse_codex_version((completed.stdout + completed.stderr) if completed and completed.returncode == 0 else "")
         if version is None:
             print("error: version_parse_failed", file=sys.stderr); return 2
-        if version != PINNED_CODEX_VERSION:
-            print("error: version_not_pinned", file=sys.stderr); return 2
+        if version < MIN_COMPATIBLE_CODEX_VERSION:
+            minimum = ".".join(str(part) for part in MIN_COMPATIBLE_CODEX_VERSION)
+            print(f"error: version_below_minimum (requires >= {minimum})", file=sys.stderr); return 2
     config_path = codex_home / "config.toml"
     config_snapshot = config_path.read_bytes() if config_path.is_file() else None
     config_text, parsed_config = _decode_config(

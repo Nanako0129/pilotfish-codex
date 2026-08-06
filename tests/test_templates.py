@@ -236,7 +236,7 @@ class NativeTemplateTests(unittest.TestCase):
 
     def test_runbook_is_native_only(self) -> None:
         runbook = (ROOT / "install" / "AGENT-INSTALL.md").read_text()
-        self.assertIn("exactly Codex `0.146.0`", runbook)
+        self.assertIn("single parseable semantic version", runbook)
         self.assertIn("stage_smoke_home.py", runbook)
         self.assertIn("NATIVE_OK", runbook)
         self.assertIn("no `--mode` or `--all-roles`", runbook)

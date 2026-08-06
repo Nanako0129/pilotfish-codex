@@ -1,0 +1,15 @@
+{
+  "version": "role-fitness-native-content-probe-v1",
+  "generated": "2026-08-05",
+  "formal_claim": false,
+  "case_id": "plan-review-05",
+  "role": "plan-verifier",
+  "binding": {"model": "gpt-5.6-sol", "reasoning_effort": "high"},
+  "dispatch_status": "NATIVE_OK",
+  "dispatch_reason": "native_verified",
+  "review_json_valid": false,
+  "status": "inconclusive",
+  "reason": "The child rollout completed with native binding evidence, but the current runtime emitted a non-machine-readable final response; no hidden-ledger quality credit was granted.",
+  "event_shape": "response_item agent_message plus event_msg agent_message",
+  "interpretation": "This proves the native role activation and child-binding path, not plan quality. The formal content-bearing cohort remains unproven and the switch score remains fail-closed at 5/10."
+}

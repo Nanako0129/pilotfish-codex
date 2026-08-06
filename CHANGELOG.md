@@ -5,6 +5,20 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
+## v1.5.1 — 2026-08-06
+
+- Stop hard-pinning the installer to one Codex release; require only the
+  minimum compatible version `>=0.146.0`, accept later releases, and let the
+  native contract and receipt evidence decide compatibility.
+- Keep Luna as the default route and make high-reasoning escalation selective:
+  clean work stays on Luna, risk-bearing disagreement can request one Sol
+  second opinion, and the route records an auditable reason.
+- Add role-fitness benchmark tooling, matched scorecards, adjudicator Matrix
+  reports, native typed dispatch evidence, and regression coverage.
+- Document the measured result honestly: native Sol transport is available and
+  stable, but its switching quality/cost score remains `5/10`; direct Sol is
+  retained only as a high-risk fallback with positive quality evidence.
+
 ## v1.5.0 — 2026-08-05
 
 - Add adaptive intent routing for clear execution, broad changes, and open-ended

@@ -1748,10 +1748,10 @@ def enforce_live_gates(
 
 
 def validate_live_codex_binary(executable: str) -> None:
-    """Reject a Codex binary that cannot satisfy the pinned V2 contract."""
+    """Reject a Codex binary whose version output cannot be parsed."""
 
     try:
-        from install import PINNED_CODEX_VERSION, parse_codex_version
+        from install import is_parseable_codex_output
     except ImportError as exc:
         raise BenchmarkError("native version helper unavailable") from exc
     try:
@@ -1764,13 +1764,9 @@ def validate_live_codex_binary(executable: str) -> None:
         )
     except (OSError, subprocess.SubprocessError) as exc:
         raise BenchmarkError("Codex binary is unavailable") from exc
-    version = (
-        parse_codex_version((completed.stdout or "") + (completed.stderr or ""))
-        if completed.returncode == 0
-        else None
-    )
-    if version != PINNED_CODEX_VERSION:
-        raise BenchmarkError("Codex binary does not match the native V2 pin")
+    output = (completed.stdout or "") + (completed.stderr or "")
+    if completed.returncode != 0 or not is_parseable_codex_output(output):
+        raise BenchmarkError("Codex binary version is unavailable or invalid")
 
 
 # Stable descriptive aliases used by offline callers and downstream tests.

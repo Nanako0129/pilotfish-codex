@@ -28,7 +28,15 @@ from hook_registration import (  # noqa: E402
     projection_digest,
     strict_json_loads,
 )
-from install import InstallAbort, install, merge_config_text, parse_codex_version  # noqa: E402
+from install import (  # noqa: E402
+    InstallAbort,
+    codex_version_token,
+    is_compatible_codex_output,
+    install,
+    is_parseable_codex_output,
+    merge_config_text,
+    parse_codex_version,
+)
 
 
 def _foreign_group(command: str = "/bin/foreign") -> dict[str, object]:
@@ -171,11 +179,24 @@ class NativeConfigMergeTests(unittest.TestCase):
         self.assertNotIn("multi_agent", data["features"])
         self.assertEqual(data["agents"]["max_concurrent_threads_per_session"], 3)
 
-    def test_exact_version_parser(self) -> None:
+    def test_version_parser_does_not_hard_pin_releases(self) -> None:
         self.assertEqual(parse_codex_version("codex 0.146.0"), (0, 146, 0))
-        for output in ("0.146.0-beta", "0.146.0 0.146.1", "none"):
+        self.assertEqual(parse_codex_version("codex-cli 0.147.0-alpha.1.2"), (0, 147, 0))
+        self.assertEqual(codex_version_token("codex-cli 0.147.0-alpha.1.2"), "0.147.0-alpha.1.2")
+        self.assertTrue(is_parseable_codex_output("codex-cli 0.146.0"))
+        self.assertTrue(is_parseable_codex_output("codex-cli 0.147.0-alpha.1.2"))
+        self.assertTrue(is_compatible_codex_output("codex-cli 0.146.0"))
+        self.assertTrue(is_compatible_codex_output("codex-cli 0.147.0-alpha.1.2"))
+        for output in ("0.146.0-beta", "0.145.9", "0.146.0 0.146.1", "none"):
             with self.subTest(output=output):
-                self.assertIsNone(parse_codex_version(output))
+                if output == "0.146.0-beta":
+                    self.assertEqual(parse_codex_version(output), (0, 146, 0))
+                    self.assertTrue(is_parseable_codex_output(output))
+                elif output in {"none", "0.146.0 0.146.1"}:
+                    self.assertFalse(is_parseable_codex_output(output))
+                else:
+                    self.assertTrue(is_parseable_codex_output(output))
+        self.assertFalse(is_compatible_codex_output("codex-cli 0.145.9"))
 
 
 class NativeInstallTests(unittest.TestCase):

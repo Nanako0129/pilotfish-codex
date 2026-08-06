@@ -40,12 +40,16 @@ lower routine cost without weakening high-judgment work.
 - Changing mechanical role behavior or adding unconditional Sol calls.
 - Running a paid live Codex behavioral gate.
 
-## Codex 0.146 migration
+## Codex native compatibility floor
 
-The active Codex CLI is `0.146.0`. The package now uses its documented native
-`[agents]` contract and the installer pins to that version.
+The active Codex CLI is validated by its documented native `[agents]` contract.
+The installer requires only the minimum compatible version `>=0.146.0`; it
+records the observed semantic version and accepts later releases without an
+exact-version pin.
 
-- Pin the installer and receipt validation to exactly `0.146.0`.
+- Reject an unparseable version or a release below `0.146.0`; do not reject a
+  later release merely because it is newer. Native contract evidence remains
+  authoritative for behavior compatibility.
 - Replace the old `[features.multi_agent_v2]` total of four slots with the
   documented `[agents]` setting `enabled = true` and a child limit of three.
   This preserves one root plus up to three children.

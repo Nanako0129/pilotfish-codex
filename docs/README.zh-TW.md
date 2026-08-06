@@ -74,7 +74,8 @@ intelligence ranking。完整 benchmark 與 bar charts 請看
 ## 實驗效果
 
 正式 live cohort 使用三個代表性情境，共 60 組案例；每組各執行一次 route
-call 與 checkpoint call，使用 Codex CLI `0.146.0`。
+call 與 checkpoint call，使用可解析版本的 Codex CLI；實際版本會記錄在
+receipt，native contract 由 runtime evidence 驗證。
 
 | 指標 | 結果 | 解讀 |
 | --- | ---: | --- |
@@ -89,7 +90,7 @@ response 都完美。Strict misses 與完整分析留在
 
 ## 快速安裝
 
-需求：Codex CLI `0.146.0`、Python `3.11+`、Bash，以及本地 checkout。
+需求：可解析版本的 Codex CLI、Python `3.11+`、Bash，以及本地 checkout。
 
 先執行 dry-run。它只會規劃變更，不會寫入 Codex home：
 

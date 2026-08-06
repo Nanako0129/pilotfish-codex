@@ -1,0 +1,17 @@
+{
+  "version": "role-fitness-native-split-v5",
+  "generated": "2026-08-05",
+  "formal_claim": false,
+  "fixture_manifest_hash": "3c69498312db023d2d2643edae33a1583bc92b6481b1c2c57f610c77f4810bf5",
+  "cohort": {"cases": 6, "review_accepted": 6, "handoff_created": 6, "executor_accepted": 4, "verifier_confirmed": 4},
+  "cases": [
+    {"case_id": "split-workflow-01", "executor": "accepted", "verifier": "CONFIRMED"},
+    {"case_id": "split-workflow-02", "executor": "accepted", "verifier": "CONFIRMED"},
+    {"case_id": "split-workflow-03", "executor": "accepted", "verifier": "CONFIRMED"},
+    {"case_id": "split-workflow-04", "executor": "INCONCLUSIVE", "verifier": "not_run"},
+    {"case_id": "split-workflow-05", "executor": "INCONCLUSIVE", "verifier": "not_run"},
+    {"case_id": "split-workflow-06", "executor": "accepted", "verifier": "CONFIRMED"}
+  ],
+  "score": {"confirmed_over_total": "4/6", "bounded_score": 7, "proven": false},
+  "interpretation": "The formal six-case attempt proves review and handoff admission at 6/6, but only 4/6 end-to-end execution and verification. The two native inconclusive executor receipts remain fail-closed evidence; no retry or completion credit is claimed."
+}
