@@ -301,7 +301,8 @@ One benchmark result is a single run, not proof of availability. The minimum
 evidence set is three independent runs (`R1`–`R3`) over the same frozen
 manifest, with fresh private roots and fresh stage homes. The fixed native
 command contract may activate `multi_agent_v2`; ad-hoc model, tool, or
-service-tier overrides remain ineligible. A run is eligible only after startup preflight, security sentinel,
+service-tier overrides remain ineligible. A run is eligible only after startup
+preflight, security sentinel,
 fixture commitment, and resource admission all pass. Each run writes a
 sanitized aggregate containing its run ID, manifest hash, scorecard hash,
 stage counts, failure taxonomy, and metric values; raw sessions remain private
@@ -632,7 +633,7 @@ specific to this repository's versioned fixtures.
 - [x] Availability reaches ≥8/10 and has at least 30 admitted-stage samples;
       the public claim uses the Wilson 95% lower bound.
 - [ ] High-reasoning switching reaches ≥8/10 only with a positive,
--      statistically supported risk yield and within the premium caps, or with
+      statistically supported risk yield and within the premium caps, or with
       the existing ≥10-point risk-coverage exception.
 - [x] No score is promoted when a quality gate is inconclusive; the report
       records the dimension as `unproven` and schedules another bounded repeat.
@@ -805,9 +806,10 @@ specific to this repository's versioned fixtures.
   These values are a starting scorecard supplied by Miyago, not new benchmark
   evidence. The evidence-updated readout is stability `10/10` from the
   deterministic `3/3` repeat gate, availability `9/10` from `40/40` admitted
-  native dispatches and `LB=0.9124`, and high-reasoning switching `5/10` from two bounded
-  matched probes. Architecture is independently regraded at `10/10` by the
-  static `5/5` invariant score; the receipt check uses synthetic data and does
+  native dispatches and `LB=0.9124`, and high-reasoning switching `5/10` from
+  two bounded matched probes. Architecture is independently regraded at
+  `10/10` by the static `5/5` invariant score; the receipt check uses synthetic
+  data and does
   not silently promote runtime availability.
 - The current `benchmark_role_fitness.py --dry-run` is contract evidence only:
   it validates the role seam and scorecard wiring but deliberately reports
