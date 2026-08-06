@@ -41,6 +41,9 @@ LIVE_CASE_CAP = 3
 
 ALLOWED_TASK_MODES = frozenset({"execute", "explore_then_plan", "co_discover"})
 ALLOWED_INTENT_CONFIDENCE = frozenset({"clear", "partial", "unclear"})
+ALLOWED_REVIEW_INTENTS = frozenset({"fast", "default", "strict"})
+ALLOWED_REVIEW_INTENT_SOURCES = frozenset({"explicit", "risk_default"})
+ALLOWED_OPTIONAL_REVIEWS = frozenset({"skip", "existing_policy", "expanded"})
 ALLOWED_CHANGE_IMPACT = frozenset({"trivial", "low", "material", "high", "critical"})
 ALLOWED_DISCOVERY_BUDGETS = frozenset({"none", "minimum", "bounded", "deep"})
 ALLOWED_REVERSIBILITY = frozenset({"yes", "partial", "no"})
@@ -80,6 +83,9 @@ ROUTE_EXPECTED_FIELDS = frozenset(
         "role",
         "decision_card",
     }
+)
+ROUTE_INTENT_FIELDS = frozenset(
+    {"review_intent", "review_intent_source", "review_intent_scope", "optional_review"}
 )
 CARD_FIELDS = frozenset(
     {
@@ -355,7 +361,10 @@ def _validate_string_list(value: Any, *, allow_empty: bool = True) -> bool:
 
 
 def _validate_route_expected(expected: Any, case_id: str) -> None:
-    if not isinstance(expected, dict) or set(expected) != ROUTE_EXPECTED_FIELDS:
+    if not isinstance(expected, dict) or set(expected) not in {
+        ROUTE_EXPECTED_FIELDS,
+        ROUTE_EXPECTED_FIELDS | ROUTE_INTENT_FIELDS,
+    }:
         raise EvaluationError(
             f"case {case_id}: route expected must contain "
             "task signals, role, approval, abstention, and card expectation"
@@ -388,6 +397,15 @@ def _validate_route_expected(expected: Any, case_id: str) -> None:
         raise EvaluationError(f"case {case_id}: invalid expected role")
     if type(expected["decision_card"]) is not bool:
         raise EvaluationError(f"case {case_id}: expected decision_card must be boolean")
+    if ROUTE_INTENT_FIELDS.issubset(expected):
+        if expected["review_intent"] not in ALLOWED_REVIEW_INTENTS:
+            raise EvaluationError(f"case {case_id}: invalid expected review_intent")
+        if expected["review_intent_source"] not in ALLOWED_REVIEW_INTENT_SOURCES:
+            raise EvaluationError(f"case {case_id}: invalid expected review_intent_source")
+        if expected["review_intent_scope"] != "turn":
+            raise EvaluationError(f"case {case_id}: review_intent_scope must be turn")
+        if expected["optional_review"] not in ALLOWED_OPTIONAL_REVIEWS:
+            raise EvaluationError(f"case {case_id}: invalid expected optional_review")
 
 
 def validate_route_corpus(corpus: Any) -> dict[str, Any]:
@@ -486,7 +504,10 @@ def _route_card_error(card: Any) -> str | None:
 
 
 def _route_decision_error(decision: Any) -> str | None:
-    if not isinstance(decision, dict) or set(decision) != ROUTE_FIELDS:
+    if not isinstance(decision, dict) or set(decision) not in {
+        ROUTE_FIELDS,
+        ROUTE_FIELDS | ROUTE_INTENT_FIELDS,
+    }:
         return "malformed"
     if not _is_nonempty_string(decision["id"]):
         return "malformed"
@@ -539,7 +560,18 @@ def _route_decision_error(decision: Any) -> str | None:
     if decision["blocking_decisions"] and decision["decision_card"] is None:
         return "decision_card_missing"
     if decision["decision_card"] is not None:
-        return _route_card_error(decision["decision_card"])
+        card_error = _route_card_error(decision["decision_card"])
+        if card_error is not None:
+            return card_error
+    if ROUTE_INTENT_FIELDS.issubset(decision):
+        if decision["review_intent"] not in ALLOWED_REVIEW_INTENTS:
+            return "malformed"
+        if decision["review_intent_source"] not in ALLOWED_REVIEW_INTENT_SOURCES:
+            return "malformed"
+        if decision["review_intent_scope"] != "turn":
+            return "malformed"
+        if decision["optional_review"] not in ALLOWED_OPTIONAL_REVIEWS:
+            return "malformed"
     return None
 
 
@@ -607,6 +639,12 @@ def evaluate_route(
         "budget_exhausted",
         "evidence_sufficient",
     )
+    has_review_intent = any(
+        ROUTE_INTENT_FIELDS.issubset(expected)
+        for expected in expected_by_id.values()
+    )
+    if has_review_intent:
+        signal_fields += tuple(ROUTE_INTENT_FIELDS)
     route_correct = sum(
         accepted.get(case_id, {}).get("task_mode") == expected["task_mode"]
         for case_id, expected in expected_by_id.items()
@@ -630,6 +668,18 @@ def evaluate_route(
     approval_correct = sum(
         accepted.get(case_id, {}).get("approval_required") == expected["approval_required"]
         for case_id, expected in expected_by_id.items()
+    )
+    review_intent_correct = (
+        sum(
+            all(
+                accepted.get(case_id, {}).get(field) == expected[field]
+                for field in ROUTE_INTENT_FIELDS
+            )
+            for case_id, expected in expected_by_id.items()
+            if ROUTE_INTENT_FIELDS.issubset(expected)
+        )
+        if has_review_intent
+        else None
     )
     total = len(expected_ids)
     false_direct = sum(
@@ -685,6 +735,15 @@ def evaluate_route(
         },
         "role_expectation": {"correct": role_correct, "total": total},
         "approval_expectation": {"correct": approval_correct, "total": total},
+        "review_intent": (
+            {
+                "correct": review_intent_correct,
+                "total": total,
+                "accuracy": review_intent_correct / total if total else 1.0,
+            }
+            if has_review_intent
+            else {"status": "not measured by legacy route corpus"}
+        ),
         "false_direct_execution": false_direct,
         "false_overexploration": false_overexploration,
         "measurements": {
