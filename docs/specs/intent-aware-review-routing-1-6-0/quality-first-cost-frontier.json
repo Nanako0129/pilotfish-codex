@@ -1,0 +1,131 @@
+{
+  "aggregate": {
+    "adjudications": 3,
+    "candidate_cost_premium_vs_luna": 1.2251187846553369,
+    "candidate_cost_usd": 0.42986315874724584,
+    "candidate_quality": 61.458333333333336,
+    "luna_cost_usd": 0.19318661174928248,
+    "luna_quality": 56.076388888888886,
+    "pure_sol_cost_usd": 2.931608,
+    "pure_terra_cost_usd": 1.363531,
+    "quality_ci_low_vs_luna": 0.0,
+    "quality_delta": 5.38194444444445
+  },
+  "case_costs": {
+    "plan-review-01": {
+      "adjudicated": false,
+      "candidate_cost_usd": 0.015656091372853325,
+      "candidate_quality": 100.0,
+      "luna_cost_usd": 0.015656091372853325,
+      "luna_quality": 100.0
+    },
+    "plan-review-02": {
+      "adjudicated": false,
+      "candidate_cost_usd": 0.015624082244690418,
+      "candidate_quality": 100.0,
+      "luna_cost_usd": 0.015624082244690418,
+      "luna_quality": 100.0
+    },
+    "plan-review-03": {
+      "adjudicated": false,
+      "candidate_cost_usd": 0.015613412535302783,
+      "candidate_quality": 100.0,
+      "luna_cost_usd": 0.015613412535302783,
+      "luna_quality": 100.0
+    },
+    "plan-review-04": {
+      "adjudicated": false,
+      "candidate_cost_usd": 0.015863083734973457,
+      "candidate_quality": 100.0,
+      "luna_cost_usd": 0.015863083734973457,
+      "luna_quality": 100.0
+    },
+    "plan-review-05": {
+      "adjudicated": true,
+      "candidate_cost_usd": 0.094838855979546,
+      "candidate_quality": 66.66666666666666,
+      "luna_cost_usd": 0.01641790862313051,
+      "luna_quality": 33.33333333333333
+    },
+    "plan-review-06": {
+      "adjudicated": false,
+      "candidate_cost_usd": 0.01623865750541823,
+      "candidate_quality": 25.0,
+      "luna_cost_usd": 0.01623865750541823,
+      "luna_quality": 25.0
+    },
+    "plan-review-07": {
+      "adjudicated": false,
+      "candidate_cost_usd": 0.01628560422672383,
+      "candidate_quality": 0.0,
+      "luna_cost_usd": 0.01628560422672383,
+      "luna_quality": 0.0
+    },
+    "plan-review-08": {
+      "adjudicated": false,
+      "candidate_cost_usd": 0.01671559351504555,
+      "candidate_quality": 56.25,
+      "luna_cost_usd": 0.01671559351504555,
+      "luna_quality": 56.25
+    },
+    "plan-review-09": {
+      "adjudicated": true,
+      "candidate_cost_usd": 0.0946032746350178,
+      "candidate_quality": 33.33333333333333,
+      "luna_cost_usd": 0.016105286138072786,
+      "luna_quality": 33.33333333333333
+    },
+    "plan-review-10": {
+      "adjudicated": true,
+      "candidate_cost_usd": 0.09584795968953297,
+      "candidate_quality": 62.5,
+      "luna_cost_usd": 0.0160903485449301,
+      "luna_quality": 31.25
+    },
+    "plan-review-11": {
+      "adjudicated": false,
+      "candidate_cost_usd": 0.016407238913742878,
+      "candidate_quality": 31.25,
+      "luna_cost_usd": 0.016407238913742878,
+      "luna_quality": 31.25
+    },
+    "plan-review-12": {
+      "adjudicated": false,
+      "candidate_cost_usd": 0.0161693043943986,
+      "candidate_quality": 62.5,
+      "luna_cost_usd": 0.0161693043943986,
+      "luna_quality": 62.5
+    }
+  },
+  "cases": 12,
+  "effective_unit_cost_usd_per_weighted_token": {
+    "luna": 1.0669709387635671e-06,
+    "sol": 3.8520570264765785e-06,
+    "terra": 2.0851074566702043e-06
+  },
+  "formal_claim": false,
+  "frontier": {
+    "acceptable_under_quality_first_rule": true,
+    "candidate_cost_vs_pure_sol": 0.14663050406031292,
+    "cheaper_than_any_high_reasoning_reference": true,
+    "cheaper_than_pure_sol": true,
+    "cheaper_than_pure_terra": true,
+    "cost_frontier_pass": true,
+    "quality_floor_epsilon": 0.0,
+    "quality_floor_met": true,
+    "quality_frontier_pass": false,
+    "quality_win_over_luna": false
+  },
+  "limitations": [
+    "Pure Sol/Terra costs come from the recorded live-v6 reference cohort, not the same 12 matched cases.",
+    "The effective unit rate is derived from recorded equivalent cost divided by weighted tokens; it is not a claim about a provider tariff table.",
+    "Quality remains an artifact-rubric score, and the current paired confidence lower bound is preserved from the live adjudicator report."
+  ],
+  "pricing_basis": "repo_recorded_effective_unit_cost_per_weighted_token",
+  "source_consistency": {
+    "adjudication_count_matches": false,
+    "observed_adjudications": 3,
+    "reported_adjudications": 2
+  },
+  "version": "quality-first-cost-frontier-v1"
+}

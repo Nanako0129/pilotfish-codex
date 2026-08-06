@@ -1,0 +1,1189 @@
+{
+  "version": "intent-review-runtime-matrix-v1",
+  "cases": 60,
+  "metrics": {
+    "intent_accuracy": 1.0,
+    "risk_category_accuracy": 1.0,
+    "signal_contract_accuracy": 1.0,
+    "hook_process_accuracy": 1.0,
+    "sol_trigger_accuracy": 1.0,
+    "hard_gate_parity": true,
+    "mandatory_review_trigger_preserved": true
+  },
+  "counts": {
+    "intent_total": 60,
+    "intent_correct": 60,
+    "category_total": 60,
+    "category_correct": 60,
+    "signal_total": 30,
+    "signal_correct": 30,
+    "hook_process_total": 60,
+    "hook_process_correct": 60,
+    "sol_total": 60,
+    "sol_correct": 60
+  },
+  "hard_gate_by_scenario": {
+    "routine_answer": [
+      {
+        "categories": [],
+        "sol_trigger": false,
+        "approval_required": false
+      }
+    ],
+    "bounded_edit": [
+      {
+        "categories": [],
+        "sol_trigger": false,
+        "approval_required": false
+      }
+    ],
+    "broad_change": [
+      {
+        "categories": [
+          "data",
+          "release"
+        ],
+        "sol_trigger": true,
+        "approval_required": true
+      }
+    ],
+    "security_plan": [
+      {
+        "categories": [
+          "security"
+        ],
+        "sol_trigger": true,
+        "approval_required": true
+      }
+    ],
+    "irreversible_release": [
+      {
+        "categories": [
+          "data",
+          "irreversible",
+          "release"
+        ],
+        "sol_trigger": true,
+        "approval_required": true
+      }
+    ]
+  },
+  "rows": [
+    {
+      "id": "routine_answer-none-1",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-none-2",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-none-3",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-fast-1",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-fast-2",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-fast-3",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-strict-1",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-strict-2",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-strict-3",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-conflicting_or_quoted-1",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-conflicting_or_quoted-2",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "routine_answer-conflicting_or_quoted-3",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-none-1",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-none-2",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-none-3",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-fast-1",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-fast-2",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-fast-3",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-strict-1",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-strict-2",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-strict-3",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-conflicting_or_quoted-1",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-conflicting_or_quoted-2",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "bounded_edit-conflicting_or_quoted-3",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [],
+      "categories_observed": [],
+      "categories_correct": true,
+      "sol_trigger_expected": false,
+      "sol_trigger_observed": false,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": false
+    },
+    {
+      "id": "broad_change-none-1",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-none-2",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-none-3",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-fast-1",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-fast-2",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-fast-3",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-strict-1",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-strict-2",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-strict-3",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-conflicting_or_quoted-1",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-conflicting_or_quoted-2",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "broad_change-conflicting_or_quoted-3",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-none-1",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-none-2",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-none-3",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-fast-1",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-fast-2",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-fast-3",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-strict-1",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-strict-2",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-strict-3",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-conflicting_or_quoted-1",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-conflicting_or_quoted-2",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "security_plan-conflicting_or_quoted-3",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "security"
+      ],
+      "categories_observed": [
+        "security"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-none-1",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-none-2",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-none-3",
+      "intent_variant": "none",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-fast-1",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-fast-2",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-fast-3",
+      "intent_variant": "fast",
+      "intent_expected": "fast",
+      "intent_observed": "fast",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-strict-1",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-strict-2",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-strict-3",
+      "intent_variant": "strict",
+      "intent_expected": "strict",
+      "intent_observed": "strict",
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-conflicting_or_quoted-1",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-conflicting_or_quoted-2",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    },
+    {
+      "id": "irreversible_release-conflicting_or_quoted-3",
+      "intent_variant": "conflicting_or_quoted",
+      "intent_expected": "default",
+      "intent_observed": null,
+      "intent_correct": true,
+      "categories_expected": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_observed": [
+        "data",
+        "irreversible",
+        "release"
+      ],
+      "categories_correct": true,
+      "sol_trigger_expected": true,
+      "sol_trigger_observed": true,
+      "signal_contract_valid": true,
+      "hook_process_valid": true,
+      "hard_gate_preserved": true
+    }
+  ]
+}

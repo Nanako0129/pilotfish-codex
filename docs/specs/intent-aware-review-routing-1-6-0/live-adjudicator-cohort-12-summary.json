@@ -1,0 +1,33 @@
+{
+  "version": "intent-review-live-adjudicator-cohort-v2",
+  "formal_claim": false,
+  "source_reports": [
+    "live-adjudicator-smoke-3.json",
+    "live-adjudicator-clean-04.json",
+    "live-adjudicator-risk-8.json"
+  ],
+  "cases": 12,
+  "accepted": 12,
+  "disagreements": 2,
+  "sol_adjudications": 2,
+  "false_escalations": 0,
+  "inconclusive": 0,
+  "score": 5,
+  "proven": false,
+  "quality_delta": 5.381944444444444,
+  "quality_ci_low": 0.0,
+  "quality_ci_high": 13.368055555555555,
+  "weighted_token_premium": 1.0135976423389272,
+  "p95_wall_premium": 1.0633633219225342,
+  "cost_basis": "weighted_token_proxy",
+  "quality_adjusted_cost_efficiency": {
+    "quality_floor": 56.076388888888886,
+    "quality_supported": true,
+    "baseline_efficiency": 30.971026798119134,
+    "switched_efficiency": 16.857130527355956,
+    "efficiency_delta": -14.113896270763178,
+    "maximizes_cost_efficiency": false
+  },
+  "excluded_case": null,
+  "interpretation": "Live Luna-first routing and disagreement-gated Sol adjudication completed without transport, false-escalation, or inconclusive failures, but the quality confidence bound and cost-performance gates do not support promotion."
+}

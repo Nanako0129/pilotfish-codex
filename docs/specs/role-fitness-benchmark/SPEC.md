@@ -406,6 +406,20 @@ The README also reports the human-readable marginal result:
 critical-risk yield = additional supported P0/P1 findings per 100k extra weighted tokens
 ```
 
+The 1.6.0 scorecard also reports the author's primary efficiency metric:
+
+```text
+quality-adjusted cost efficiency = quality points / equivalent cost
+```
+
+This metric is eligible only when the candidate meets the matched baseline
+quality floor and the paired quality confidence lower bound is non-negative.
+If the quality floor fails, its candidate efficiency is reported as zero; a
+cheaper but lower-quality route cannot win by cost alone. Equivalent cost is
+preferred when receipt-backed pricing is available, otherwise the report uses
+the weighted-token proxy and labels that basis explicitly. This descriptive
+metric never bypasses the existing score-8/9 promotion gates.
+
 If any quality result is inconclusive, the automatic route fails closed. Sol
 may still be manually requested, but the benchmark cannot claim it is justified
 as a default escalation.
@@ -603,13 +617,13 @@ specific to this repository's versioned fixtures.
       the sanitized policy-projection artifact.
 - [x] Run the remaining six risk-bearing cases and combine them into the
       twelve-case matched quality aggregate before any switching regrade.
-- [ ] Compare Sol/high against Luna/xhigh on matched risk-bearing plans before
+- [x] Compare Sol/high against Luna/xhigh on matched risk-bearing plans before
       changing the automatic escalation rule.
 - [x] Define the Luna-verifier disagreement contract and one-shot Sol
       adjudicator boundary without changing the frozen rubric or denominator.
 - [x] Add an offline adjudicator policy Matrix covering Luna-only,
       risk-gated adjudication, and semantic-adjudication variants.
-- [ ] Run the bounded adjudicator Matrix with matched plan and split-workflow
+- [x] Run the bounded adjudicator Matrix with matched plan and split-workflow
       cases before changing the automatic escalation rule.
 - [x] Prove the native typed Sol adjudicator seam on a bounded 2-case smoke;
       retain child binding, receipt, and source-rubric evidence.
@@ -618,7 +632,7 @@ specific to this repository's versioned fixtures.
 - [x] Obtain explicit execution approval from Miyago for all benchmark actions;
       run at most 60 scenario arms
       and 108 paid processes within the declared resource caps.
-- [ ] Review the sanitized aggregate, fail closed on an inconclusive score, and
+- [x] Review the sanitized aggregate, fail closed on an inconclusive score, and
       decide whether the Sol escalation remains automatic.
 - [ ] Generate the two-panel README SVG and update benchmark documentation only
       after Miyago approves the reviewed aggregate.
@@ -789,6 +803,20 @@ specific to this repository's versioned fixtures.
   negative evidence for reducing Sol reasoning effort.
 - `docs/benchmarks/role-fitness-v1-sol-xhigh-diagnostic.json` - Sol/xhigh
   diagnostic; higher effort raised cost without recovering quality.
+- `docs/specs/intent-aware-review-routing-1-6-0/intent-matrix.json` - 60-case
+  offline user-intent routing Matrix.
+- `docs/specs/intent-aware-review-routing-1-6-0/runtime-matrix-results.json` -
+  process-level hook and intent runtime Matrix.
+- `docs/specs/intent-aware-review-routing-1-6-0/quality-first-cost-frontier.json`
+  - token-price-derived quality-first cost frontier benchmark.
+- `docs/benchmarks/role-fitness-v1-pilotfish-value-matrix.json` - combined
+  Luna-quality and Sol-primary cost-saving value Matrix.
+- `docs/benchmarks/PILOTFISH-VALUE-MATRIX.md` - human-readable comparison for
+  Luna-only, Sol-only, and Sol-primary Pilotfish routing.
+- `install/evaluate_quality_cost_frontier.py` - reproducible cost-frontier
+  evaluator using model-effective unit costs and per-stage weighted tokens.
+- `install/evaluate_pilotfish_value_matrix.py` - reproducible value Matrix
+  evaluator for quality uplift and Sol-primary cost savings.
 - `docs/assets/role-fitness-evidence.svg` - post-review README chart.
 - `README.md` - role-fit evidence and limitation disclosure after results.
 
@@ -1005,3 +1033,19 @@ specific to this repository's versioned fixtures.
 - Sixty trials are the initial budget. A second paired replicate requires new
   approval and is allowed only if a decision gate is still statistically
   ambiguous or a fixture is invalid.
+
+### Quality-first cost-frontier experiment (2026-08-06)
+
+The author's cost value is now evaluated as a two-gate frontier: a candidate
+must not fall below Luna's quality floor; after that, it may pass by costing
+less than pure Sol or pure Terra, or by showing a confidence-supported quality
+win over Luna. A cheaper lower-quality route still fails closed. The bounded
+12-case result is recorded in
+`docs/specs/intent-aware-review-routing-1-6-0/quality-first-cost-frontier.json`:
+the candidate estimate is `$0.430` versus pure Sol `$2.932` and pure Terra
+`$1.364`, while its quality CI lower bound versus Luna is `0.00`. It therefore
+passes the cost-frontier branch but does not yet prove a quality win; the
+high-reasoning switching score remains `5/10` until the paired quality evidence
+is stronger. The experiment also found a source-count mismatch (three observed
+adjudications versus two in the aggregate summary), which is retained as a
+data-quality follow-up rather than hidden.

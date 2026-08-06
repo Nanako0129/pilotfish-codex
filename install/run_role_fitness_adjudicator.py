@@ -73,6 +73,17 @@ def _arm(row: dict[str, Any], *, extra_tokens: int = 0, extra_wall: float = 0.0)
     return arm
 
 
+def _report_arm(row: dict[str, Any], *, include_status: bool) -> dict[str, Any]:
+    """Project optional fixture metrics without inventing risk coverage."""
+    keys = ["quality_score", "supported_findings", "weighted_tokens", "wall_seconds", "false_escalation"]
+    if include_status:
+        keys.append("status")
+    projected = {key: row[key] for key in keys}
+    if "risk_coverage" in row:
+        projected["risk_coverage"] = row["risk_coverage"]
+    return projected
+
+
 def run_adjudicator_case(
     *, private_root: Path, active_home: Path, codex_bin: str, case_id: str, timeout: int
 ) -> dict[str, Any]:
@@ -88,7 +99,7 @@ def run_adjudicator_case(
     if primary.get("status") != "accepted":
         return {"case_id": case_id, "status": "inconclusive", "reason": "primary_luna_failed", "primary": primary}
     if not _needs_verifier(primary["review_output"]):
-        primary_arm = {key: primary[key] for key in ("quality_score", "supported_findings", "weighted_tokens", "wall_seconds", "status", "false_escalation", "risk_coverage")}
+        primary_arm = _report_arm(primary, include_status=True)
         return {
             "case_id": case_id,
             "status": "accepted",
@@ -130,12 +141,12 @@ def run_adjudicator_case(
         "status": "accepted",
         "disagreement": disagreement,
         "adjudicated": adjudicator is not None,
-        "primary": {key: primary[key] for key in ("quality_score", "supported_findings", "weighted_tokens", "wall_seconds", "status", "false_escalation", "risk_coverage")},
+        "primary": _report_arm(primary, include_status=True),
         "primary_verdict": primary["review_output"],
         "verifier_verdict": verifier["review_output"],
-        "verifier": {key: verifier[key] for key in ("quality_score", "supported_findings", "weighted_tokens", "wall_seconds", "false_escalation", "risk_coverage")},
-        "adjudicator": None if adjudicator is None else {key: adjudicator[key] for key in ("quality_score", "supported_findings", "weighted_tokens", "wall_seconds", "false_escalation", "risk_coverage")},
-        "final": {key: final[key] for key in ("quality_score", "supported_findings", "weighted_tokens", "wall_seconds", "false_escalation", "risk_coverage")},
+        "verifier": _report_arm(verifier, include_status=False),
+        "adjudicator": None if adjudicator is None else _report_arm(adjudicator, include_status=False),
+        "final": _report_arm(final, include_status=True),
         "switched_arm": _arm(
             final,
             extra_tokens=primary["weighted_tokens"] + (0 if adjudicator is None else verifier["weighted_tokens"]),
