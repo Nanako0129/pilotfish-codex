@@ -53,6 +53,56 @@ def child_events(model: str = "gpt-5.6-luna", effort: str = "low") -> list[dict]
     return [{"type": "session_meta", "payload": {"id": CHILD, "parent_thread_id": PARENT}}, {"type": "turn_context", "payload": {"model": model, "effort": effort}}]
 
 
+def custom_transport_parent_events() -> list[dict]:
+    return [
+        {"type": "session_meta", "payload": {"id": PARENT}},
+        {"type": "turn_context", "payload": {"model": "gpt-5.6-terra", "effort": "low"}},
+        {
+            "type": "response_item",
+            "payload": {
+                "type": "custom_tool_call",
+                "name": "exec",
+                "call_id": CALL,
+                "input": (
+                    "const r = await tools.multi_agent_v1__spawn_agent({\n"
+                    '  message: "Do not run commands. Reply only READY.",\n'
+                    '  agent_type: "scout",\n'
+                    '  task_name: "model_probe_scout",\n'
+                    '  fork_turns: "none"\n'
+                    "});"
+                ),
+            },
+        },
+        {
+            "type": "response_item",
+            "payload": {
+                "type": "custom_tool_call",
+                "name": "exec",
+                "call_id": WAIT_CALL,
+                "input": (
+                    "const r = await tools.multi_agent_v1__wait_agent({\n"
+                    f'  targets: ["{CHILD}"],\n'
+                    "  timeout_ms: 30000\n"
+                    "});"
+                ),
+            },
+        },
+        {
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": f'<subagent_notification>\n{{"agent_path":"{CHILD}","status":{{"completed":"READY"}}}}\n</subagent_notification>',
+                    }
+                ],
+            },
+        },
+    ]
+
+
 def autoroute_parent_events(
     *,
     prompt: str = AUTO_ROUTE_PROMPT,
@@ -353,6 +403,7 @@ class NativeEvidenceTests(unittest.TestCase):
 
         self.assertIn("--skip-git-repo-check", command)
         self.assertIn("--strict-config", command)
+        self.assertEqual(command[command.index("--enable") + 1], "multi_agent_v2")
         self.assertEqual(command[command.index("-C") + 1], "/tmp/clean-smoke")
         self.assertIn("wait_agent exactly once", command[-1])
         self.assertIn("a second spawn", command[-1])
@@ -364,6 +415,10 @@ class NativeEvidenceTests(unittest.TestCase):
         self.assertEqual((verdict.status, verdict.reason_code, verdict.child_created), ("NATIVE_OK", "native_verified", "yes"))
         self.assertEqual(len(verdict.parent_ref or ""), 16)
         self.assertNotEqual(verdict.parent_ref, PARENT)
+
+    def test_current_custom_tool_transport_is_native_ok(self) -> None:
+        verdict = inspect_dispatch(custom_transport_parent_events(), child_events(), expected_role=self.binding)
+        self.assertEqual((verdict.status, verdict.reason_code, verdict.child_created), ("NATIVE_OK", "native_verified", "yes"))
 
     def test_undocumented_multi_agent_marker_is_optional(self) -> None:
         events = parent_events()
@@ -888,11 +943,29 @@ class NativeHomeAndReceiptTests(unittest.TestCase):
         with self.assertRaises(Exception):
             validate_receipt(payload)
 
+    def test_autoroute_policy_violation_is_receiptable(self) -> None:
+        events = autoroute_parent_events()
+        events.append(dict(events[-2], payload=dict(events[-2]["payload"])))
+        verdict = inspect_autoroute(
+            events,
+            {CHILD: autoroute_child_events()},
+            expected_role=RoleBinding("gpt-5.6-sol", "high"),
+            parent_rollout_id=PARENT,
+        )
+        self.assertEqual(
+            (verdict.status, verdict.reason_code, verdict.phase, verdict.child_created),
+            ("FAILED", "policy_violation", "post-spawn", "unknown"),
+        )
+        hashes = {"config": "a" * 64, "role_manifest": "b" * 64, "policy": "c" * 64}
+        validate_receipt(receipt_payload(verdict, codex_version="0.146.0", active=hashes, target=hashes))
+
     def test_receipt_rejects_impossible_execution_and_native_success_cells(self) -> None:
         hashes = {"config": "a" * 64, "role_manifest": "b" * 64, "policy": "c" * 64}
         with self.assertRaises(Exception):
             receipt_payload(verify_dispatch._verdict("FAILED", "codex_exec_failed", phase="execution-pre-child", child_created="yes"), codex_version="0.146.0", active=hashes, target=hashes)
         success = receipt_payload(inspect_dispatch(parent_events(), child_events(), expected_role=RoleBinding("gpt-5.6-luna", "low")), codex_version="0.146.0", active=hashes, target=hashes)
+        newer = dict(success, codex_version="0.147.0-alpha.1.2")
+        validate_receipt(newer)
         success["target_policy_sha256"] = "d" * 64
         with self.assertRaises(Exception):
             validate_receipt(success)

@@ -7,7 +7,9 @@ IDs, resume commands, and `Explore` shadowing are not Codex runtime claims.
 
 ## Native Multi-Agent boundary
 
-The active target is exactly Codex `rust-v0.146.0` and one explicit global
+The active target is the native Codex contract, with `0.146.0` as the minimum
+compatibility floor; later releases are accepted after parsing and native
+contract validation. It uses one explicit global
 agent table:
 
 ```toml

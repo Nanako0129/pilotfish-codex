@@ -385,12 +385,20 @@ class SimulationTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
-    def test_live_codex_binary_matches_native_0146_pin(self) -> None:
+    def test_live_codex_binary_accepts_parseable_versions(self) -> None:
         with mock.patch.object(
             benchmark.subprocess,
             "run",
             return_value=benchmark.subprocess.CompletedProcess(
                 ["codex", "--version"], 0, stdout="codex-cli 0.146.0\n", stderr=""
+            ),
+        ):
+            self.assertIsNone(benchmark.validate_live_codex_binary("codex"))
+        with mock.patch.object(
+            benchmark.subprocess,
+            "run",
+            return_value=benchmark.subprocess.CompletedProcess(
+                ["codex", "--version"], 0, stdout="codex-cli 0.147.0-alpha.1.2\n", stderr=""
             ),
         ):
             self.assertIsNone(benchmark.validate_live_codex_binary("codex"))

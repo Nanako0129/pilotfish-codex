@@ -13,13 +13,14 @@
 - [x] Remove Terra from role bindings; use Luna/xhigh for outcome verification.
 - [x] Bind the existing risk-triggered Plan review to Sol/high without changing
       the Nanako-designed escalation timing.
-- [x] Establish the approved Codex `0.146.0` compatibility contract: update
+- [x] Establish the approved Codex `>=0.146.0` compatibility floor (later
+      releases accepted): update
       the validator, installer, stage helper, verifier, fixtures, and tests.
 - [x] Fail closed for stale, malformed, unowned, extra-key, or conflicting V2
       config; make dry-run list every target and transaction-artifact path
       before any home write.
-- [x] Update README, the install runbook, and design rationale to make Codex
-      0.146 `[agents]` the sole active configuration contract.
+- [x] Update README, the install runbook, and design rationale to make the
+      native `[agents]` contract and `>=0.146.0` compatibility floor explicit.
 - [x] Run the protected installer against the active Codex home after its
       0.146 dry-run identifies only owned routing changes.
 - [x] Resolve the stale active install state with explicit operator approval;

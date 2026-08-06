@@ -102,7 +102,8 @@ The strict misses remain documented for follow-up.
 
 ## Install quickly
 
-Prerequisites: Codex CLI `0.146.0`, Python `3.11+`, Bash, and a local checkout.
+Prerequisites: Codex CLI `>=0.146.0` (later releases are accepted), Python
+`3.11+`, Bash, and a local checkout.
 
 Run a dry-run first. It plans the changes without writing to the Codex home:
 

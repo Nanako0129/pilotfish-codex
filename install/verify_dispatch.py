@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline-safe verifier for the native Codex 0.146.0 dispatch contract.
+"""Offline-safe verifier for the native Codex dispatch contract.
 
 ``--live --yes`` is deliberately the only path that invokes Codex.  All normal
 helpers validate staged inputs, receipts, and rollout evidence without reading a
@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Iterable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from install import PINNED_CODEX_VERSION, parse_codex_version
+from install import codex_version_token, parse_codex_version
 from validate_agents import ROLES, validate_agent
 from stage_smoke_home import (
     StageError,
@@ -46,6 +46,7 @@ AUTO_ROUTE_PROMPT = (
 AUTO_ROUTE_DIRECTIVE_TOKENS = ("spawn", "delegate", "subagent")
 AUTO_ROUTE_PARENT_MODEL = "gpt-5.6-luna"
 AUTO_ROUTE_PARENT_EFFORT = "medium"
+NATIVE_MULTI_AGENT_FEATURE = "multi_agent_v2"
 CORRELATION_MODES = frozenset({"spawn_activity", "session_metadata"})
 RECEIPT_KEYS = frozenset({
     "status", "reason_code", "phase", "child_created", "codex_version",
@@ -57,7 +58,7 @@ RECEIPT_KEYS = frozenset({
 MATRIX = {
     ("preflight", "live_flag_required", "SKIPPED"), ("preflight", "operator_opt_in_required", "SKIPPED"),
     ("preflight", "native_schema_introspection_unavailable", "SKIPPED"),
-    ("preflight", "version_parse_failed", "SKIPPED"), ("preflight", "version_not_pinned", "FAILED"),
+    ("preflight", "version_parse_failed", "SKIPPED"),
     ("preflight", "auth_unavailable", "SKIPPED"), ("preflight", "smoke_cwd_untrusted", "FAILED"),
     ("preflight", "stage_layout_untrusted", "FAILED"), ("preflight", "external_input_unowned", "FAILED"),
     ("preflight", "role_layer_unapproved", "FAILED"), ("preflight", "role_manifest_extra", "FAILED"),
@@ -73,6 +74,7 @@ MATRIX = {
     ("post-spawn", "native_v2_selection_mismatch", "FAILED"), ("post-spawn", "native_spawn_evidence_missing", "SKIPPED"),
     ("post-spawn", "autoroute_prompt_missing", "FAILED"), ("post-spawn", "autoroute_prompt_directive_detected", "FAILED"),
     ("post-spawn", "autoroute_plan_verifier_missing", "FAILED"),
+    ("post-spawn", "policy_violation", "FAILED"),
     ("post-spawn", "untyped_fallback_detected", "FAILED"), ("dispatch", "policy_violation", "FAILED"),
     ("dispatch", "service_tier_override_forbidden", "FAILED"), ("post-spawn", "parent_child_mismatch", "FAILED"),
     ("post-spawn", "child_evidence_missing", "SKIPPED"), ("post-spawn", "child_binding_unobservable", "SKIPPED"),
@@ -593,6 +595,8 @@ def build_codex_command(*, codex_bin: str, cwd: Path, parent_model: str, role: s
     return [
         codex_bin,
         "exec",
+        "--enable",
+        NATIVE_MULTI_AGENT_FEATURE,
         "--json",
         "--strict-config",
         "--skip-git-repo-check",
@@ -632,19 +636,98 @@ def _events_valid(events: Iterable[object], kinds: set[str]) -> bool:
     return all(isinstance(event, dict) and (event.get("type") not in kinds or isinstance(event.get("payload"), dict)) for event in events)
 
 
-def inspect_dispatch(parent_events: list[dict], child_events: list[dict], *, expected_role: RoleBinding, expected_role_name: str = "scout", expected_task_name: str | None = None) -> Verdict:
-    """Classify native evidence without using an adapter namespace predicate."""
-    task = expected_task_name or task_name_for_role(expected_role_name)
-    if not _events_valid(parent_events, {"session_meta", "turn_context", "response_item", "event_msg"}):
-        return _verdict("FAILED", "policy_violation", phase="dispatch")
-    function_calls = [
+def _js_string_fields(source: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for match in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(\"(?:\\\\.|[^\"\\\\])*\")", source):
+        try:
+            fields[match.group(1)] = json.loads(match.group(2))
+        except json.JSONDecodeError:
+            continue
+    return fields
+
+
+def _custom_native_calls(events: Iterable[dict]) -> list[tuple[int, dict]]:
+    """Normalize current custom-tool transport into the legacy call shape."""
+    calls: list[tuple[int, dict]] = []
+    for index, event in enumerate(events):
+        payload = event.get("payload") if isinstance(event, dict) else None
+        if not isinstance(payload, dict) or payload.get("type") != "custom_tool_call":
+            continue
+        source = payload.get("input")
+        if not isinstance(source, str):
+            continue
+        if re.search(r"tools\.[A-Za-z0-9_]+__spawn_agent\s*\(", source):
+            fields = _js_string_fields(source)
+            arguments = {key: fields[key] for key in ("message", "agent_type", "task_name", "fork_turns") if key in fields}
+            calls.append((index, {"type": "function_call", "name": "spawn_agent", "call_id": payload.get("call_id"), "arguments": json.dumps(arguments)}))
+        elif re.search(r"tools\.[A-Za-z0-9_]+__wait_agent\s*\(", source):
+            timeout = re.search(r"\btimeout_ms\s*:\s*(\d+)", source)
+            targets_match = re.search(r"\btargets\s*:\s*\[(.*?)\]", source, re.DOTALL)
+            arguments: dict[str, object] = {}
+            if timeout:
+                arguments["timeout_ms"] = int(timeout.group(1))
+            if targets_match:
+                arguments["targets"] = re.findall(r'"((?:\\.|[^"\\])*)"', targets_match.group(1))
+            calls.append((index, {"type": "function_call", "name": "wait_agent", "call_id": payload.get("call_id"), "arguments": json.dumps(arguments)}))
+    return calls
+
+
+def _native_calls(events: Iterable[dict]) -> list[tuple[int, dict]]:
+    calls = [
         (index, event["payload"])
-        for index, event in enumerate(parent_events)
+        for index, event in enumerate(events)
         if isinstance(event, dict)
         and event.get("type") == "response_item"
         and isinstance(event.get("payload"), dict)
         and event["payload"].get("type") == "function_call"
     ]
+    return calls + _custom_native_calls(events)
+
+
+def _notification_activities(events: Iterable[dict], call_id: str | None) -> list[dict]:
+    activities: list[dict] = []
+    for payload in _payloads(events, "response_item"):
+        if payload.get("type") != "message" or payload.get("role") != "assistant":
+            continue
+        content = payload.get("content")
+        if not isinstance(content, list):
+            continue
+        for item in content:
+            text = item.get("text") if isinstance(item, dict) else None
+            if not isinstance(text, str) or "<subagent_notification>" not in text:
+                continue
+            match = re.search(r"<subagent_notification>\s*(\{[^\r\n]+\})", text)
+            if not match:
+                continue
+            try:
+                notification = json.loads(match.group(1))
+            except json.JSONDecodeError:
+                continue
+            child_id = notification.get("agent_path")
+            if isinstance(child_id, str) and child_id:
+                activities.append({"kind": "started", "event_id": call_id, "agent_thread_id": child_id})
+    return activities
+
+
+def _native_activities(events: Iterable[dict], calls: list[tuple[int, dict]]) -> list[dict]:
+    activities = [
+        payload
+        for payload in _payloads(events, "event_msg")
+        if payload.get("type") == "sub_agent_activity" and payload.get("kind") == "started"
+    ]
+    spawn = next((payload for _, payload in calls if payload.get("name") == "spawn_agent"), None)
+    call_id = spawn.get("call_id") if spawn else None
+    if not activities:
+        activities.extend(_notification_activities(events, call_id))
+    return activities
+
+
+def inspect_dispatch(parent_events: list[dict], child_events: list[dict], *, expected_role: RoleBinding, expected_role_name: str = "scout", expected_task_name: str | None = None) -> Verdict:
+    """Classify native evidence without using an adapter namespace predicate."""
+    task = expected_task_name or task_name_for_role(expected_role_name)
+    if not _events_valid(parent_events, {"session_meta", "turn_context", "response_item", "event_msg"}):
+        return _verdict("FAILED", "policy_violation", phase="dispatch")
+    function_calls = _native_calls(parent_events)
     calls = [
         (index, payload)
         for index, payload in function_calls
@@ -656,7 +739,7 @@ def inspect_dispatch(parent_events: list[dict], child_events: list[dict], *, exp
         if payload.get("name") == "wait_agent"
     ]
     untyped = [p for p in _payloads(parent_events, "response_item") if p.get("type") == "function_call" and p.get("name") != "spawn_agent" and "spawn" in str(p.get("name", ""))]
-    activities = [p for p in _payloads(parent_events, "event_msg") if p.get("type") == "sub_agent_activity" and p.get("kind") == "started"]
+    activities = _native_activities(parent_events, function_calls)
     created = "yes" if activities else "unknown"
     # The rollout marker is undocumented and optional.  If a runtime emits it,
     # an explicitly non-native value is still contradictory evidence.
@@ -685,13 +768,16 @@ def inspect_dispatch(parent_events: list[dict], child_events: list[dict], *, exp
         wait_args = json.loads(wait_call.get("arguments", ""))
     except (TypeError, json.JSONDecodeError):
         return _verdict("FAILED", "policy_violation", phase="dispatch", child_created=created)
-    if wait_index <= call_index or wait_args != {"timeout_ms": 30000}:
+    if wait_index <= call_index or wait_args.get("timeout_ms") != 30000 or set(wait_args) - {"timeout_ms", "targets"}:
         return _verdict("FAILED", "policy_violation", phase="dispatch", child_created=created)
     call_id = call.get("call_id")
     matched = [a for a in activities if a.get("event_id") == call_id]
     if not isinstance(call_id, str) or not call_id or len(matched) != 1:
         return _verdict("SKIPPED", "native_spawn_evidence_missing", child_created=created)
     child_id = matched[0].get("agent_thread_id")
+    targets = wait_args.get("targets")
+    if targets is not None and targets != [child_id]:
+        return _verdict("FAILED", "parent_child_mismatch", child_created="yes")
     parent_id = next((p.get("id") for p in _payloads(parent_events, "session_meta") if isinstance(p.get("id"), str)), None)
     contexts = _payloads(child_events, "turn_context")
     sessions = _payloads(child_events, "session_meta")
@@ -927,10 +1013,10 @@ def locate_rollout(sessions_root: Path, thread_id: str) -> Path:
 
 
 def child_thread_from_parent(events: list[dict]) -> str:
-    calls = [p for p in _payloads(events, "response_item") if p.get("type") == "function_call" and p.get("name") == "spawn_agent"]
+    calls = [p for _, p in _native_calls(events) if p.get("name") == "spawn_agent"]
     if len(calls) != 1 or not isinstance(calls[0].get("call_id"), str):
         raise EvidenceError("typed spawn is unobservable")
-    activities = [p for p in _payloads(events, "event_msg") if p.get("type") == "sub_agent_activity" and p.get("kind") == "started" and p.get("event_id") == calls[0]["call_id"]]
+    activities = [p for p in _native_activities(events, [(0, calls[0])]) if p.get("event_id") == calls[0]["call_id"]]
     if len(activities) != 1 or not isinstance(activities[0].get("agent_thread_id"), str):
         raise EvidenceError("child activity is unobservable")
     return activities[0]["agent_thread_id"]
@@ -1010,7 +1096,7 @@ def inspect_available_evidence(home: Path, stdout: str, binding: RoleBinding, ro
     try:
         parent_id = parse_exec_thread_id(stdout)
         parent_events = load_jsonl(locate_rollout(home / "sessions", parent_id))
-        boundary = any(p.get("type") == "function_call" and p.get("name") == "spawn_agent" for p in _payloads(parent_events, "response_item"))
+        boundary = any(p.get("name") == "spawn_agent" for _, p in _native_calls(parent_events))
         try:
             child_id = child_thread_from_parent(parent_events)
             child_events = load_jsonl(locate_rollout(home / "sessions", child_id))
@@ -1103,7 +1189,7 @@ def validate_receipt(payload: dict) -> None:
     if payload["child_created"] not in {"no", "yes", "unknown"}:
         raise ReceiptError("receipt child_created is invalid")
     version = payload["codex_version"]
-    if version != "unknown" and not re.fullmatch(r"\d+\.\d+\.\d+", str(version)):
+    if version != "unknown" and not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?", str(version)):
         raise ReceiptError("receipt version is invalid")
     hashes = [key for key in required if key.endswith("sha256")]
     if any(not isinstance(payload[key], str) or not re.fullmatch(r"[0-9a-f]{64}", payload[key]) for key in hashes):
@@ -1128,7 +1214,7 @@ def validate_receipt(payload: dict) -> None:
     child_bound_reasons = {"parent_child_mismatch", "child_binding_unobservable", "child_binding_mismatch", "child_model_mismatch", "child_effort_mismatch", "inherited_parent_model", "native_verified"}
     if payload["reason_code"] in child_bound_reasons and payload["child_created"] != "yes":
         raise ReceiptError("child-bound receipt lacks observed child")
-    if payload["status"] == "NATIVE_OK" and (payload["codex_version"] != "0.146.0" or payload["active_config_sha256"] != payload["target_config_sha256"] or payload["active_role_manifest_sha256"] != payload["target_role_manifest_sha256"] or payload["active_policy_sha256"] != payload["target_policy_sha256"]):
+    if payload["status"] == "NATIVE_OK" and (payload["codex_version"] == "unknown" or payload["active_config_sha256"] != payload["target_config_sha256"] or payload["active_role_manifest_sha256"] != payload["target_role_manifest_sha256"] or payload["active_policy_sha256"] != payload["target_policy_sha256"]):
         raise ReceiptError("NATIVE_OK receipt has invalid version or hash equality")
     if "role" in payload and (not isinstance(payload["role"], str) or payload["role"] not in ROLES):
         raise ReceiptError("role evidence is invalid")
@@ -1294,15 +1380,16 @@ def main(argv: list[str] | None = None) -> int:
             _print(verdict); return 1
     except (OSError, json.JSONDecodeError, ReceiptError):
         print("environment_binding_unobservable", file=sys.stderr); return 2
+    version_text: str | None = None
     try:
         version_run = subprocess.run([args.codex_bin, "--version"], capture_output=True, text=True, check=False)
-        token = parse_codex_version(version_run.stdout + version_run.stderr) if version_run.returncode == 0 else None
+        raw_version = version_run.stdout + version_run.stderr
+        version_text = codex_version_token(raw_version) if version_run.returncode == 0 else None
+        token = parse_codex_version(raw_version) if version_text is not None else None
     except OSError:
         token = None
     if token is None:
         verdict = _verdict("SKIPPED", "version_parse_failed", phase="preflight", child_created="no")
-    elif token != PINNED_CODEX_VERSION:
-        verdict = _verdict("FAILED", "version_not_pinned", phase="preflight", child_created="no")
     else:
         try:
             login = subprocess.run([args.codex_bin, "login", "status"], capture_output=True, text=True, check=False)
@@ -1314,7 +1401,7 @@ def main(argv: list[str] | None = None) -> int:
             env = {"CODEX_HOME": str(args.codex_home), "CODEX_SQLITE_HOME": str(args.codex_home), **{k: v for k, v in os.environ.items() if k not in {"CODEX_HOME", "CODEX_SQLITE_HOME"}}}
             if env.get("CODEX_HOME") != str(args.codex_home) or env.get("CODEX_SQLITE_HOME") != str(args.codex_home):
                 verdict = _verdict("FAILED", "environment_propagation_failed", phase="preflight", child_created="no")
-                payload = receipt_payload(verdict, codex_version="0.146.0", active=active_hash, target=target_hash)
+                payload = receipt_payload(verdict, codex_version=version_text or "unknown", active=active_hash, target=target_hash)
                 write_receipt(destination, payload)
                 _print(verdict)
                 return 1
@@ -1343,7 +1430,7 @@ def main(argv: list[str] | None = None) -> int:
                 if changed:
                     phase = "post-spawn" if spawn_boundary else "execution-pre-child"
                     verdict = _verdict("FAILED", "snapshot_mutated", phase=phase, child_created=verdict.child_created)
-    version_text = ".".join(map(str, token)) if token else "unknown"
+    version_text = version_text or "unknown"
     try:
         payload = receipt_payload(verdict, codex_version=version_text, active=active_hash, target=target_hash)
         write_receipt(destination, payload)

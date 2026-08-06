@@ -1,4 +1,4 @@
-"""Fail-closed static validation for the native Codex 0.146.0 target.
+"""Fail-closed static validation for the native Codex role contract.
 
 The validator intentionally validates Pilotfish's staged single-layer contract;
 it does not claim to reproduce Codex's layered role loader.

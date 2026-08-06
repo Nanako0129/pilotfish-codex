@@ -94,6 +94,29 @@ def classify_prompt(prompt: object) -> tuple[str, ...]:
     )
 
 
+def requires_sol_review(categories: tuple[str, ...]) -> bool:
+    """Apply the bounded selective-switch trigger for high-reasoning review."""
+    return bool(categories) and ("security" in categories or len(categories) >= 2)
+
+
+def route_reason(
+    categories: tuple[str, ...],
+    *,
+    luna_uncertain: bool = False,
+    unresolved_critical: bool = False,
+) -> str:
+    """Return the auditable reason for a Luna-first/Sol-second-opinion route."""
+    if "security" in categories:
+        return "security_boundary"
+    if unresolved_critical:
+        return "unresolved_critical"
+    if luna_uncertain:
+        return "luna_uncertainty"
+    if len(categories) >= 2:
+        return "multiple_material_risks"
+    return "luna_default"
+
+
 def _marker_directory(codex_home: Path, *, create: bool) -> Path | None:
     directory = codex_home / MARKER_DIRECTORY
     try:
@@ -757,7 +780,7 @@ def _handle_prompt(payload: dict[str, Any], codex_home: Path) -> None:
         _remove_marker(codex_home, session_id)
         return
     categories = classify_prompt(payload.get("prompt"))
-    if not _valid_identifier(turn_id) or not categories:
+    if not _valid_identifier(turn_id) or not requires_sol_review(categories):
         _remove_marker(codex_home, session_id)
         return
     marker = {

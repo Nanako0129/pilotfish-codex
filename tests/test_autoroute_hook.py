@@ -705,6 +705,29 @@ class TriggerCorpusTests(unittest.TestCase):
             with self.subTest(prompt=prompt):
                 self.assertEqual(gate.classify_prompt(prompt), tuple(sorted(expected)))
 
+    def test_selective_sol_review_requires_security_or_multiple_risks(self) -> None:
+        self.assertFalse(gate.requires_sol_review(("data",)))
+        self.assertFalse(gate.requires_sol_review(("release",)))
+        self.assertTrue(gate.requires_sol_review(("security",)))
+        self.assertTrue(gate.requires_sol_review(("data", "irreversible")))
+
+    def test_single_nonsecurity_risk_does_not_create_review_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "codex-home"
+            home.mkdir()
+            session_id = "session-single-risk"
+            gate.handle(
+                {
+                    "hook_event_name": "UserPromptSubmit",
+                    "session_id": session_id,
+                    "turn_id": "turn-single-risk",
+                    "prompt": "Plan the database change.",
+                },
+                codex_home=home,
+            )
+            marker = gate._marker_path(home, session_id, create=False)
+            self.assertTrue(marker is None or not marker.exists())
+
     def test_generic_chinese_validation_is_not_a_security_boundary(self) -> None:
         self.assertEqual(gate.classify_prompt("規劃如何驗證這份報表"), ())
         self.assertEqual(
