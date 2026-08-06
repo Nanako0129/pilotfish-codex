@@ -1,0 +1,277 @@
+{
+  "case_count": 30,
+  "cases": [
+    {
+      "case_id": "plan-review-01",
+      "clean_control": true,
+      "cohort": "plan_review",
+      "fixture_hash": "9c50486efd3e230cc1b99033d099c0d34edb405f69f11cd8c361a9d5ccbeba61",
+      "ledger_commitment": "d9150bfb503128aec0eadddb693065e9647f2a4328d0e1a1306aeac850a7de9a",
+      "ledger_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "rubric_hash": "5ccc78330803f15200cece46fc08d22d512de9f079aa4615a4522457493fbc28"
+    },
+    {
+      "case_id": "plan-review-02",
+      "clean_control": true,
+      "cohort": "plan_review",
+      "fixture_hash": "38af674223521de2b415f57703f867ee3a774ec45adf4ade5f141e4579b9d7a4",
+      "ledger_commitment": "653c72fc8bbbf9c953fffb0a9711b131434e5ec9b45da88f021ab947fd06bd0e",
+      "ledger_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "rubric_hash": "c9c2842672f0e2512138406dc1e9d96c61ae639e6a40d8e59b02fff544a44d23"
+    },
+    {
+      "case_id": "plan-review-03",
+      "clean_control": true,
+      "cohort": "plan_review",
+      "fixture_hash": "dcfa731ec56e7007c55c9e21d5af3f32c432c01642b9810f577b0e57cb92aba2",
+      "ledger_commitment": "d2c4466832f3603283234deac47e83d68d5a4d70a04c9a7c40be1b1a794c907a",
+      "ledger_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "rubric_hash": "263bcf5d0ec79c341bd72ac626aad07afdf2c7ccd6fdc20e1d6a7080c0097c4c"
+    },
+    {
+      "case_id": "plan-review-04",
+      "clean_control": true,
+      "cohort": "plan_review",
+      "fixture_hash": "1bcd9207c319c29f869c3e03050f5aed47d9a9e8fca5b2cae6bd33a52b5aaf2c",
+      "ledger_commitment": "20698197aedf88487c55a6b3ebcd5ebc3a896e01e0ebb644e499ace3551066a7",
+      "ledger_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "rubric_hash": "43d24b500b5f91e384c034ac57cf8838d9689a87644c88c9e3792622c2acefd0"
+    },
+    {
+      "case_id": "plan-review-05",
+      "clean_control": false,
+      "cohort": "plan_review",
+      "fixture_hash": "fafe11456a9abbab46b518593e75341a690a0aab64c8c708f3b3501111ede04b",
+      "ledger_commitment": "6aafd15d9280177c6aad2275e5d097510be61a33408d605134896870c379335c",
+      "ledger_hash": "576e4cae1f2a20df7e19680c46a081cf820e0d94bdf4fc64bdc89e6b9914e152",
+      "rubric_hash": "52df44c9c9af5ac4b99658f0e75d2ca869d93c5de9811b1093f95401f1f83158"
+    },
+    {
+      "case_id": "plan-review-06",
+      "clean_control": false,
+      "cohort": "plan_review",
+      "fixture_hash": "c19ad58cb87dfb89167ee26e5d5524156b8f47320d351199407da9529e9f2c77",
+      "ledger_commitment": "750544d8f76fa23795d6fcba71d42e50a639452ba17a059847bbed0c8e18e7a7",
+      "ledger_hash": "eb8d6df1bb3f38752d826bc5deef59aa7d04e8cd342e7591ff5cfca364f89fa5",
+      "rubric_hash": "cb02d8a5314915f9c9f4b1fd4cec8638247a7c215a4bc8201b8be17d97afc948"
+    },
+    {
+      "case_id": "plan-review-07",
+      "clean_control": false,
+      "cohort": "plan_review",
+      "fixture_hash": "d2e04f59928bf8df31da0390a6d1c83a47384828d1e621402a335b69dffd8d72",
+      "ledger_commitment": "b1ed5d174dc4b20480df413370cf0310f74c872f0d3b200ccf7260070c571a21",
+      "ledger_hash": "65531626e2b69081e4f5178a47aa356c09468f31f432cb76abee6eb62d39603a",
+      "rubric_hash": "7e359a2584b00ee13be9e6035a82f5ceef187c508d5cc2a321b143337bb11f35"
+    },
+    {
+      "case_id": "plan-review-08",
+      "clean_control": false,
+      "cohort": "plan_review",
+      "fixture_hash": "5cc1f001337b75e8e60c45957590dfe545465c73bcd15897afd6e9faafba0c32",
+      "ledger_commitment": "61c450412212689a6f5203a6e778bf8069547be4eca9edcb26534487310312db",
+      "ledger_hash": "59ee454cbdfb667e5fbdf91f6a9613a0892c89ec21cf7ee8941c5fc04f25db96",
+      "rubric_hash": "e64e036e56cf7e49a8e5852d091e44fc337b1e9778eb134092f45b91aef358fc"
+    },
+    {
+      "case_id": "plan-review-09",
+      "clean_control": false,
+      "cohort": "plan_review",
+      "fixture_hash": "d9abeea16431c05272a3a97335a1e9201f9966a82a65c4bcfb9b95c9b772fa57",
+      "ledger_commitment": "4f23ce9f35a4dc70b4e8928b244717653e150b79694c19592b69f1a375b70d31",
+      "ledger_hash": "9f74211792a2dc89d46c8a95d8c9466d31fd1b3ac04d9578bd6f56fccfeb0486",
+      "rubric_hash": "363038a53c7e6bf1949bfce8829b1c679e50112d2ade0572f4e91289184e87cf"
+    },
+    {
+      "case_id": "plan-review-10",
+      "clean_control": false,
+      "cohort": "plan_review",
+      "fixture_hash": "2a2c62879fa320cad037bdbd17e4aaa839e9d44bc036c72bb7eb50152e704b82",
+      "ledger_commitment": "5774012d7b1cc260f75f10dd615f3c553c8dd569e7db5086b4c80e832db629de",
+      "ledger_hash": "ddb349ceb0438595bbd848fc0a9f351a6b3c2a0844affce3b8132ef55818a774",
+      "rubric_hash": "7f0ef7f7b9d021014019c77bb48cc30bb11133a01f7b0c3d27e1a9d2068bd6c9"
+    },
+    {
+      "case_id": "plan-review-11",
+      "clean_control": false,
+      "cohort": "plan_review",
+      "fixture_hash": "6d53dd2aefdf9aa3906e4fc389c2edca1b759ae572e1b4a841b3daaebdd08bdc",
+      "ledger_commitment": "fdeb9acaee0c741d52f302af583fd1992643014972bfbdecb37b383eddafcb03",
+      "ledger_hash": "64d4c3a591348e85071bee8a1f8ce252a6f23fb8b06839b33e06b6e5d5ca3792",
+      "rubric_hash": "cea0327eb01ba0ce8f98bce316f17dd427011ce5b46f3d85acded6541359ad8b"
+    },
+    {
+      "case_id": "plan-review-12",
+      "clean_control": false,
+      "cohort": "plan_review",
+      "fixture_hash": "acadafadb96cd7ac70b2729055b6d7cd1c378727929e32977df598088ef806e1",
+      "ledger_commitment": "93be7dbd81a8bb9cde404c6774075a05fafd9c9de591b6bf02e457e4b04700ab",
+      "ledger_hash": "6c1f980d53dacf19c39bd8238da1396927b54efcb475c0914373d00d9e9b2cf4",
+      "rubric_hash": "071ed8a3167fb88f15b64860dbcc987be3346b6b5e1ad2f6ca83fa50ad2768e1"
+    },
+    {
+      "case_id": "mechanical-execution-01",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "62f041f30b1fb883f421519cdd51d14e49be23c51ceca9c5d043335ca58ae326",
+      "ledger_commitment": "228770cbeba24045f21eca10f04b217be86267dbb081d3e502fe10787c7f3e37",
+      "ledger_hash": "c0f6f48107bc156568e3ef6be79995ea8084335c913d59b01eba1ae8e6331745",
+      "rubric_hash": "758ccc216efd5dd5b42432844e584befd17cc12f7ff0a59e88f655fb3274c11f"
+    },
+    {
+      "case_id": "mechanical-execution-02",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "70307be040cba38bb621b75262fc7973576e8581540d51b0c7dfc7c1b44ee287",
+      "ledger_commitment": "50564a3445385809480c5e6f2a9797f9c14db093c921d40f871fab9b04cb98a6",
+      "ledger_hash": "030b26d9c9e0a6d258da56cd3db2d1acf6a031d1cfc0f80044adaf7a07a0ef2f",
+      "rubric_hash": "434a7d7319bd795413a08eec52fa65f71cee161cd92fe9c24e5f990f6a9040f7"
+    },
+    {
+      "case_id": "mechanical-execution-03",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "1a7d26ed9101e92839f9c26d41a65c4123207c9c37a37f97f71d9b8b19bffc3d",
+      "ledger_commitment": "2c11e5e33ab940adb338fe1c955a5c67119e5a89bebd845d6d4beca9f76e84f6",
+      "ledger_hash": "926c9a1db866cb743f9caa8798687ff81fdcdcbd8273785b26f4a220917265c8",
+      "rubric_hash": "9fab0d6923b38db83a763160cd68d11186dfc6d91c95a7efd1aaf83c3cc73d08"
+    },
+    {
+      "case_id": "mechanical-execution-04",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "a3700d8c3ba51e7ecb45e64c812a0e0ba1a0880ba3eb91f7e31163dd3517d2aa",
+      "ledger_commitment": "e85de596023c81f3af3a68f820e049655045a90e40b6c395cead9edf1666c0a5",
+      "ledger_hash": "e72ce513ecb1b771c01351fd04883d06a555e0369c036cb90161078250b56b4d",
+      "rubric_hash": "080a559913d3395f15342a32a7929210caf8ae9ebd176f692cc2af342f71bf51"
+    },
+    {
+      "case_id": "mechanical-execution-05",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "74cceed30bc46eb35c73e8a4e165f46d91f8508e680aec053b32157de6c4244a",
+      "ledger_commitment": "59ac22be1655db700ccbb63aa80b42bf41e3ee7e2bbe9c51b966037182b7122d",
+      "ledger_hash": "84eab47d484b8def5cda41bedc889c555a6a1a9db29a27cbfedb349e365043ad",
+      "rubric_hash": "02266da356c1eacaa01a8de54a3b0494c9b7cd250bbca65f95a6d22dbed3ada6"
+    },
+    {
+      "case_id": "mechanical-execution-06",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "48e39d7ad8baf83123a00990800071e47255444fe3767a1c6290c3a446914956",
+      "ledger_commitment": "c83baf602187ea55fb92c7486bb8cbe7050ff942c04baf6bbb83d2eac62595b1",
+      "ledger_hash": "be30c125b589a47acdcadb24342e09ebac3f51fa93b468dd4141459c589f6df2",
+      "rubric_hash": "bffbbdfb6357bb9ba07faad38acdf5f30fe856893051fa61c8176631e08e97e1"
+    },
+    {
+      "case_id": "mechanical-execution-07",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "778165ceb2a23dd6fba21dba8dfcc75b714eea341deab893b26a483819bda05e",
+      "ledger_commitment": "e857ee5d0e26ded8357d24ec787494f88fd4b2a41bfdb23d70fc22d139e1a92e",
+      "ledger_hash": "7f3830e465375a3d6dd757d748d869e95932530224b0e911c5aca50be5cec9b3",
+      "rubric_hash": "3bcc618ee33e34902936e1055775a28a397f0215b9a0902b83b5258ecefa6b4e"
+    },
+    {
+      "case_id": "mechanical-execution-08",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "8996e37103706996e878dcb5ee55147896f5dc072d83e44d9e9bc5aaf3685f62",
+      "ledger_commitment": "ca9b17a94560967c8ee410dc09bda34e36b13ee0ddfe7935a2abdbaa8cc48c1e",
+      "ledger_hash": "79b31868b262644024f2af422369a6c8e9f982d0c8da915e8ad36190d2c7743a",
+      "rubric_hash": "fe6534ac772511ad480cc26b35893d78fef02016c7ab9bc14ab914483d0e7408"
+    },
+    {
+      "case_id": "mechanical-execution-09",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "11888955c7f6f68646cc1b704da859be94d7de638d7ce54b8a365093cf090315",
+      "ledger_commitment": "e4f80fbae473c9cf809f2aab68df46619aeab772a9d3dfc075c5c929969d9786",
+      "ledger_hash": "51904878141e2f883679ebb810fdc8dd891b7d3132b3aab7d44522146ac584ee",
+      "rubric_hash": "1869b07d9989bc9861730feba33351da36835b684dfcac9eca27b6526a42b434"
+    },
+    {
+      "case_id": "mechanical-execution-10",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "a829be8f3ca19fb18cf75657c44fe6d0aef975b55bf63716697d22204455c97c",
+      "ledger_commitment": "0098d5f49e697293d6f6d5a98f19e00ebac9ce3074ccbcf62f4eca8f19097804",
+      "ledger_hash": "83abb1adbe990add087744d14d7552caebec2ed675b12293ead1218d56abf89c",
+      "rubric_hash": "a2b59d945ebc3dcfd789cdbd53cfd1f75c22d22f770f12fa467c90f0788d7bc0"
+    },
+    {
+      "case_id": "mechanical-execution-11",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "506bdd727c1c8637def106f7d7c1a0cada4420fd72c42887a1d07e34fb81a3b0",
+      "ledger_commitment": "b087b447b93f11975273c4513f4c8ef529b58a00fb376a496080ee13d974e663",
+      "ledger_hash": "8092b6b27a814c5379be3fa079623f141e82289ce71c2a249692b58892cd9b9f",
+      "rubric_hash": "8646babb99d98f92b13e2a743e178a564ad142303067dcc3f9b61dc482cca610"
+    },
+    {
+      "case_id": "mechanical-execution-12",
+      "clean_control": false,
+      "cohort": "mechanical_execution",
+      "fixture_hash": "4a67e7d587b99ef1da459d3176aee7e1c60fc3338cfcb8821263d8d29fd83f1e",
+      "ledger_commitment": "031f618ae8a73d849ac372dd98948fb51a91e3d90bcac4b437bbfa8c247e2838",
+      "ledger_hash": "99543030a4970cb331185880f241427418075a1e1b94d922c0739542040e895e",
+      "rubric_hash": "3cd7c682fb90e40e77a40a21666e266f48b04caee38508f38fc5bc7a825ef92d"
+    },
+    {
+      "case_id": "split-workflow-01",
+      "clean_control": false,
+      "cohort": "split_workflow",
+      "fixture_hash": "ce8ea4897bd9745d5ced7d7077624ac3f35892eeb1bf2d849f21d65db698d6f2",
+      "ledger_commitment": "5952044ad3280dad6d4eacab8b45f7947b2be8663d0fe0d427715fafba61eed5",
+      "ledger_hash": "85c5bba72d68f51856ed9d6641a22042c10102380721f2882bf8cbb2be24387c",
+      "rubric_hash": "5279463b7bf88b8b885b7dbe7a4acdba85224c8b1f8ab7368e5fd50655b820b9"
+    },
+    {
+      "case_id": "split-workflow-02",
+      "clean_control": false,
+      "cohort": "split_workflow",
+      "fixture_hash": "d99bc559b0118f79c36a0a8086ac84b5507a82d7495357e9b63e8eebfe759025",
+      "ledger_commitment": "2733d1f4d9ab9c27c5675fb691330d8cb02dcf305e888797dd946786f4491b27",
+      "ledger_hash": "492d4fa4e65702ea2d7a429a5b3c493c8d6abe47f750012b8a78bfac6bfed227",
+      "rubric_hash": "87ee90647a16725a8fa4968020a3bd2a92028bd1087cd405bfa524f7d7f0df6f"
+    },
+    {
+      "case_id": "split-workflow-03",
+      "clean_control": false,
+      "cohort": "split_workflow",
+      "fixture_hash": "6aad4b9042563850a3291a6b8d876291fe44ec3c1b94c662cd29ae340388ed7b",
+      "ledger_commitment": "b1e5ee065de4e31b425a5cee5d61e16fca40322ff61c55b6449895a3e995ff10",
+      "ledger_hash": "35f231853170eea5f70c9d2fe1542dd6fc01f5a5fbf1b3d177a90c2519b137c1",
+      "rubric_hash": "2f91fa1d9b8656b1332cb648fdec94b1459f7689a4acbb74739c727bb5cebde3"
+    },
+    {
+      "case_id": "split-workflow-04",
+      "clean_control": false,
+      "cohort": "split_workflow",
+      "fixture_hash": "1be51a8c7669ac977e8dc9e3fbf3b80b8072f384e198d68df7d0cf275edf7eeb",
+      "ledger_commitment": "baae69e5b0580f52baa1af53856ca0e869de0727bf9aae27d795dc38f0915b4f",
+      "ledger_hash": "b6075e0e46b1d9cdbcf2a23674daee787f8d6207f1b62afba95ca9797453e777",
+      "rubric_hash": "7cdf675b91bec262f6e4830a8bc2d8a43f9859202f942574028bd13186322c73"
+    },
+    {
+      "case_id": "split-workflow-05",
+      "clean_control": false,
+      "cohort": "split_workflow",
+      "fixture_hash": "512e79dbcf8af1e423fcd526bd54bc41507145586c061bb8bef5e7070b5ce97d",
+      "ledger_commitment": "4a1dd3feb7907e29919de74708c0ece845e845dd42344f62fe15844df651e415",
+      "ledger_hash": "d8294bb7e50f864abd13e6d657c5910721553dfb988b53a8c3a639c9bc815bce",
+      "rubric_hash": "a368ee23d88e4b9bb7a17d60a33d07233d241df7ac823dfcf298f9e321a00e23"
+    },
+    {
+      "case_id": "split-workflow-06",
+      "clean_control": false,
+      "cohort": "split_workflow",
+      "fixture_hash": "5ccdf27441fcf0993409775a18bcae3ae3d23b1293346198a782b5c1c40c6ae4",
+      "ledger_commitment": "df641bd30c8e152e7bf7bbd0bef9fbb482372b21c17e7e99a25bfe5668cfaaa2",
+      "ledger_hash": "6621b865ea699c5fc02b7671c889b5c1129b7618ac1177f508d4b762875eb609",
+      "rubric_hash": "ad04f6e424ce84d1b0bc5ccef62a5dd25f5f2c6795ad0e3419edaef4069c726c"
+    }
+  ],
+  "manifest_hash": "7ef0ac3299c5be0a016cf240cc428f95339d9adadedaad8e23d311deb309b3e2",
+  "version": "role-fitness-fixtures-v1"
+}

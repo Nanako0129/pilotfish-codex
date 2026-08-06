@@ -1,0 +1,13 @@
+{
+  "version": "role-fitness-native-mechanical-verifier-v1",
+  "generated": "2026-08-05",
+  "formal_claim": false,
+  "case_id": "mechanical-execution-01",
+  "role": "verifier",
+  "binding": {"model": "gpt-5.6-luna", "reasoning_effort": "xhigh"},
+  "dispatch_status": "NATIVE_OK",
+  "verification": "INCONCLUSIVE",
+  "status": "inconclusive",
+  "reason": "The independent verifier child activated successfully but did not produce sufficient CONFIRMED evidence for the isolated artifact contract.",
+  "interpretation": "The executor acceptance remains valid as an executor-stage result, but first-pass/rework-free reliability receives no credit until the verifier contract is independently confirmed."
+}
