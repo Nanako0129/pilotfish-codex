@@ -68,7 +68,12 @@ v1.3.1 `plan-verifier` and `verifier` payloads may likewise upgrade to their
 packaged calibrated contracts. The released canonical v1.3.3 payloads for
 those roles may upgrade to the latest packaged routing contracts. Any other
 same-name role difference remains `installed_role_drift` and requires explicit
-operator resolution.
+operator resolution. When the operator has explicitly chosen the upstream
+canonical role, pass `--replace-drifted-roles`; this replaces only drifted
+same-name role files and preserves a timestamped backup. The flag does not
+authorize credential, external, or unrelated home changes. For a narrower
+update, use `--replace-drifted-role <role>` once per approved role. Both forms
+retain role validation, transaction fingerprints, and post-write verification.
 
 ## Install entrypoints and offline validation
 

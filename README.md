@@ -132,6 +132,12 @@ py -3 install/install.py --dry-run --codex-home $codexHome
 py -3 install/install.py --codex-home $codexHome
 ```
 
+If an explicitly approved upstream replacement is needed for a customized
+same-name role, add `--replace-drifted-role <role>` to both commands. Repeat
+the option for multiple roles; use `--replace-drifted-roles` only when all
+drifted roles are intentionally being aligned. Role validation and
+post-install fingerprint verification remain enabled.
+
 The installer adds the native seven-role manifest and the Pilotfish routing
 hook. Trust the hook in a new interactive Codex session after installation.
 

@@ -131,6 +131,13 @@ def child_events(
 
 
 class AutorouteHookTests(unittest.TestCase):
+    def test_missing_review_block_explains_wait_state_and_write_boundary(self) -> None:
+        self.assertIn("Status: WAITING_FOR_REVIEW", gate.BLOCK_REASON)
+        self.assertIn("not a user decision", gate.BLOCK_REASON)
+        self.assertIn("read-only local inspection or preparation", gate.BLOCK_REASON)
+        self.assertIn("do not create, rotate, or revoke credentials", gate.BLOCK_REASON)
+        self.assertIn("Do not emit PAUSED_NEEDS_USER", gate.BLOCK_REASON)
+
     def test_explicit_review_intent_is_redacted_and_turn_scoped(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "codex-home"

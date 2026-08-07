@@ -828,6 +828,35 @@ class NativeInstallTests(unittest.TestCase):
             with self.assertRaisesRegex(InstallAbort, "installed_role_drift"):
                 self.run_install(home)
 
+            self.assertEqual(
+                self.run_install(home, replace_drifted_roles=True),
+                0,
+            )
+            self.assertEqual(
+                (agents / "plan-verifier.toml").read_bytes(),
+                (ROOT / "templates/agents/plan-verifier.toml").read_bytes(),
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            agents = home / "agents"
+            agents.mkdir(parents=True)
+            (agents / "plan-verifier.toml").write_bytes(
+                (previous / "plan-verifier.toml").read_bytes() + b"# custom\n"
+            )
+            with self.assertRaisesRegex(InstallAbort, "installed_role_drift"):
+                self.run_install(
+                    home,
+                    replace_drifted_role=("security-reviewer",),
+                )
+            self.assertEqual(
+                self.run_install(
+                    home,
+                    replace_drifted_role=("plan-verifier",),
+                ),
+                0,
+            )
+
     def test_dry_run_names_canonical_role_upgrades_without_writes(self) -> None:
         previous = ROOT / "install" / "previous" / "v1.3.0" / "agents"
         with tempfile.TemporaryDirectory() as directory:

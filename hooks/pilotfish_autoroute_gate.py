@@ -32,8 +32,14 @@ IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._:-]{1,256}$")
 TASK_NAME_RE = re.compile(r"^[a-z0-9_]+$")
 
 BLOCK_REASON = (
-    "Required independent Plan review is missing. Call the typed "
-    "plan-verifier role now, wait for its result, and then continue."
+    "Status: WAITING_FOR_REVIEW. Required independent Plan review is missing. "
+    "This is an internal review dependency, not a user decision. Call the "
+    "typed plan-verifier role now, wait for its result, and then continue "
+    "from the review gate. Until a valid result arrives, allow only "
+    "read-only local inspection or preparation; do not create, rotate, or "
+    "revoke credentials, modify secrets or variables, push, deploy, or make "
+    "any other external or irreversible write. Do not emit PAUSED_NEEDS_USER "
+    "or ask the user solely because this review is pending."
 )
 BLOCK_OUTPUT = {"decision": "block", "reason": BLOCK_REASON}
 
