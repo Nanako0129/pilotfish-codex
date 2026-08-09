@@ -32,7 +32,9 @@
 | 12-case projection | 60.42 | 60.42 | `0.00` | `8.34%` |
 | 6-case live slice | 83.33 | 83.33 | `0.00` | `16.80%` |
 
-意思是：即使使用者偏好 Sol，Pilotfish 也不必把所有工作都交給 Sol。一般工作交給 Luna，安全、複合風險或 Luna 不確定時才保留 Sol，已在這兩個 cohort 中維持 Sol 的觀察品質並降低 token 使用量。
+意思是：即使使用者偏好 Sol，Pilotfish 也不必把所有工作都交給 Sol。
+一般工作交給 Luna，安全、複合風險或 Luna 不確定時才保留 Sol，已在這兩個
+cohort 中維持 Sol 的觀察品質並降低 token 使用量。
 
 ## 結論
 
@@ -42,4 +44,5 @@
 2. Pilotfish 有較強的成本證據：Sol-primary routing 維持 Sol 品質，12-case 少 `8.34%` token，6-case live 少 `16.80%`。
 3. Pilotfish 尚不能宣稱「統計上已證明比 Luna 品質好」；目前最穩固的 production value 是「品質不降的前提下，避免 Sol 全程執行而省錢」。
 
-機器可讀結果：[role-fitness-v1-pilotfish-value-matrix.json](role-fitness-v1-pilotfish-value-matrix.json)。產生器：[evaluate_pilotfish_value_matrix.py](../../install/evaluate_pilotfish_value_matrix.py)。
+機器可讀結果：[role-fitness-v1-pilotfish-value-matrix.json](role-fitness-v1-pilotfish-value-matrix.json)。
+產生器：[evaluate_pilotfish_value_matrix.py](../../install/evaluate_pilotfish_value_matrix.py)。

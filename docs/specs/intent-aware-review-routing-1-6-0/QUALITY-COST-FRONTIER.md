@@ -24,7 +24,9 @@
 
 ## 成本算法
 
-成本以每個模型在既有 `live-v6-summary.json` 的 recorded equivalent cost ÷ weighted tokens 得到有效單位成本，再乘以本次報告中各 stage 的 weighted tokens：
+成本以每個模型在既有 `live-v6-summary.json` 的 recorded equivalent cost ÷
+weighted tokens 得到有效單位成本，再乘以本次報告中各 stage 的 weighted
+tokens：
 
 - 不分歧：Luna primary 成本。
 - 分歧：Luna primary + Sol adjudicator 成本。
@@ -34,4 +36,8 @@
 
 ## 限制
 
-純 Sol/Terra 成本來自既有 `live-v6` reference cohort，不是同一批 12 個 Plan 的 paired quality run；因此這是可追溯的 directional experiment，不是正式 promotion claim。另三份原始分案報告觀察到 3 次 adjudication，但 summary 記成 2 次，已標在 JSON 的 `source_consistency`，需在下一輪修正產出管線。
+純 Sol/Terra 成本來自既有 `live-v6` reference cohort，不是同一批 12 個
+Plan 的 paired quality run；因此這是可追溯的 directional experiment，不是
+正式 promotion claim。另三份原始分案報告觀察到 3 次 adjudication，但
+summary 記成 2 次，已標在 JSON 的 `source_consistency`，需在下一輪修正產出
+管線。

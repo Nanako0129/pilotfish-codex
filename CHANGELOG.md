@@ -36,6 +36,7 @@ are noted only as source references.
   quality floor with a non-negative paired confidence bound.
 - Preserve the Codex compatibility floor `>=0.146.0`; later releases remain
   accepted and are evaluated by runtime evidence.
+
 ## v1.5.1 — 2026-08-06
 
 - Stop hard-pinning the installer to one Codex release; require only the
