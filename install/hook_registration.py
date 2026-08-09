@@ -190,6 +190,26 @@ def load_registration(payload: bytes | str, *, source: str) -> dict[str, Any]:
     return validate_registration(strict_json_loads(payload, source=source), source=source)
 
 
+def windows_compatibility_warnings(document: dict[str, Any]) -> list[str]:
+    """Return non-blocking warnings for command hooks without a Windows form."""
+    warnings: list[str] = []
+    for event, groups in document["hooks"].items():
+        for index, group in enumerate(groups):
+            matcher = group.get("matcher", "<all>")
+            for handler_index, handler in enumerate(group["hooks"]):
+                if handler.get("type") != "command" or "commandWindows" in handler:
+                    continue
+                command = handler["command"]
+                warnings.append(
+                    "Windows compatibility: "
+                    f"hooks.{event}[{index}].hooks[{handler_index}] "
+                    f"matcher={matcher!r} has no commandWindows; "
+                    f"Windows may run the Unix command and time out ({command!r}). "
+                    "Pilotfish preserved it and did not modify it."
+                )
+    return warnings
+
+
 def _canonical_projection_bytes(projection_id: str) -> bytes:
     try:
         projection = TRUSTED_PROJECTIONS[projection_id]

@@ -140,6 +140,8 @@ post-install fingerprint verification remain enabled.
 
 The installer adds the native seven-role manifest and the Pilotfish routing
 hook. Trust the hook in a new interactive Codex session after installation.
+On Windows, it also warns about preserved command hooks that lack
+`commandWindows`; those hooks are not modified automatically.
 
 For remote installation, pin the same release tag or full commit SHA in the
 script URL and archive ref. Do not install a real Codex home from mutable

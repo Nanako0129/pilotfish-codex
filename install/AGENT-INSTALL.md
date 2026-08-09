@@ -153,6 +153,11 @@ on other errors. Inspect the current file and its recorded ownership before
 taking a separately approved replacement action; do not delete the state
 sidecar or rollback backup merely to make an install pass.
 
+On native Windows, the installer also prints a non-blocking compatibility
+warning for any preserved command hook that has no `commandWindows` field. The
+warning identifies the event and command so its owner can add a Windows form;
+Pilotfish does not delete, rewrite, or adopt that unrelated hook.
+
 There is no automatic uninstall or rollback. Each replaced target has a
 timestamped sibling backup named `*.pilotfish-codex-<timestamp>`. If recovery
 is required, stop the installer, identify the exact affected target and backup,

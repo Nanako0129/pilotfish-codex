@@ -35,6 +35,7 @@ from hook_registration import (
     validate_owned_projection,
     validate_projection_state,
     validate_source_registration,
+    windows_compatibility_warnings,
 )
 from validate_agents import ROLES, validate_agent, validate_agents_config
 
@@ -50,6 +51,7 @@ LEGACY_PATHS = frozenset({
 })
 CANONICAL_ROLE_UPGRADE_DIGESTS = {
     "plan-verifier": frozenset({
+        "dd3b318d3b771227c38110275b68d50c5fccf2ead0d5e4c9876909b773a5748c",
         "c552938705065c826da9a3cbaf09c2fbbaa9fde4adb1f691a59b694d8468f541",
         "e29dff16ee22d8dcf60f214c7226eba52e9c1d5fca475d47ca750c8850a32852",
         "5cfd8630f9807a45eb18bfd587ab12dc41e8c06de82872ec6aa87f2c3e4c8fe0",
@@ -885,6 +887,13 @@ def install(
         )
     except HookRegistrationError as exc:
         raise InstallAbort(f"hook registration rejected: {exc}") from exc
+    windows_warnings = (
+        windows_compatibility_warnings(
+            load_registration(merged_registration, source="planned hooks.json")
+        )
+        if IS_WINDOWS
+        else []
+    )
     if current_registration != merged_registration:
         writes.append(
             (
@@ -971,6 +980,8 @@ def install(
         owned_hook_projection != desired_hook_projection
     )
     if dry_run:
+        for warning in windows_warnings:
+            print(f"warning: {warning}")
         for note in notes:
             print(f"note: {note}")
         if not writes and not state_needs_publication:
@@ -1070,6 +1081,8 @@ def install(
             if pending.is_file() and pending.read_bytes() == pending_payload:
                 _atomic_write(pending, aborted_payload, 0o600)
             raise
+    for warning in windows_warnings:
+        print(f"warning: {warning}")
     for note in notes:
         print(f"note: {note}")
     print("changed native target" if writes else "already up to date; nothing to change")

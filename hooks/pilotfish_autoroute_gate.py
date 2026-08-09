@@ -218,9 +218,9 @@ def _marker_directory(codex_home: Path, *, create: bool) -> Path | None:
             return None
         if not directory.resolve(strict=True).is_relative_to(home):
             return None
-        if create:
+        if create and os.name != "nt":
             os.chmod(directory, 0o700)
-        elif stat.S_IMODE(info.st_mode) != 0o700:
+        elif not create and os.name != "nt" and stat.S_IMODE(info.st_mode) != 0o700:
             return None
         return directory
     except OSError:
@@ -302,7 +302,10 @@ def _load_marker(codex_home: Path, session_id: str) -> dict[str, Any] | None:
         if (
             stat.S_ISLNK(info.st_mode)
             or not stat.S_ISREG(info.st_mode)
-            or stat.S_IMODE(info.st_mode) != 0o600
+            or (
+                os.name != "nt"
+                and stat.S_IMODE(info.st_mode) != 0o600
+            )
             or info.st_size > MAX_MARKER_BYTES
         ):
             return None
@@ -631,29 +634,37 @@ def _decode_jsonl(payload: bytes) -> list[dict[str, Any]]:
 
 
 def _read_scanned_jsonl(
-    directory_fd: int,
+    directory_fd: int | Path,
     name: str,
     expected: os.stat_result,
 ) -> list[dict[str, Any]]:
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
     descriptor: int | None = None
     try:
-        descriptor = os.open(name, flags, dir_fd=directory_fd)
+        if isinstance(directory_fd, Path):
+            path = directory_fd / name
+            descriptor = os.open(path, flags)
+        else:
+            path = None
+            descriptor = os.open(name, flags, dir_fd=directory_fd)
         opened = os.fstat(descriptor)
         if (
             _stat_fingerprint(opened) != _stat_fingerprint(expected)
-            or opened.st_uid != expected.st_uid
+            or not _same_owner(opened, expected.st_uid)
         ):
             raise _ScanRejected
         payload = _read_bounded(descriptor, MAX_TRANSCRIPT_BYTES)
         after_fd = os.fstat(descriptor)
-        after_path = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if path is not None:
+            after_path = os.stat(path, follow_symlinks=False)
+        else:
+            after_path = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
         if (
             len(payload) > MAX_TRANSCRIPT_BYTES
             or _stat_fingerprint(after_fd) != _stat_fingerprint(expected)
             or _stat_fingerprint(after_path) != _stat_fingerprint(expected)
-            or after_fd.st_uid != expected.st_uid
-            or after_path.st_uid != expected.st_uid
+            or not _same_owner(after_fd, expected.st_uid)
+            or not _same_owner(after_path, expected.st_uid)
         ):
             raise _ScanRejected
         return _decode_jsonl(payload)
@@ -664,6 +675,100 @@ def _read_scanned_jsonl(
             os.close(descriptor)
 
 
+def _same_owner(info: os.stat_result, current_uid: int | None) -> bool:
+    """Use NTFS ACL inheritance where Windows has no POSIX uid mapping."""
+    return os.name == "nt" or info.st_uid == current_uid
+
+
+def _intrinsic_child_review_proven_windows(
+    codex_home: Path,
+    *,
+    parent_id: str,
+    root_started_at: float,
+    allowed_child_id: str | None,
+) -> bool:
+    """Scan Windows sessions without POSIX dir_fd APIs."""
+    sessions = codex_home / "sessions"
+    state = {"entries": 0, "candidates": 0, "bytes": 0}
+    cutoff = _scan_cutoff(root_started_at)
+    valid_children = 0
+
+    def scan(directory: Path, depth: int, parts: tuple[str, ...]) -> None:
+        nonlocal valid_children
+        if depth > MAX_SCAN_DEPTH:
+            raise _ScanExhausted
+        try:
+            with os.scandir(directory) as iterator:
+                entries = sorted(iterator, key=lambda entry: entry.name)
+        except OSError as exc:
+            raise _ScanRejected from exc
+        for entry in entries:
+                state["entries"] += 1
+                if state["entries"] > MAX_SCAN_ENTRIES:
+                    raise _ScanExhausted
+                try:
+                    # DirEntry.stat() returns zero device/inode fields on some
+                    # Windows filesystems; use the path stat so the later
+                    # open/read identity check compares like with like.
+                    info = os.stat(entry.path, follow_symlinks=False)
+                except OSError as exc:
+                    raise _ScanRejected from exc
+                if stat.S_ISLNK(info.st_mode):
+                    continue
+                name = entry.name
+                if stat.S_ISDIR(info.st_mode):
+                    child_parts = parts + (name,)
+                    if _prunable_subtree(child_parts, cutoff):
+                        continue
+                    child = directory / name
+                    scan(child, depth + 1, child_parts)
+                    try:
+                        after = child.stat(follow_symlinks=False)
+                    except OSError as exc:
+                        raise _ScanRejected from exc
+                    if _directory_identity(after) != _directory_identity(info):
+                        raise _ScanRejected
+                    continue
+                if not stat.S_ISREG(info.st_mode) or not name.endswith(".jsonl"):
+                    continue
+                if info.st_mtime + SCAN_MTIME_SLOP_SECONDS < root_started_at:
+                    continue
+                state["candidates"] += 1
+                state["bytes"] += info.st_size
+                if (
+                    state["candidates"] > MAX_SCAN_CANDIDATES
+                    or state["bytes"] > MAX_SCAN_BYTES
+                ):
+                    raise _ScanExhausted
+                if info.st_size > MAX_TRANSCRIPT_BYTES:
+                    raise _ScanRejected
+                events = _read_scanned_jsonl(directory, name, info)
+                status = _linked_child_status(
+                    events,
+                    parent_id=parent_id,
+                    root_started_at=root_started_at,
+                    allowed_child_id=allowed_child_id,
+                )
+                if status < 0:
+                    raise _ScanRejected
+                valid_children += status
+
+    try:
+        root_info = sessions.lstat()
+        if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
+            return False
+        home = codex_home.resolve(strict=True)
+        if not sessions.resolve(strict=True).is_relative_to(home):
+            return False
+        scan(sessions, 0, ())
+        after = sessions.lstat()
+        if _directory_identity(after) != _directory_identity(root_info):
+            return False
+    except (OSError, _ScanRejected):
+        return False
+    return valid_children == 1
+
+
 def _intrinsic_child_review_proven(
     codex_home: Path,
     *,
@@ -671,10 +776,15 @@ def _intrinsic_child_review_proven(
     root_started_at: float,
     allowed_child_id: str | None,
 ) -> bool:
+    if os.name == "nt":
+        return _intrinsic_child_review_proven_windows(
+            codex_home,
+            parent_id=parent_id,
+            root_started_at=root_started_at,
+            allowed_child_id=allowed_child_id,
+        )
     getuid = getattr(os, "getuid", None)
-    if getuid is None:
-        return False
-    current_uid = getuid()
+    current_uid = getuid() if getuid is not None else None
     sessions = codex_home / "sessions"
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     root_fd: int | None = None
@@ -701,7 +811,7 @@ def _intrinsic_child_review_proven(
                 info = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
             except OSError as exc:
                 raise _ScanRejected from exc
-            if stat.S_ISLNK(info.st_mode) or info.st_uid != current_uid:
+            if stat.S_ISLNK(info.st_mode) or not _same_owner(info, current_uid):
                 continue
             if stat.S_ISDIR(info.st_mode):
                 child_parts = parts + (name,)
@@ -716,7 +826,7 @@ def _intrinsic_child_review_proven(
                     opened = os.fstat(child_fd)
                     if (
                         (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino)
-                        or opened.st_uid != current_uid
+                        or not _same_owner(opened, current_uid)
                     ):
                         raise _ScanRejected
                     scan(child_fd, depth + 1, child_parts)
@@ -756,7 +866,7 @@ def _intrinsic_child_review_proven(
         if (
             stat.S_ISLNK(root_info.st_mode)
             or not stat.S_ISDIR(root_info.st_mode)
-            or root_info.st_uid != current_uid
+            or not _same_owner(root_info, current_uid)
         ):
             return False
         home = codex_home.resolve(strict=True)
@@ -766,7 +876,7 @@ def _intrinsic_child_review_proven(
         opened = os.fstat(root_fd)
         if (
             (opened.st_dev, opened.st_ino) != (root_info.st_dev, root_info.st_ino)
-            or opened.st_uid != current_uid
+            or not _same_owner(opened, current_uid)
         ):
             return False
         scan(root_fd, 0, ())

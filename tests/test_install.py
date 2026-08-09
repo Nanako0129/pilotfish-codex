@@ -27,6 +27,7 @@ from hook_registration import (  # noqa: E402
     merge_registration,
     projection_digest,
     strict_json_loads,
+    windows_compatibility_warnings,
 )
 from install import (  # noqa: E402
     InstallAbort,
@@ -48,6 +49,31 @@ def _write_registration(path: Path, document: dict[str, object]) -> None:
 
 
 class HookRegistrationTests(unittest.TestCase):
+    def test_windows_warning_identifies_unix_only_foreign_hook(self) -> None:
+        document = {"hooks": {"Stop": [_foreign_group("/bin/foreign")]}}
+        warnings = windows_compatibility_warnings(document)
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("hooks.Stop[0].hooks[0]", warnings[0])
+        self.assertIn("commandWindows", warnings[0])
+        self.assertIn("/bin/foreign", warnings[0])
+        self.assertIn("preserved it", warnings[0])
+
+    def test_windows_warning_ignores_windows_aware_and_non_command_handlers(self) -> None:
+        document = {
+            "hooks": {
+                "Stop": [
+                    {
+                        "matcher": "aware",
+                        "hooks": [
+                            {"type": "command", "command": "/x", "commandWindows": "x.exe"},
+                            {"type": "prompt", "command": "/not-a-command"},
+                        ],
+                    }
+                ]
+            }
+        }
+        self.assertEqual(windows_compatibility_warnings(document), [])
+
     def test_strict_parser_rejects_duplicates_non_finite_and_malformed_shapes(self) -> None:
         invalid = (
             '{"hooks":{},"hooks":{}}',

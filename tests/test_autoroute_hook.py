@@ -208,8 +208,9 @@ class AutorouteHookTests(unittest.TestCase):
             self.assertEqual(marker["required_task"], "automatic_plan_review")
             self.assertFalse(marker["attempted"])
             self.assertNotIn("credential migration", markers[0].read_text())
-            self.assertEqual(stat.S_IMODE(marker_dir.stat().st_mode), 0o700)
-            self.assertEqual(stat.S_IMODE(markers[0].stat().st_mode), 0o600)
+            if os.name != "nt":
+                self.assertEqual(stat.S_IMODE(marker_dir.stat().st_mode), 0o700)
+                self.assertEqual(stat.S_IMODE(markers[0].stat().st_mode), 0o600)
 
     def test_ordinary_prompt_clears_stale_session_marker(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

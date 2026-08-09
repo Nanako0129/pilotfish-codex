@@ -5,6 +5,15 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
+## v1.6.2 — 2026-08-09
+
+- Fix Windows hook marker handling without requiring POSIX file-mode semantics.
+- Add a Windows path-based session scanner for environments without Unix
+  `dir_fd` APIs while retaining bounded, fail-closed transcript validation.
+- Warn about preserved command hooks that lack `commandWindows` and keep the
+  native Windows hook launch path explicit.
+- Expand Python CI validation to Ubuntu, macOS, and Windows runners.
+
 ## v1.6.1 — 2026-08-07
 
 - Add a review-service circuit breaker so missing reviewer or verifier receipts
@@ -27,7 +36,6 @@ are noted only as source references.
   quality floor with a non-negative paired confidence bound.
 - Preserve the Codex compatibility floor `>=0.146.0`; later releases remain
   accepted and are evaluated by runtime evidence.
-
 ## v1.5.1 — 2026-08-06
 
 - Stop hard-pinning the installer to one Codex release; require only the
