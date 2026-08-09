@@ -27,6 +27,12 @@ The policy also applies a grounding floor to prevent unsupported guessing, a
 stopping ceiling to prevent runaway analysis, and a `direction_checkpoint` to
 decide whether to continue, pivot, roll back, or ask for more input.
 
+In v1.6.0, an explicit current-turn request can also choose review intent:
+`fast` skips optional review overhead, `default` follows the risk policy, and
+`strict` expands review and verification. This signal never overrides required
+approval or safety gates. The offline Matrix and quality-adjusted cost metric
+are documented in the [1.6.0 spec](./docs/specs/intent-aware-review-routing-1-6-0/SPEC.md).
+
 ## From intent to roles
 
 Intent routing chooses the interaction shape. The original Pilotfish role
@@ -126,6 +132,12 @@ py -3 install/install.py --dry-run --codex-home $codexHome
 py -3 install/install.py --codex-home $codexHome
 ```
 
+If an explicitly approved upstream replacement is needed for a customized
+same-name role, add `--replace-drifted-role <role>` to both commands. Repeat
+the option for multiple roles; use `--replace-drifted-roles` only when all
+drifted roles are intentionally being aligned. Role validation and
+post-install fingerprint verification remain enabled.
+
 The installer adds the native seven-role manifest and the Pilotfish routing
 hook. Trust the hook in a new interactive Codex session after installation.
 
@@ -146,6 +158,7 @@ prompt is in [INSTALL_PROMPT.md](./INSTALL_PROMPT.md).
 | Adaptive routing design | [EXPERIMENT.md](./docs/specs/adaptive-intent-routing/EXPERIMENT.md) |
 | Adaptive routing results | [EXPERIMENT-RESULTS.md](./docs/specs/adaptive-intent-routing/EXPERIMENT-RESULTS.md) |
 | Live experiment protocol | [LIVE-EXPERIMENT.md](./docs/specs/adaptive-intent-routing/LIVE-EXPERIMENT.md) |
+| 1.6.0 intent runtime and live evidence | [intent-aware spec](./docs/specs/intent-aware-review-routing-1-6-0/SPEC.md) |
 | Usage-routing benchmark | [benchmark README](./docs/benchmarks/usage-routing-v1/README.md) |
 | Native verification | [verification README](./docs/verification/README.md) |
 | Traditional Chinese entry | [docs/README.zh-TW.md](./docs/README.zh-TW.md) |

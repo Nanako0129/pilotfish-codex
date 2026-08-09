@@ -183,6 +183,15 @@ class SwitchCostTests(unittest.TestCase):
         self.assertTrue(result["cost_saving"])
         self.assertTrue(result["proven"])
 
+    def test_cohort_uses_equivalent_cost_when_both_arms_provide_it(self) -> None:
+        cases = self._cases()
+        for case in cases:
+            case["baseline"]["equivalent_cost"] = 1.0
+            case["switched"]["equivalent_cost"] = 0.8
+        result = scorecard.score_switch_cohort(cases, bootstrap_samples=100)
+        self.assertEqual(result["cost_basis"], "equivalent_cost")
+        self.assertTrue(result["quality_adjusted_cost_efficiency"]["maximizes_cost_efficiency"])
+
     def test_negative_incremental_findings_are_fail_closed_evidence(self) -> None:
         result = scorecard.score_switch_cost_performance(
             additional_findings=-1,
@@ -197,6 +206,31 @@ class SwitchCostTests(unittest.TestCase):
         self.assertEqual(result["score"], 5)
         self.assertLess(result["switch_value"], 0)
         self.assertFalse(result["proven"])
+
+    def test_quality_adjusted_cost_efficiency_requires_quality_floor(self) -> None:
+        result = scorecard.quality_adjusted_cost_efficiency(
+            baseline_quality=70,
+            switched_quality=80,
+            baseline_cost=1.0,
+            switched_cost=1.1,
+            quality_delta_ci_low=2.0,
+        )
+        self.assertTrue(result["quality_supported"])
+        self.assertGreater(result["switched_efficiency"], 0)
+        self.assertGreater(result["efficiency_delta"], 0)
+        self.assertTrue(result["maximizes_cost_efficiency"])
+
+    def test_quality_adjusted_cost_efficiency_rejects_cheaper_lower_quality(self) -> None:
+        result = scorecard.quality_adjusted_cost_efficiency(
+            baseline_quality=80,
+            switched_quality=60,
+            baseline_cost=1.0,
+            switched_cost=0.5,
+            quality_delta_ci_low=-5.0,
+        )
+        self.assertFalse(result["quality_supported"])
+        self.assertEqual(result["switched_efficiency"], 0.0)
+        self.assertFalse(result["maximizes_cost_efficiency"])
 
 
 if __name__ == "__main__":

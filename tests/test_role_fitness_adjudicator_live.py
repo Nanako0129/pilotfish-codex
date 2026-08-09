@@ -48,6 +48,20 @@ class AdjudicatorLiveContractTests(unittest.TestCase):
             {"supported_findings", "quality_score", "weighted_tokens", "wall_seconds", "status", "false_escalation"},
         )
 
+    def test_report_arm_does_not_require_optional_risk_coverage(self) -> None:
+        projected = runner._report_arm(
+            {
+                "supported_findings": 0,
+                "quality_score": 75,
+                "weighted_tokens": 10,
+                "wall_seconds": 2,
+                "status": "accepted",
+                "false_escalation": False,
+            },
+            include_status=True,
+        )
+        self.assertNotIn("risk_coverage", projected)
+
     def test_adjudicator_prompt_does_not_expose_model_identity(self) -> None:
         prompt = runner._adjudicator_prompt("Plan", {"decision": "READY"}, {"decision": "REVISE"})
         self.assertIn("Verdict A", prompt)

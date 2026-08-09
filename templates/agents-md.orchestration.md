@@ -1,5 +1,5 @@
 <!-- pilotfish-codex:begin -->
-<!-- pilotfish-codex v1.5.1 -->
+<!-- pilotfish-codex v1.6.1 -->
 <!-- markdownlint-disable-next-line MD041 -->
 ### Orchestration
 
@@ -69,6 +69,38 @@ ambiguity separate from technical uncertainty and authority/risk uncertainty.
 Clear intent does not require `explore_then_plan` by itself: a bounded release
 request may remain `execute` with `next_gate=approval`. The approval gate
 controls authority; the route controls the interaction shape.
+
+#### Turn-scoped review intent
+
+Keep `review_intent` separate from `task_mode`. A clear explicit preference in
+the current prompt may be `fast`, `default`, or `strict`; it never changes the
+task's impact, reversibility, approval, or authority classification.
+
+- `fast` skips optional review, extra Sol calls, and non-required reasoning on
+  non-mandatory work. User-named tests and existing safety or approval gates
+  still run.
+- `default` uses the existing risk policy and is the fallback when no clear
+  preference is present.
+- `strict` requests the complete primary review/test path. It permits one
+  Luna baseline plus one Sol adjudicator only after a fingerprinted semantic
+  disagreement; strict does not mean always-Sol.
+
+The preference is turn-scoped. Do not infer it from task wording, quoted
+examples, negation, or vague urgency. Conflicting or ambiguous cues fall back
+to `default`. Pilotfish may emit a redacted, versioned advisory signal for
+`codex-auto-review`, but that scheduler owns optional child creation. A
+missing consumer never weakens mandatory controls.
+
+The precedence is:
+
+```text
+explicit current-turn review_intent > existing risk policy > Luna-first default
+```
+
+Host permission and approval controls remain authoritative for external,
+release, destructive, and irreversible operations. The existing Stop hook
+continues to require the exact `automatic_plan_review` readiness contract;
+`semantic_adjudication` evidence cannot satisfy that gate.
 
 Record these logical signals in the internal route decision:
 
@@ -145,6 +177,19 @@ obviously incomplete or the user did not name an agent. If typed delegation is
 unavailable, report that verification is unavailable and do not substitute a
 local readiness judgment.
 
+#### Review-service circuit breaker
+
+Treat a missing or timed-out `plan-verifier`, `security-reviewer`, or `verifier`
+receipt as a service-availability failure, not as a user decision. Allow one
+bounded retry for the same stable unit and typed role. If the retry also has no
+valid receipt, stop dispatching that role for the unit and record the state:
+`WAITING_FOR_REVIEW` for plan or security readiness, or `PAUSED_VERIFICATION`
+for outcome or direction verification. Do not loop, issue an unchanged retry,
+claim `READY` or `CONFIRMED`, or emit `PAUSED_NEEDS_USER` solely because the
+service is unavailable. Preserve read-only local work and block only the
+affected write or claim; unrelated approved safe slices may continue. Resume
+from the recorded gate when a valid receipt or a genuine user decision arrives.
+
 For large, ambiguous, architectural, risky, or explicitly plan-first work, use
 this lifecycle:
 
@@ -205,7 +250,9 @@ incomplete. Continue working, or explicitly emit `PAUSED_NEEDS_USER` with the
 blocker, one concise question, and the resume point. If the user explicitly
 requests a pause, honor it without inventing a blocker or question and state the
 active objective, current phase or slice, and exact resume point. The pause
-remains in force through status or explanation requests until the user
+A review-service circuit-breaker state uses `WAITING_FOR_REVIEW` or
+`PAUSED_VERIFICATION` with no question when no user decision is pending. The
+pause remains in force through status or explanation requests until the user
 explicitly asks to resume or new input clearly supersedes the objective. This
 liveness invariant does not expand approval, security, destructive-action,
 external-action, or scope boundaries.

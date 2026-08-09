@@ -229,6 +229,55 @@ def score_switch_cost_performance(
     }
 
 
+def quality_adjusted_cost_efficiency(
+    *,
+    baseline_quality: float,
+    switched_quality: float,
+    baseline_cost: float,
+    switched_cost: float,
+    quality_delta_ci_low: float,
+) -> dict[str, Any]:
+    """Measure cost efficiency only after the baseline quality floor holds.
+
+    The metric is deliberately separate from the fail-closed switch score. A
+    cheaper but lower-quality route gets no efficiency credit, while a route
+    that is quality-supported is compared by quality points per cost unit.
+    """
+    values = {
+        "baseline_quality": baseline_quality,
+        "switched_quality": switched_quality,
+        "baseline_cost": baseline_cost,
+        "switched_cost": switched_cost,
+        "quality_delta_ci_low": quality_delta_ci_low,
+    }
+    if any(
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+        for value in values.values()
+    ):
+        raise ValueError("quality-adjusted efficiency inputs must be finite numbers")
+    if baseline_cost <= 0 or switched_cost <= 0:
+        raise ValueError("quality-adjusted efficiency costs must be positive")
+
+    quality_supported = (
+        switched_quality >= baseline_quality and quality_delta_ci_low >= 0
+    )
+    baseline_efficiency = baseline_quality / baseline_cost
+    switched_efficiency = (
+        switched_quality / switched_cost if quality_supported else 0.0
+    )
+    efficiency_delta = switched_efficiency - baseline_efficiency
+    return {
+        "quality_floor": baseline_quality,
+        "quality_supported": quality_supported,
+        "baseline_efficiency": baseline_efficiency,
+        "switched_efficiency": switched_efficiency,
+        "efficiency_delta": efficiency_delta,
+        "maximizes_cost_efficiency": quality_supported and efficiency_delta >= 0,
+    }
+
+
 def _percentile(values: list[float], probability: float) -> float:
     if not values or not 0 <= probability <= 1:
         raise ValueError("invalid percentile input")
@@ -263,12 +312,22 @@ def score_switch_cohort(
         "false_escalation",
     }
     ids: set[str] = set()
+    use_equivalent_cost = all(
+        isinstance(row, Mapping)
+        and isinstance(row.get("baseline"), Mapping)
+        and isinstance(row.get("switched"), Mapping)
+        and "equivalent_cost" in row["baseline"]
+        and "equivalent_cost" in row["switched"]
+        for row in rows
+    )
     quality_deltas: list[float] = []
     finding_deltas: list[int] = []
     baseline_tokens: list[float] = []
     switched_tokens: list[float] = []
     baseline_wall: list[float] = []
     switched_wall: list[float] = []
+    baseline_costs: list[float] = []
+    switched_costs: list[float] = []
     coverage_deltas: list[float] = []
     false_escalations = 0
     inconclusive = 0
@@ -279,7 +338,13 @@ def score_switch_cohort(
         arms: list[Mapping[str, Any]] = []
         for name in ("baseline", "switched"):
             arm = row[name]
-            if not isinstance(arm, Mapping) or set(arm) not in (nested, nested | {"risk_coverage"}):
+            allowed_shapes = (
+                nested,
+                nested | {"risk_coverage"},
+                nested | {"equivalent_cost"},
+                nested | {"risk_coverage", "equivalent_cost"},
+            )
+            if not isinstance(arm, Mapping) or set(arm) not in allowed_shapes:
                 raise ValueError("matched cohort arm schema is invalid")
             if "risk_coverage" in arm:
                 coverage = arm["risk_coverage"]
@@ -293,6 +358,15 @@ def score_switch_cohort(
                     raise ValueError("matched cohort metric is invalid")
             if arm["weighted_tokens"] <= 0 or arm["wall_seconds"] <= 0:
                 raise ValueError("matched cohort usage must be positive")
+            if "equivalent_cost" in arm:
+                cost = arm["equivalent_cost"]
+                if (
+                    isinstance(cost, bool)
+                    or not isinstance(cost, (int, float))
+                    or not math.isfinite(cost)
+                    or cost <= 0
+                ):
+                    raise ValueError("matched cohort equivalent cost is invalid")
             arms.append(arm)
         baseline, switched = arms
         if baseline["status"] != "accepted" or switched["status"] != "accepted":
@@ -303,6 +377,12 @@ def score_switch_cohort(
         switched_tokens.append(float(switched["weighted_tokens"]))
         baseline_wall.append(float(baseline["wall_seconds"]))
         switched_wall.append(float(switched["wall_seconds"]))
+        if use_equivalent_cost:
+            baseline_costs.append(float(baseline["equivalent_cost"]))
+            switched_costs.append(float(switched["equivalent_cost"]))
+        else:
+            baseline_costs.append(float(baseline["weighted_tokens"]) / 100_000)
+            switched_costs.append(float(switched["weighted_tokens"]) / 100_000)
         if "risk_coverage" in baseline and "risk_coverage" in switched and (risk_case_ids is None or row["case_id"] in risk_case_ids):
             coverage_deltas.append((float(switched["risk_coverage"]) - float(baseline["risk_coverage"])) * 100)
         false_escalations += int(switched["false_escalation"])
@@ -331,8 +411,23 @@ def score_switch_cohort(
         false_escalations=false_escalations,
         inconclusive=inconclusive,
     )
+    quality_efficiency = quality_adjusted_cost_efficiency(
+        baseline_quality=sum(
+            float(row["baseline"]["quality_score"]) for row in rows
+        )
+        / len(rows),
+        switched_quality=sum(
+            float(row["switched"]["quality_score"]) for row in rows
+        )
+        / len(rows),
+        baseline_cost=sum(baseline_costs),
+        switched_cost=sum(switched_costs),
+        quality_delta_ci_low=quality_ci_low,
+    )
     return {
         **score,
+        "quality_adjusted_cost_efficiency": quality_efficiency,
+        "cost_basis": "equivalent_cost" if use_equivalent_cost else "weighted_token_proxy",
         "cases": len(rows),
         "additional_findings": sum(finding_deltas),
         "extra_weighted_tokens": extra_tokens,

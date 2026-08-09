@@ -15,7 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA = 1
+SCHEMA = 2
+REQUIRED_TASK = "automatic_plan_review"
 MARKER_DIRECTORY = ".pilotfish-autoroute-gate"
 MAX_HOOK_INPUT_BYTES = 1_048_576
 MAX_PROMPT_CHARS = 65_536
@@ -31,8 +32,14 @@ IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._:-]{1,256}$")
 TASK_NAME_RE = re.compile(r"^[a-z0-9_]+$")
 
 BLOCK_REASON = (
-    "Required independent Plan review is missing. Call the typed "
-    "plan-verifier role now, wait for its result, and then continue."
+    "Status: WAITING_FOR_REVIEW. Required independent Plan review is missing. "
+    "This is an internal review dependency, not a user decision. Call the "
+    "typed plan-verifier role now, wait for its result, and then continue "
+    "from the review gate. Until a valid result arrives, allow only "
+    "read-only local inspection or preparation; do not create, rotate, or "
+    "revoke credentials, modify secrets or variables, push, deploy, or make "
+    "any other external or irreversible write. Do not emit PAUSED_NEEDS_USER "
+    "or ask the user solely because this review is pending."
 )
 BLOCK_OUTPUT = {"decision": "block", "reason": BLOCK_REASON}
 
@@ -71,7 +78,34 @@ _CATEGORY_PATTERNS = {
     ),
 }
 _MARKER_KEYS = frozenset(
-    {"schema", "session_id", "turn_id", "categories", "attempted"}
+    {"schema", "session_id", "turn_id", "categories", "required_task", "attempted"}
+)
+_REVIEW_INTENT_PATTERNS = {
+    "fast": re.compile(
+        r"(?:快一點|快點|省時間|省錢|節省(?:時間|成本|token)|"
+        r"不要額外(?:審查|review|思考)|先不要額外(?:審查|review)|"
+        r"as fast as possible|save (?:time|money|tokens)|"
+        r"minimi[sz]e cost|skip (?:the )?extra review)",
+        re.IGNORECASE,
+    ),
+    "strict": re.compile(
+        r"(?:嚴格(?:審查|review)|完整(?:驗證|測試|審查)|全面(?:審查|驗證)|"
+        r"thorough(?:ly)? review|strict review|full verification|"
+        r"test thoroughly|be rigorous)",
+        re.IGNORECASE,
+    ),
+    "default": re.compile(
+        r"(?:照預設|按預設模式|依照預設|use the default|default mode)",
+        re.IGNORECASE,
+    ),
+}
+_REVIEW_INTENT_NEGATION = re.compile(
+    r"(?:不要|別|不必|do not|don't|never)\s*"
+    r"(?:快|快速|quick|strict|嚴格|完整|thorough|rigorous)",
+    re.IGNORECASE,
+)
+_QUOTED_SEGMENT = re.compile(
+    r'"[^"\n]*"|\'[^\'\n]*\'|`[^`\n]*`|「[^」\n]*」|『[^』\n]*』'
 )
 
 
@@ -92,6 +126,60 @@ def classify_prompt(prompt: object) -> tuple[str, ...]:
             if pattern.search(prompt) is not None
         )
     )
+
+
+def classify_review_intent(prompt: object) -> str | None:
+    """Extract only clear explicit review preferences from a user prompt.
+
+    This is intentionally narrower than task or risk classification. Quoted
+    examples, negated cues, and conflicting preferences abstain to the normal
+    risk policy instead of guessing a mode.
+    """
+    if not isinstance(prompt, str) or len(prompt) > MAX_PROMPT_CHARS:
+        return None
+    text = _QUOTED_SEGMENT.sub(" ", prompt)
+    if _REVIEW_INTENT_NEGATION.search(text):
+        return None
+    matches = [
+        intent
+        for intent, pattern in _REVIEW_INTENT_PATTERNS.items()
+        if pattern.search(text) is not None
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _review_intent_output(
+    payload: dict[str, Any],
+    intent: str | None,
+    categories: tuple[str, ...],
+) -> dict[str, Any] | None:
+    if intent is None:
+        return None
+    optional_review = {
+        "fast": "skip",
+        "default": "existing_policy",
+        "strict": "expanded",
+    }[intent]
+    signal = {
+        "schema": 1,
+        "session_id": payload["session_id"],
+        "turn_id": payload["turn_id"],
+        "review_intent": intent,
+        "source": "explicit",
+        "scope": "turn",
+        "confidence": "clear",
+        "risk_categories": list(categories),
+        "optional_review": optional_review,
+    }
+    context = "Pilotfish review intent signal: " + json.dumps(
+        signal, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": context,
+        }
+    }
 
 
 def requires_sol_review(categories: tuple[str, ...]) -> bool:
@@ -240,6 +328,7 @@ def _load_marker(codex_home: Path, session_id: str) -> dict[str, Any] | None:
         or marker.get("session_id") != session_id
         or not _valid_identifier(marker.get("turn_id"))
         or not isinstance(marker.get("attempted"), bool)
+        or marker.get("required_task") != REQUIRED_TASK
         or not isinstance(categories, list)
         or categories != sorted(set(categories))
         or any(category not in _CATEGORY_PATTERNS for category in categories)
@@ -743,6 +832,8 @@ def _direct_child_filter(
             or arguments.get("fork_turns") not in {"none", "1", "2", "3"}
         ):
             return False, None
+        if arguments["task_name"] != REQUIRED_TASK:
+            return False, None
         call_id = payload.get("call_id")
         if isinstance(call_id, str) and call_id:
             calls.append((index, call_id))
@@ -771,27 +862,33 @@ def _direct_child_filter(
     return True, child_id
 
 
-def _handle_prompt(payload: dict[str, Any], codex_home: Path) -> None:
+def _handle_prompt(payload: dict[str, Any], codex_home: Path) -> dict[str, Any] | None:
     session_id = payload.get("session_id")
     turn_id = payload.get("turn_id")
     if not _valid_identifier(session_id):
-        return
+        return None
     if payload.get("agent_id") is not None or payload.get("agent_type") is not None:
         _remove_marker(codex_home, session_id)
-        return
+        return None
     categories = classify_prompt(payload.get("prompt"))
-    if not _valid_identifier(turn_id) or not requires_sol_review(categories):
+    intent = classify_review_intent(payload.get("prompt"))
+    if not _valid_identifier(turn_id):
         _remove_marker(codex_home, session_id)
-        return
-    marker = {
-        "schema": SCHEMA,
-        "session_id": session_id,
-        "turn_id": turn_id,
-        "categories": list(categories),
-        "attempted": False,
-    }
-    if not _atomic_marker_write(codex_home, marker):
+        return None
+    if requires_sol_review(categories):
+        marker = {
+            "schema": SCHEMA,
+            "session_id": session_id,
+            "turn_id": turn_id,
+            "categories": list(categories),
+            "required_task": REQUIRED_TASK,
+            "attempted": False,
+        }
+        if not _atomic_marker_write(codex_home, marker):
+            _remove_marker(codex_home, session_id)
+    else:
         _remove_marker(codex_home, session_id)
+    return _review_intent_output(payload, intent, categories)
 
 
 def _handle_stop(payload: dict[str, Any], codex_home: Path) -> dict[str, str] | None:
@@ -853,8 +950,7 @@ def handle(
     home = codex_home or Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
     event = payload.get("hook_event_name")
     if event == "UserPromptSubmit":
-        _handle_prompt(payload, home)
-        return None
+        return _handle_prompt(payload, home)
     if event == "Stop":
         return _handle_stop(payload, home)
     return None

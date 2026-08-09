@@ -5,6 +5,29 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
+## v1.6.1 — 2026-08-07
+
+- Add a review-service circuit breaker so missing reviewer or verifier receipts
+  receive one bounded retry and then enter an explicit waiting state.
+- Clarify that review-service loss is not a user decision and does not permit
+  readiness, verification, credential, or external-write claims.
+- Improve installer recovery for explicitly approved upstream role replacement,
+  with per-role and all-role options, backups, and retained fingerprint checks.
+- Make the Stop hook expose the read-only boundary while an independent review
+  is pending.
+
+## v1.6.0 — 2026-08-06
+
+- Add turn-scoped `review_intent` routing for explicit fast, default, and
+  strict requests without weakening mandatory gates.
+- Keep Pilotfish as an advisory signal producer while optional review
+  scheduling remains owned by the auto-review consumer.
+- Add a 60-case offline intent Matrix and quality-adjusted cost efficiency:
+  quality points divided by equivalent cost, credited only above the baseline
+  quality floor with a non-negative paired confidence bound.
+- Preserve the Codex compatibility floor `>=0.146.0`; later releases remain
+  accepted and are evaluated by runtime evidence.
+
 ## v1.5.1 — 2026-08-06
 
 - Stop hard-pinning the installer to one Codex release; require only the

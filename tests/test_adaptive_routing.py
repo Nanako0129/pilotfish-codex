@@ -125,6 +125,58 @@ class AdaptiveRoutingTests(unittest.TestCase):
             },
         )
 
+    def test_review_intent_fields_are_scored_without_changing_task_mode(self) -> None:
+        corpus = json.loads(json.dumps(self.route_corpus))
+        intents = ("default", "fast", "strict")
+        decisions = self._perfect_route_decisions()
+        for index, (case, decision) in enumerate(zip(corpus["cases"], decisions)):
+            intent = intents[index % len(intents)]
+            optional_review = {
+                "fast": "skip",
+                "default": "existing_policy",
+                "strict": "expanded",
+            }[intent]
+            fields = {
+                "review_intent": intent,
+                "review_intent_source": "explicit",
+                "review_intent_scope": "turn",
+                "optional_review": optional_review,
+            }
+            case["expected"].update(fields)
+            decision.update(fields)
+
+        report = evaluate_route(corpus, decisions)
+
+        self.assertTrue(report["passed"])
+        self.assertEqual(report["review_intent"]["accuracy"], 1.0)
+
+    def test_review_intent_rejects_session_scope_and_unknown_mode(self) -> None:
+        corpus = json.loads(json.dumps(self.route_corpus))
+        for case in corpus["cases"]:
+            case["expected"].update(
+                {
+                    "review_intent": "default",
+                    "review_intent_source": "explicit",
+                    "review_intent_scope": "turn",
+                    "optional_review": "existing_policy",
+                }
+            )
+        decisions = self._perfect_route_decisions()
+        for decision in decisions:
+            decision.update(
+                {
+                    "review_intent": "default",
+                    "review_intent_source": "explicit",
+                    "review_intent_scope": "session",
+                    "optional_review": "existing_policy",
+                }
+            )
+
+        report = evaluate_route(corpus, decisions)
+
+        self.assertFalse(report["passed"])
+        self.assertEqual(report["invalid_decisions"]["malformed"], len(decisions))
+
     def test_route_rejects_overconfident_and_missing_card_decisions(self) -> None:
         decisions = self._perfect_route_decisions()
         decisions[5]["abstain"] = False

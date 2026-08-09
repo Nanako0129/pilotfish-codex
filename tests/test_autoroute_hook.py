@@ -131,6 +131,62 @@ def child_events(
 
 
 class AutorouteHookTests(unittest.TestCase):
+    def test_missing_review_block_explains_wait_state_and_write_boundary(self) -> None:
+        self.assertIn("Status: WAITING_FOR_REVIEW", gate.BLOCK_REASON)
+        self.assertIn("not a user decision", gate.BLOCK_REASON)
+        self.assertIn("read-only local inspection or preparation", gate.BLOCK_REASON)
+        self.assertIn("do not create, rotate, or revoke credentials", gate.BLOCK_REASON)
+        self.assertIn("Do not emit PAUSED_NEEDS_USER", gate.BLOCK_REASON)
+
+    def test_explicit_review_intent_is_redacted_and_turn_scoped(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "codex-home"
+            home.mkdir()
+            payload = gate.handle(
+                prompt_input("快一點處理，先不要額外審查這個本地修改。"),
+                codex_home=home,
+            )
+
+            self.assertIsInstance(payload, dict)
+            context = payload["hookSpecificOutput"]["additionalContext"]
+            self.assertIn('"review_intent":"fast"', context)
+            self.assertIn('"scope":"turn"', context)
+            self.assertNotIn("本地修改", context)
+
+            gate.handle(
+                prompt_input("請修正下一回合的拼字。", turn_id="next-turn"),
+                codex_home=home,
+            )
+            self.assertIsNone(
+                gate.handle(
+                    prompt_input("請修正下一回合的拼字。", turn_id="next-turn"),
+                    codex_home=home,
+                )
+            )
+
+    def test_ambiguous_or_quoted_review_intent_falls_back_to_default(self) -> None:
+        prompts = (
+            "不要為了快而跳過驗證，請先說明。",
+            "請把『嚴格審查』當成文件範例，不要改變這次模式。",
+            "先快一點，但也請完整嚴格審查。",
+        )
+        for prompt in prompts:
+            with self.subTest(prompt=prompt):
+                self.assertIsNone(gate.classify_review_intent(prompt))
+
+    def test_strict_intent_preserves_mandatory_review_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "codex-home"
+            home.mkdir()
+            payload = gate.handle(
+                prompt_input("請完整嚴格審查這個跨服務 production credential migration Plan。"),
+                codex_home=home,
+            )
+            self.assertIn('"review_intent":"strict"', payload["hookSpecificOutput"]["additionalContext"])
+            marker = next((home / gate.MARKER_DIRECTORY).glob("*.json"))
+            value = json.loads(marker.read_text(encoding="utf-8"))
+            self.assertEqual(value["required_task"], "automatic_plan_review")
+
     def test_marker_is_private_redacted_and_category_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "codex-home"
@@ -144,11 +200,12 @@ class AutorouteHookTests(unittest.TestCase):
             marker = json.loads(markers[0].read_text(encoding="utf-8"))
             self.assertEqual(
                 set(marker),
-                {"schema", "session_id", "turn_id", "categories", "attempted"},
+                {"schema", "session_id", "turn_id", "categories", "required_task", "attempted"},
             )
             self.assertEqual(marker["session_id"], SESSION)
             self.assertEqual(marker["turn_id"], TURN)
             self.assertEqual(marker["categories"], sorted(marker["categories"]))
+            self.assertEqual(marker["required_task"], "automatic_plan_review")
             self.assertFalse(marker["attempted"])
             self.assertNotIn("credential migration", markers[0].read_text())
             self.assertEqual(stat.S_IMODE(marker_dir.stat().st_mode), 0o700)
@@ -199,6 +256,54 @@ class AutorouteHookTests(unittest.TestCase):
                         },
                     },
                 ],
+            )
+
+            self.assertEqual(
+                gate.handle(stop_input(transcript), codex_home=home),
+                gate.BLOCK_OUTPUT,
+            )
+
+    def test_semantic_adjudication_cannot_satisfy_readiness_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "codex-home"
+            home.mkdir()
+            transcript = home / "sessions" / "rollout.jsonl"
+            gate.handle(prompt_input(TRIGGER), codex_home=home)
+            write_events(
+                transcript,
+                [
+                    session_meta(),
+                    {
+                        "type": "response_item",
+                        "payload": {
+                            "type": "function_call",
+                            "name": "spawn_agent",
+                            "call_id": "adjudication-call",
+                            "arguments": json.dumps(
+                                {
+                                    "message": "Resolve the fingerprinted Luna disagreement.",
+                                    "agent_type": "plan-verifier",
+                                    "task_name": "semantic_adjudication",
+                                    "fork_turns": "none",
+                                }
+                            ),
+                        },
+                    },
+                    task_started(),
+                    {
+                        "type": "event_msg",
+                        "payload": {
+                            "type": "sub_agent_activity",
+                            "kind": "started",
+                            "event_id": "adjudication-call",
+                            "agent_thread_id": "adjudication-child",
+                        },
+                    },
+                ],
+            )
+            write_events(
+                home / "sessions" / "adjudication-child.jsonl",
+                child_events("adjudication-child"),
             )
 
             self.assertEqual(

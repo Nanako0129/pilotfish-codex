@@ -302,6 +302,11 @@ class PolicyTests(unittest.TestCase):
             "must call `plan-verifier` before sending any readiness recommendation",
             "Do not return `READY` or `REVISE` from the main session first",
             "typed delegation is unavailable",
+            "Review-service circuit breaker",
+            "one bounded retry for the same stable unit and typed role",
+            "Do not loop",
+            "`WAITING_FOR_REVIEW` for plan or security readiness",
+            "emit `PAUSED_NEEDS_USER` solely because the service is unavailable",
         ):
             self.assertIn(phrase, policy)
 

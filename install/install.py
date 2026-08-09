@@ -773,7 +773,23 @@ def _commit(writes: list[tuple[Path, bytes, int, bytes | None]], stamp: str,
             temp.unlink(missing_ok=True)
 
 
-def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: bool = True) -> int:
+def install(
+    *,
+    source_root: Path,
+    codex_home: Path,
+    dry_run: bool,
+    check_codex: bool = True,
+    replace_drifted_roles: bool = False,
+    replace_drifted_role: tuple[str, ...] = (),
+) -> int:
+    unknown_drift_roles = set(replace_drifted_role) - set(ROLES)
+    if unknown_drift_roles:
+        raise InstallAbort(
+            "unknown drifted role: " + ", ".join(sorted(unknown_drift_roles))
+        )
+    approved_drift_roles = (
+        set(ROLES) if replace_drifted_roles else set(replace_drifted_role)
+    )
     if check_codex:
         try:
             completed = subprocess.run(["codex", "--version"], capture_output=True, text=True, check=False)
@@ -840,10 +856,14 @@ def install(*, source_root: Path, codex_home: Path, dry_run: bool, check_codex: 
         current = target.read_bytes() if target.exists() else None
         if current is not None and current != payload:
             known = CANONICAL_ROLE_UPGRADE_DIGESTS.get(role, frozenset())
-            if _sha256_bytes(current) not in known:
+            if _sha256_bytes(current) not in known and role not in approved_drift_roles:
                 raise InstallAbort(f"installed_role_drift: agents/{role}.toml requires explicit replacement approval")
             writes.append((target, payload, 0o600, current))
-            notes.append(f"upgraded canonical role {role}")
+            notes.append(
+                f"replaced drifted role {role} with upstream canonical bytes"
+                if _sha256_bytes(current) not in known
+                else f"upgraded canonical role {role}"
+            )
         elif current is None:
             writes.append((target, payload, 0o600, None))
     if policy_payload != policy_bytes:
@@ -1060,9 +1080,27 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codex-home", type=Path, default=Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--replace-drifted-roles",
+        action="store_true",
+        help="explicitly replace all customized same-name roles with upstream templates",
+    )
+    parser.add_argument(
+        "--replace-drifted-role",
+        action="append",
+        default=[],
+        choices=sorted(ROLES),
+        help="explicitly replace one named customized role; may be repeated",
+    )
     args = parser.parse_args(argv)
     try:
-        return install(source_root=Path(__file__).resolve().parents[1], codex_home=args.codex_home, dry_run=args.dry_run)
+        return install(
+            source_root=Path(__file__).resolve().parents[1],
+            codex_home=args.codex_home,
+            dry_run=args.dry_run,
+            replace_drifted_roles=args.replace_drifted_roles,
+            replace_drifted_role=tuple(args.replace_drifted_role),
+        )
     except InstallAbort as exc:
         print(f"aborted: {exc}", file=sys.stderr); return 2
     except OSError as exc:

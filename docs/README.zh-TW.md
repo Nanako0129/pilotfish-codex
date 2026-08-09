@@ -26,6 +26,11 @@ Policy 同時設定 grounding floor，避免在資料不足時亂猜；設定 st
 ceiling，避免分析無限擴張；並用 `direction_checkpoint` 判斷應該繼續、轉向、
 回滾，或向使用者補問。
 
+1.6.0 另外支援目前 turn 的明確 review intent：`fast` 省略 optional review
+overhead、`default` 依照既有 risk policy、`strict` 擴大 review 與 verification。
+這個 signal 不會覆寫必要的 approval 或 safety gate；Matrix 與「品質兼顧的成本
+效益」指標請見 [1.6.0 spec](./specs/intent-aware-review-routing-1-6-0/SPEC.md)。
+
 ## 從意圖到 role
 
 Intent routing 決定互動形狀；原本 Pilotfish 的 role system 再把工作分配給
