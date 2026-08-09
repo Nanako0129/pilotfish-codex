@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -49,7 +50,8 @@ class ContentProbeTests(unittest.TestCase):
             output = Path(directory) / "nested" / "report.json"
             content._write_report(output, {"formal_claim": False, "rows": []})
             self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["rows"], [])
-            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+            if os.name != "nt":
+                self.assertEqual(output.stat().st_mode & 0o777, 0o600)
 
     def test_resume_loads_only_valid_rows_for_requested_cases(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

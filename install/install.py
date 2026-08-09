@@ -51,6 +51,9 @@ LEGACY_PATHS = frozenset({
 })
 CANONICAL_ROLE_UPGRADE_DIGESTS = {
     "plan-verifier": frozenset({
+        "6cb7b398c28269d9019a181e5faacd255d9bccc384b8bee2a99a4ca41b9d53fc",
+        "5d46fbeda04d159a84614d9f69c6b30c30d4a53a5577d023bddfb3da77a6b6f9",
+        "b4d2a70d8b762f574c05b7e1fa285b05796ebae3f506e331c736d9cd504e6723",
         "dd3b318d3b771227c38110275b68d50c5fccf2ead0d5e4c9876909b773a5748c",
         "c552938705065c826da9a3cbaf09c2fbbaa9fde4adb1f691a59b694d8468f541",
         "e29dff16ee22d8dcf60f214c7226eba52e9c1d5fca475d47ca750c8850a32852",
@@ -60,9 +63,13 @@ CANONICAL_ROLE_UPGRADE_DIGESTS = {
         "94d7de12d1cb197c98e83c2f78d402cf3fb393e860feee1e146f5b6294075d27",
     }),
     "security-executor": frozenset({
+        "1424995ef9b2a3d63a424a75ebf563fa329bf7badbbf5fe8eadc2c69649d3068",
         "90568cf473e0e8025bfbd2a22a9c46d4db6d6b4ed0d344c975f4116365da9ce0",
     }),
     "verifier": frozenset({
+        "4e93fd5660b5f08c0362f632ef2a4f0b85ac33176a6def57fc768aeda95e136d",
+        "5d46fbeda04d159a84614d9f69c6b30c30d4a53a5577d023bddfb3da77a6b6f9",
+        "b4d2a70d8b762f574c05b7e1fa285b05796ebae3f506e331c736d9cd504e6723",
         "9478638b7456b6e4120ecd5a59408431d886c87ae1a7391aade61bc84d722e2e",
         "07e9864edc5734644557bff9c26a41476a30620779980658954e07ff865c9cb8",
     }),
@@ -649,11 +656,12 @@ def _atomic_write(path: Path, payload: bytes, mode: int) -> None:
     fd, name = tempfile.mkstemp(prefix=f".{path.name}.pilotfish-", dir=path.parent)
     temp = Path(name)
     try:
-        os.fchmod(fd, mode)
         with os.fdopen(fd, "wb") as handle:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
+        if not IS_WINDOWS:
+            os.chmod(temp, stat.S_IMODE(mode))
         os.replace(temp, path)
     finally:
         temp.unlink(missing_ok=True)

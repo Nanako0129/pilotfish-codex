@@ -123,6 +123,14 @@ def _short_ref(value: str | None) -> str | None:
 
 
 def _stat_fingerprint(value: os.stat_result) -> tuple[int, ...]:
+    if os.name == "nt":
+        return (
+            value.st_dev,
+            value.st_ino,
+            value.st_mode,
+            value.st_size,
+            value.st_mtime_ns,
+        )
     return (
         value.st_dev,
         value.st_ino,
@@ -1271,9 +1279,10 @@ def write_receipt(path: Path, payload: dict) -> None:
     fd, name = tempfile.mkstemp(prefix=".receipt-", dir=path.parent)
     temp = Path(name)
     try:
-        os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, sort_keys=True, separators=(",", ":")); handle.write("\n"); handle.flush(); os.fsync(handle.fileno())
+        if os.name != "nt":
+            os.chmod(temp, 0o600)
         os.link(temp, path)
     except OSError as exc:
         raise ReceiptError("receipt_write_failed") from exc

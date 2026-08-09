@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -22,7 +23,8 @@ class FixtureBundleTests(unittest.TestCase):
             self.assertEqual(public["case_count"], 30)
             self.assertEqual(len(public["cases"]), 30)
             self.assertNotIn("dual-write period", json.dumps(public))
-            self.assertEqual(private.stat().st_mode & 0o077, 0)
+            if os.name != "nt":
+                self.assertEqual(private.stat().st_mode & 0o077, 0)
 
     def test_commitment_detects_ledger_tampering(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

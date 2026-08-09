@@ -258,12 +258,13 @@ def _atomic_marker_write(codex_home: Path, marker: dict[str, Any]) -> bool:
     try:
         descriptor, name = tempfile.mkstemp(prefix=".marker-", dir=path.parent)
         temporary = Path(name)
-        os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "wb") as handle:
             descriptor = None
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
+        if os.name != "nt":
+            os.chmod(temporary, 0o600)
         if path.exists() and path.is_symlink():
             return False
         os.replace(temporary, path)
@@ -342,6 +343,14 @@ def _load_marker(codex_home: Path, session_id: str) -> dict[str, Any] | None:
 
 
 def _stat_fingerprint(value: os.stat_result) -> tuple[int, ...]:
+    if os.name == "nt":
+        return (
+            value.st_dev,
+            value.st_ino,
+            value.st_mode,
+            value.st_size,
+            value.st_mtime_ns,
+        )
     return (
         value.st_dev,
         value.st_ino,

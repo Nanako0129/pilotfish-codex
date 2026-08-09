@@ -86,6 +86,14 @@ def project_config_bytes(content: bytes) -> bytes:
 
 
 def _stat_fingerprint(value: os.stat_result) -> tuple[int, ...]:
+    if os.name == "nt":
+        return (
+            value.st_dev,
+            value.st_ino,
+            value.st_mode,
+            value.st_size,
+            value.st_mtime_ns,
+        )
     return (
         value.st_dev,
         value.st_ino,

@@ -114,7 +114,8 @@ class HomeAndAuthTests(unittest.TestCase):
             destination = root / "out" / "auth.json"
             benchmark.copy_auth_secure(source, destination)
             self.assertEqual(destination.read_text(), source.read_text())
-            self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+            if os.name != "nt":
+                self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
             link = root / "link"
             link.symlink_to(source)
             with self.assertRaises(benchmark.BenchmarkError):
@@ -443,7 +444,8 @@ class CliTests(unittest.TestCase):
             payload = {"version": "usage-routing-v1", "trials": []}
             benchmark.write_result_report(destination, payload)
             self.assertEqual(json.loads(destination.read_text(encoding="utf-8")), payload)
-            self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+            if os.name != "nt":
+                self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
             with self.assertRaises(benchmark.BenchmarkError):
                 benchmark.write_result_report(destination, payload)
 

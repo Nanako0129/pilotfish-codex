@@ -404,7 +404,10 @@ class NativeEvidenceTests(unittest.TestCase):
         self.assertIn("--skip-git-repo-check", command)
         self.assertIn("--strict-config", command)
         self.assertEqual(command[command.index("--enable") + 1], "multi_agent_v2")
-        self.assertEqual(command[command.index("-C") + 1], "/tmp/clean-smoke")
+        self.assertEqual(
+            Path(command[command.index("-C") + 1]),
+            Path("/tmp/clean-smoke"),
+        )
         self.assertIn("wait_agent exactly once", command[-1])
         self.assertIn("a second spawn", command[-1])
 
@@ -1163,12 +1166,14 @@ class StageSmokeHomeTests(unittest.TestCase):
             ignored_symlink = active / ".future-runtime-symlink"
             ignored_symlink.symlink_to(outside)
             ignored_fifo = active / ".future-runtime-fifo"
-            os.mkfifo(ignored_fifo)
+            if hasattr(os, "mkfifo"):
+                os.mkfifo(ignored_fifo)
             ignored_root_names = set(sentinels) | {
                 ignored_directory.name,
                 ignored_symlink.name,
-                ignored_fifo.name,
             }
+            if ignored_fifo.exists():
+                ignored_root_names.add(ignored_fifo.name)
 
             original_lstat = Path.lstat
             original_path_open = Path.open
@@ -1320,13 +1325,14 @@ class StageSmokeHomeTests(unittest.TestCase):
             Path("hooks/pilotfish_autoroute_gate.py"),
             Path("auth.json"),
         )
-        replacements = (
+        replacements = [
             (
                 "external symlink",
                 lambda path, root: path.symlink_to(root / "outside"),
             ),
-            ("fifo", lambda path, _root: os.mkfifo(path)),
-        )
+        ]
+        if hasattr(os, "mkfifo"):
+            replacements.append(("fifo", lambda path, _root: os.mkfifo(path)))
         for relative in relative_inputs:
             for label, replace in replacements:
                 with (
@@ -1350,6 +1356,8 @@ class StageSmokeHomeTests(unittest.TestCase):
                         materialize(active, root / "staged")
 
     def test_required_projected_inputs_reject_unreadable_files(self) -> None:
+        if os.name == "nt":
+            self.skipTest("Windows ACLs do not honor POSIX chmod readability probes")
         relative_inputs = (
             Path("config.toml"),
             Path("AGENTS.md"),
@@ -1407,7 +1415,7 @@ class StageSmokeHomeTests(unittest.TestCase):
                 def mutate_after_stat(source: Path, confined_home: Path):
                     nonlocal mutated
                     before = original(source, confined_home)
-                    if source == source_to_mutate and not mutated:
+                    if source.resolve() == source_to_mutate and not mutated:
                         source.write_bytes(source.read_bytes() + b"\n")
                         mutated = True
                     return before
