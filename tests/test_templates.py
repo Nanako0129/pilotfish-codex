@@ -65,8 +65,8 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertTrue(any("legacy features.multi_agent_v2" in item for item in errors))
         with tempfile.TemporaryDirectory() as directory:
             agents = Path(directory); source = (ROOT / "templates" / "agents" / "scout.toml").read_text(encoding="utf-8")
-            (agents / "scout.toml").write_text(source)
-            (agents / "copy.toml").write_text(source)
+            (agents / "scout.toml").write_text(source, encoding="utf-8")
+            (agents / "copy.toml").write_text(source, encoding="utf-8")
             problems = validate_dir(agents, expected_names=ROLES)
             self.assertTrue(any("duplicate role" in item for item in problems))
             self.assertTrue(any("manifest missing" in item for item in problems))

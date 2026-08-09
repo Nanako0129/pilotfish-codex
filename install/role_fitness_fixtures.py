@@ -238,7 +238,11 @@ def validate_split_revisions(case_id: str, value: Any) -> bool:
 
 def validate_bundle(private_root: Path) -> dict[str, Any]:
     """Validate private bytes, commitments, counts, and answer-key boundaries."""
-    if not private_root.is_dir() or private_root.is_symlink() or stat.S_IMODE(private_root.stat().st_mode) & 0o077:
+    if (
+        not private_root.is_dir()
+        or private_root.is_symlink()
+        or (os.name != "nt" and stat.S_IMODE(private_root.stat().st_mode) & 0o077)
+    ):
         raise BenchmarkContractError("private fixture root permissions are unsafe")
     try:
         salt = (private_root / "salt.bin").read_bytes()
