@@ -41,7 +41,8 @@ cohort 中維持 Sol 的觀察品質並降低 token 使用量。
 目前可以負責任地宣稱：
 
 1. Pilotfish 有方向性品質提升證據：disagreement adjudication 相對 Luna `+5.38` quality points。
-2. Pilotfish 有較強的成本證據：Sol-primary routing 維持 Sol 品質，12-case 少 `8.34%` token，6-case live 少 `16.80%`。
+2. Pilotfish 有較強的成本證據：Sol-primary routing 維持 Sol 品質，
+   12-case 少 `8.34%` token，6-case live 少 `16.80%`。
 3. Pilotfish 尚不能宣稱「統計上已證明比 Luna 品質好」；目前最穩固的 production value 是「品質不降的前提下，避免 Sol 全程執行而省錢」。
 
 機器可讀結果：[role-fitness-v1-pilotfish-value-matrix.json](role-fitness-v1-pilotfish-value-matrix.json)。
