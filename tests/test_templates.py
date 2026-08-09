@@ -64,7 +64,7 @@ class NativeTemplateTests(unittest.TestCase):
         errors, _ = validate_agents_config(config)
         self.assertTrue(any("legacy features.multi_agent_v2" in item for item in errors))
         with tempfile.TemporaryDirectory() as directory:
-            agents = Path(directory); source = (ROOT / "templates" / "agents" / "scout.toml").read_text()
+            agents = Path(directory); source = (ROOT / "templates" / "agents" / "scout.toml").read_text(encoding="utf-8")
             (agents / "scout.toml").write_text(source)
             (agents / "copy.toml").write_text(source)
             problems = validate_dir(agents, expected_names=ROLES)
@@ -83,7 +83,7 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertTrue(any("unsupported key" in item for item in errors))
 
     def test_policy_is_native_typed_and_post_hoc(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         self.assertIn("native typed `spawn_agent`", policy)
         self.assertIn("non-empty `message`", policy)
         self.assertIn("`agent_type`", policy)
@@ -95,7 +95,7 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertNotIn("fork_turns = \"all\"", policy)
 
     def test_policy_exposes_proactive_role_decision_cues(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())
         self.assertIn("Decision cues", policy)
         self.assertIn("classify each bounded workstream", policy)
@@ -112,7 +112,7 @@ class NativeTemplateTests(unittest.TestCase):
 
     def test_policy_exposes_adaptive_route_and_discovery_contract(self) -> None:
         policy = " ".join(
-            (ROOT / "templates" / "agents-md.orchestration.md").read_text().split()
+            (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8").split()
         )
         for phrase in (
             "Adaptive intent routing",
@@ -137,7 +137,7 @@ class NativeTemplateTests(unittest.TestCase):
 
     def test_policy_preserves_risk_triggered_plan_review(self) -> None:
         policy = " ".join(
-            (ROOT / "templates" / "agents-md.orchestration.md").read_text().split()
+            (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8").split()
         )
         self.assertIn("Independent review is risk-triggered, not a synonym for non-trivial", policy)
         self.assertIn("a data, schema, serialization, migration, or release boundary", policy)
@@ -146,7 +146,7 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertNotIn("Sol escalation is narrower than the risk trigger", policy)
 
     def test_policy_preserves_parent_ownership_and_no_untyped_fallback(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())
         self.assertIn("The parent session remains responsible and accountable throughout", policy)
         self.assertIn("integrates writes", policy)
@@ -235,7 +235,7 @@ class NativeTemplateTests(unittest.TestCase):
             self.assertIn(phrase, f"{description} {instructions}")
 
     def test_runbook_is_native_only(self) -> None:
-        runbook = (ROOT / "install" / "AGENT-INSTALL.md").read_text()
+        runbook = (ROOT / "install" / "AGENT-INSTALL.md").read_text(encoding="utf-8")
         self.assertIn("single parseable semantic version", runbook)
         self.assertIn("stage_smoke_home.py", runbook)
         self.assertIn("NATIVE_OK", runbook)

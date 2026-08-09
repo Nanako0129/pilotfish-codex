@@ -8,15 +8,15 @@ AGENTS = ROOT / "templates" / "agents"
 
 class PolicyTests(unittest.TestCase):
     def test_stamp_and_roles_remain_consistent(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
-        version = (ROOT / "VERSION").read_text().strip()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
+        version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
         self.assertIn(f"<!-- pilotfish-codex v{version} -->", policy)
         for path in AGENTS.glob("*.toml"):
-            self.assertEqual(tomllib.loads(path.read_text())["name"], path.stem)
+            self.assertEqual(tomllib.loads(path.read_text(encoding="utf-8"))["name"], path.stem)
             self.assertIn(f"`{path.stem}`", policy)
 
     def test_native_spawn_policy_is_typed_bounded_and_no_override(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         for phrase in (
             "non-empty `message`", "known `agent_type`", "`task_name` matching `[a-z0-9_]+`",
             '`fork_turns = "none"`', '`"1"` through `"3"`', "full-history named-role fork",
@@ -27,7 +27,7 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("agents.spawn_agent", policy)
 
     def test_policy_proactively_routes_suitable_work_and_parallel_surfaces(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())
         for phrase in (
             "active delegation signal",
@@ -44,7 +44,7 @@ class PolicyTests(unittest.TestCase):
             self.assertIn(phrase, policy)
 
     def test_policy_keeps_parent_accountability_and_local_escape_hatches(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())
         for phrase in (
             "The parent session remains responsible and accountable throughout",
@@ -61,7 +61,7 @@ class PolicyTests(unittest.TestCase):
             self.assertIn(phrase, policy)
 
     def test_policy_uses_rebuttable_mechanical_default(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())
         for phrase in (
             "Stable multi-file mechanical repetition",
@@ -82,7 +82,7 @@ class PolicyTests(unittest.TestCase):
             self.assertIn(phrase, policy)
 
     def test_policy_uses_net_benefit_and_stable_recurrence_contracts(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())
         for phrase in (
             "Outside that qualifying mechanical shape, choose delegation by net benefit",
@@ -100,7 +100,7 @@ class PolicyTests(unittest.TestCase):
             self.assertIn(phrase, policy)
 
     def test_policy_verifies_at_smallest_coherent_boundary(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())
         for phrase in (
             "smallest coherent integration boundary",
@@ -117,7 +117,7 @@ class PolicyTests(unittest.TestCase):
             self.assertIn(phrase, policy)
 
     def test_policy_preserves_unfinished_objective_across_user_input(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())
         for phrase in (
             "unfinished root objective remains active across turns",
@@ -162,7 +162,7 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("resume useful in-scope work in the same turn", policy)
 
     def test_policy_schedules_native_parallel_calls_back_to_back(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())
         for phrase in (
             "Schedule eligible calls by data dependency",
@@ -177,10 +177,10 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("worktree", policy)
 
     def test_verifier_contracts_converge_without_crossing_boundaries(self) -> None:
-        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text()
-        plan = (AGENTS / "plan-verifier.toml").read_text()
-        outcome = (AGENTS / "verifier.toml").read_text()
-        security = (AGENTS / "security-reviewer.toml").read_text()
+        policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
+        plan = (AGENTS / "plan-verifier.toml").read_text(encoding="utf-8")
+        outcome = (AGENTS / "verifier.toml").read_text(encoding="utf-8")
+        security = (AGENTS / "security-reviewer.toml").read_text(encoding="utf-8")
         normalized_policy = " ".join(policy.split())
         normalized_plan = " ".join(plan.split())
 
@@ -223,7 +223,7 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("first plan-verifier review", security)
 
     def test_policy_owns_outcome_disposition(self) -> None:
-        policy = " ".join((ROOT / "templates" / "agents-md.orchestration.md").read_text().split())
+        policy = " ".join((ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8").split())
         self.assertIn(
             "Role verdicts are evidence, not implementation or scope authority",
             policy,
@@ -247,7 +247,7 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("explicit acceptance and approved scope", policy)
 
     def test_policy_bounds_verification_recovery_and_user_pause(self) -> None:
-        policy = " ".join((ROOT / "templates" / "agents-md.orchestration.md").read_text().split())
+        policy = " ".join((ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8").split())
         self.assertRegex(
             policy,
             r"use Codex `request_user_input` only when that tool is exposed in the current mode",
@@ -295,7 +295,7 @@ class PolicyTests(unittest.TestCase):
 
     def test_risk_triggered_plan_review_is_a_mandatory_tool_use_gate(self) -> None:
         policy = " ".join(
-            (ROOT / "templates" / "agents-md.orchestration.md").read_text().split()
+            (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8").split()
         )
         for phrase in (
             "mandatory tool-use gate",

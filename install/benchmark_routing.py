@@ -1007,8 +1007,11 @@ def copy_auth_secure(source: Path, destination: Path) -> None:
         raise BenchmarkError("auth source unavailable") from exc
     if stat.S_ISLNK(link_stat.st_mode) or not stat.S_ISREG(link_stat.st_mode):
         raise BenchmarkError("auth source must be a regular non-symlink file")
-    expected_uid = os.geteuid()
-    if link_stat.st_uid != expected_uid or stat.S_IMODE(link_stat.st_mode) != 0o600:
+    expected_uid = os.geteuid() if hasattr(os, "geteuid") else None
+    if (
+        (expected_uid is not None and link_stat.st_uid != expected_uid)
+        or (os.name != "nt" and stat.S_IMODE(link_stat.st_mode) != 0o600)
+    ):
         raise BenchmarkError("auth source must be owner-only 0600")
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
     try:
@@ -1019,8 +1022,8 @@ def copy_auth_secure(source: Path, destination: Path) -> None:
         first = os.fstat(fd)
         if (
             not stat.S_ISREG(first.st_mode)
-            or first.st_uid != expected_uid
-            or stat.S_IMODE(first.st_mode) != 0o600
+            or (expected_uid is not None and first.st_uid != expected_uid)
+            or (os.name != "nt" and stat.S_IMODE(first.st_mode) != 0o600)
             or _fingerprint(first) != _fingerprint(link_stat)
         ):
             raise BenchmarkError("auth source changed before copy")
