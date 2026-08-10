@@ -556,6 +556,8 @@ def _validate_committed_state(
     else:
         allowed_top = v2_allowed if is_v2 else legacy_allowed
     accepted_shapes = [allowed_top]
+    if not is_v2:
+        accepted_shapes.append(legacy_with_plugin)
     if is_v2 and state.get("state_version") == 2:
         accepted_shapes.append(v2_pre_policy_ownership)
     if set(state) not in accepted_shapes:

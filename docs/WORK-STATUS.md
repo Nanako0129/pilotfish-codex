@@ -141,7 +141,14 @@ host，且 active policy 是 dotfiles symlink，需先確認 target 後使用
 
 Codex marketplace package 使用官方 `.agents/plugins/marketplace.json` layout；
 實機安裝前曾因舊 layout 被 CLI 拒絕，已修正；另已修正 marketplace registration
-寫入 `config.toml` 後的 post-sidecar fingerprint 收斂，待重新執行安裝驗證。
+寫入 `config.toml` 後的 post-sidecar fingerprint 收斂，並已完成實機重新安裝。
+
+實機結果：`runtime_status=integrated`、Plugin `installed`、Skill `available`；
+active policy symlink 保留並以 `integrated-symlink-target` 記錄。一次失敗交易的
+pending sidecar 已保留為 `/Users/miyago/.codex.pilotfish-install-state.json.aborted-20260810T141400Z`，可供追查，未刪除。
+
+最後驗證：335 tests passed、1 skipped，Plugin validator、Markdown lint、native
+config/role validator 與 fresh session probe 均通過。
 
 ## Handoff rule
 
