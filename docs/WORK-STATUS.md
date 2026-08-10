@@ -28,7 +28,7 @@ native runtime、policy ownership、transaction、migration 與 fresh-session pr
 - [x] Windows 實機驗證：WSL、PowerShell、VS Code task 流程通過。
 - [x] GitHub Actions：Ubuntu、macOS、Windows Python tests 與 Markdown lint
   全部通過。
-- [x] commits 已 push：`239e010`、`d7055c0`。
+- [x] 版本／Windows CI 修正 commits 已 push：`f169531`、`74ade3e`。
 - [x] policy isolation spec：
   `docs/specs/policy-install-isolation/SPEC.md`。
 - [x] Hybrid runtime spec 草稿：
@@ -157,7 +157,8 @@ smoke 均通過。
 
 Release baseline：Policy 為 `1.6.3`、Installer 為 `1.7.0`，已建立
 `1.6.3` 與 `1.7.0` annotated tags；目前尚未建立 GitHub Release，未完成的
-decision checkpoint 保留在 `Unreleased`。
+decision checkpoint 功能保留在 `Unreleased`。既有 GitHub Release 標題已統一
+為 `vX.Y.Z`。
 
 ## Handoff rule
 
