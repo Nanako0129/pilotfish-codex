@@ -156,9 +156,9 @@ config/role validator、fresh session probe 與 decision checkpoint acceptance
 smoke 均通過。
 
 Release baseline：Policy 為 `1.6.3`、Installer 為 `1.7.0`，已建立
-`1.6.3` 與 `1.7.0` annotated tags；目前尚未建立 GitHub Release，未完成的
-decision checkpoint 功能保留在 `Unreleased`。既有 GitHub Release 標題已統一
-為 `vX.Y.Z`。
+`1.6.3` 與 `1.7.0` annotated tags；GitHub Release 已依序發布為 `v1.6.3`
+與 `v1.7.0`，未來 release 標題統一為 `vX.Y.Z`。decision checkpoint 功能
+保留在 `Unreleased`。
 
 ## Handoff rule
 
