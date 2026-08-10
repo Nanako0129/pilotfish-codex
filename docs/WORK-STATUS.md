@@ -140,7 +140,8 @@ host，且 active policy 是 dotfiles symlink，需先確認 target 後使用
 仍須通過既有 target fingerprint、hook projection 與 config provenance 驗證。
 
 Codex marketplace package 使用官方 `.agents/plugins/marketplace.json` layout；
-實機安裝前曾因舊 layout 被 CLI 拒絕，已修正並待重新安裝 Plugin。
+實機安裝前曾因舊 layout 被 CLI 拒絕，已修正；另已修正 marketplace registration
+寫入 `config.toml` 後的 post-sidecar fingerprint 收斂，待重新執行安裝驗證。
 
 ## Handoff rule
 

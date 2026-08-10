@@ -1103,6 +1103,8 @@ def install(
     new_policy, policy_action = merge_instruction_text(policy_text, policy_template)
     policy_payload = _encode_instruction_text(new_policy, policy_newline)
     policy_ownership = _policy_ownership(codex_home, user_policy_path, policy_path)
+    if follow_policy_symlink:
+        policy_ownership["user_policy"]["status"] = "integrated-symlink-target"
     policy_ownership["pilotfish_policy"]["sha256"] = _sha256_bytes(policy_payload)
     plugin = _probe_plugin(
         source_root=source_root,
@@ -1338,6 +1340,13 @@ def install(
                     else "integrated-plugin-unavailable"
                 )
                 plugin_activated = not plugin_was_installed and plugin["status"] == "installed"
+                # Codex records local marketplace registration in config.toml.
+                # Include that host-side mutation in the committed fingerprint.
+                current_config = config_path.read_bytes() if config_path.is_file() else None
+                if current_config is None:
+                    raise InstallAbort("config.toml disappeared during Plugin installation")
+                expected_inventory["config.toml"] = _sha256_bytes(current_config)
+                expected_state_inventory["config.toml"] = expected_inventory["config.toml"]
             ownership = dict(pending_record["owned_legacy"])
             record = {
                 "state_version": 3,
