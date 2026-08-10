@@ -46,7 +46,7 @@ native runtime、policy ownership、transaction、migration 與 fresh-session pr
 - [x] Installer state v3：記錄 Plugin name/version/source digest/status、runtime
   outcome 與 exact rollback backup manifest；Codex
   CLI 不可用時保留 native fallback 並標記 `unavailable`。
-- [x] Current targeted/full Python verification：336 tests，1 skipped，全部通過；
+- [x] Current targeted/full Python verification：342 tests，1 skipped，全部通過；
   Plugin、Skill validators 與 `git diff --check` 通過。
 - [x] Plugin discovery probe：installer 會用 `codex plugin list --json` 驗證
   name、marketplace、version 與 enabled，未通過時不宣稱 Skill active。
@@ -132,8 +132,8 @@ Hybrid spec、Policy `1.6.3` 與 Installer `1.7.0` 已完成。POSIX 使用
 `install/install.py`；Windows PowerShell entrypoint 由 CI 驗證，本機未安裝
 `pwsh`。目前 user host 已完成實機升級與 fresh-session probe。
 
-下一個最小動作是處理 `review-block-deduplication` spec 中延後的 decision
-checkpoint、session resume 與三平台 hook parity；這些保留在 `Unreleased`，不屬於
+下一個最小動作是處理 `review-block-deduplication` spec 尚未完成的三平台 hook
+parity；decision checkpoint、session resume 已完成並保留在 `Unreleased`，不屬於
 本次 `1.6.3`／`1.7.0` release。
 
 舊版 state v2 若缺少後續加入的 `policy_ownership` 欄位，已納入受限相容升級；

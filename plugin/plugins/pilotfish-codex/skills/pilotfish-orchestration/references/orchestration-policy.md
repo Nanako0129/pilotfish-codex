@@ -144,6 +144,32 @@ card; product, authority, risk, irreversible-cost, or unresolved-direction
 choices require it. A decision card is a user checkpoint, not a replacement
 for the internal Plan or an approval bypass.
 
+#### General-mode decision checkpoint contract
+
+When a task decomposition, blocker disposition, risk, permission boundary, or
+acceptance choice can change the outcome, emit one structured checkpoint before
+continuing the affected task. This is an interaction contract, not Plan mode.
+Use exactly two or three mutually exclusive options and identify the
+recommendation. Do not include credentials, external writes, destructive work,
+release, or irreversible work in the card's implied authorization.
+
+The card schema is `pilotfish-decision-checkpoint-v1` and contains exactly:
+`checkpoint_id`, `scope`, `current_interpretation`, `impact`,
+`recommended_option`, `options`, `excluded_scope`, `affected_task_ids`,
+`resume_point`, and `approval_boundary`. Each option contains an identifier,
+short label, and concrete effect. `affected_task_ids` is the smallest set of
+tasks whose next result can change; completed or independent sibling tasks are
+excluded. `excluded_scope` names work that the answer cannot authorize.
+
+Resolve replies conservatively: an exact option number or identifier confirms
+only that option; an explicit rejection keeps the affected tasks pending or
+blocked; every other, multiple, quoted, or ambiguous reply remains pending and
+requires one concise clarification. Never treat a plausible free-text answer
+as approval. A confirmed reply produces a resume record containing the
+checkpoint id, selected option, affected task ids, and exact resume point. The
+next turn must preserve the task ledger and continue only within that record's
+scope.
+
 At each stable slice boundary, the existing `verifier` may receive the
 explicit `direction_checkpoint` contract. It compares the original outcome,
 non-negotiable constraints, slice acceptance, and current evidence, then

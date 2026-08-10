@@ -28,6 +28,8 @@ are noted only as source references.
 
 - Reserved for the unfinished general-mode decision checkpoint and its
   cross-platform hook parity work.
+- Add the `pilotfish-decision-checkpoint-v1` contract with bounded options,
+  conservative confirmation/rejection handling, and an explicit resume record.
 
 ## v1.6.2 — 2026-08-09
 

@@ -43,6 +43,29 @@ class PolicyTests(unittest.TestCase):
         ):
             self.assertIn(phrase, policy)
 
+    def test_policy_defines_general_mode_decision_checkpoint_contract(self) -> None:
+        policy = " ".join(
+            (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8").split()
+        )
+        for phrase in (
+            "General-mode decision checkpoint contract",
+            "pilotfish-decision-checkpoint-v1",
+            "exactly two or three mutually exclusive options",
+            "checkpoint_id",
+            "current_interpretation",
+            "recommended_option",
+            "affected_task_ids",
+            "resume_point",
+            "approval_boundary",
+            "exact option number or identifier confirms",
+            "explicit rejection keeps the affected tasks pending or blocked",
+            "ambiguous reply remains pending",
+            "Never treat a plausible free-text answer as approval",
+            "confirmed reply produces a resume record",
+            "card's implied authorization",
+        ):
+            self.assertIn(phrase, policy)
+
     def test_policy_keeps_parent_accountability_and_local_escape_hatches(self) -> None:
         policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())

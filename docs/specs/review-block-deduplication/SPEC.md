@@ -137,16 +137,16 @@ Resume point: after the selected option is confirmed
   `CLEARED` 狀態轉換與人為解除入口。
 - [x] T4 — 實作 runnable-first scheduling，以及「只剩 blocked tasks 才中斷」
   的彙總提醒策略。
-- [ ] T5 — 定義一般模式 decision checkpoint 的觸發條件、選項 schema、推薦
-  預設與使用者回覆的 resume contract（next release）。
+- [x] T5 — 定義一般模式 decision checkpoint 的觸發條件、選項 schema、推薦
+  預設與使用者回覆的 resume contract。
 - [x] T6 — 新增跨 turn duplicate-warning regression tests（current release）。
 - [x] T7 — 新增複數 task isolation、sibling completion、blocked-only summary、
   receipt-clears、human-clears 與 malformed-state fail-closed tests。
-- [ ] T8 — 新增一般模式 decision checkpoint 的選項、確認、拒絕、模糊回覆與
-  session resume tests；確認它不會越權批准外部或不可逆操作（next release）。
+- [x] T8 — 新增一般模式 decision checkpoint 的選項、確認、拒絕、模糊回覆與
+  session resume tests；確認它不會越權批准外部或不可逆操作。
 - [ ] T9 — 在 macOS、Linux、Windows 驗證 hook launch、marker handling、path
   scanner 與既有 review gate parity。
-- [ ] T10 — 更新 `CHANGELOG.md`、安裝說明與 recovery 操作文件。
+- [x] T10 — 更新 `CHANGELOG.md`、安裝說明與 recovery 操作文件。
 
 ## Files
 
@@ -200,4 +200,5 @@ marker schema 與一次性 block 行為，保留 mandatory review gate；不得�
 
 前三項目前以 orchestration policy 的 task ledger 契約落地，沒有新增外部持久化
 task database；ledger 由 main session 維護，避免把 prompt-level blocker 再次
-擴大成 session-wide lock。一般模式 decision checkpoint 仍是下一版本範圍。
+擴大成 session-wide lock。Decision checkpoint 已以 Skill policy 與純驗證模組
+落地；T9 的三平台 hook parity 仍是下一個獨立 slice。
