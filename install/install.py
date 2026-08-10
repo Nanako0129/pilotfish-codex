@@ -82,7 +82,7 @@ class InstallAbort(Exception):
 
 MIN_COMPATIBLE_CODEX_VERSION = (0, 146, 0)
 PILOTFISH_PLUGIN_NAME = "pilotfish-codex"
-PILOTFISH_PLUGIN_VERSION = "1.6.2"
+PILOTFISH_PLUGIN_VERSION = "1.7.0"
 RUNTIME_STATUSES = frozenset({"integrated", "integrated-plugin-unavailable"})
 
 

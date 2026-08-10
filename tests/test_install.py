@@ -479,7 +479,7 @@ class NativeInstallTests(unittest.TestCase):
                         "installed": [{
                             "name": "pilotfish-codex",
                             "marketplaceName": "pilotfish-codex",
-                            "version": "1.6.2",
+                            "version": "1.7.0",
                             "enabled": True,
                             "marketplaceSource": {"source": str(ROOT / "plugin")},
                         }]
@@ -515,7 +515,7 @@ class NativeInstallTests(unittest.TestCase):
             home = Path(directory) / "home"
             unavailable = {
                 "name": "pilotfish-codex",
-                "version": "1.6.2",
+                            "version": "1.7.0",
                 "status": "unavailable",
                 "source_sha256": installer._plugin_source_digest(ROOT / "plugin"),
             }

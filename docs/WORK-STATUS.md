@@ -149,6 +149,9 @@ pending sidecar 已保留為 `/Users/miyago/.codex.pilotfish-install-state.json.
 最後驗證：335 tests passed、1 skipped，Plugin validator、Markdown lint、native
 config/role validator 與 fresh session probe 均通過。
 
+Release baseline：`v1.7.0` 分為 `policy-v1.7.0` 與 `installer-v1.7.0` 兩個
+annotated tags；未完成的 decision checkpoint 保留在 `Unreleased`。
+
 ## Handoff rule
 
 handoff 只需要提供：

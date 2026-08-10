@@ -15,7 +15,7 @@ class PluginPackageTests(unittest.TestCase):
         entry = marketplace["plugins"][0]
         self.assertEqual(entry["name"], manifest["name"])
         self.assertEqual(entry["source"]["path"], "./plugins/pilotfish-codex")
-        self.assertEqual(manifest["version"], "1.6.2")
+        self.assertEqual(manifest["version"], "1.7.0")
 
     def test_skill_is_complete_and_references_exist(self) -> None:
         skill = PLUGIN / "skills" / "pilotfish-orchestration"
