@@ -415,6 +415,26 @@ class NativeInstallTests(unittest.TestCase):
             backup_name = state["rollback_backups"]["AGENTS.md"]
             self.assertTrue((home / backup_name).is_file())
 
+    def test_policy_symlink_requires_explicit_opt_in_and_updates_target(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            home.mkdir()
+            target = root / "managed-AGENTS.md"
+            original = b"# Dotfiles policy\n"
+            target.write_bytes(original)
+            os.symlink(target, home / "AGENTS.md")
+
+            with self.assertRaisesRegex(InstallAbort, "explicit policy integration"):
+                self.run_install(home)
+            self.assertEqual(target.read_bytes(), original)
+
+            self.assertEqual(self.run_install(home, follow_policy_symlink=True), 0)
+            installed = target.read_bytes()
+            self.assertTrue(installed.startswith(original))
+            self.assertIn(b"<!-- pilotfish-codex:begin -->", installed)
+            self.assertTrue((home / "AGENTS.md").is_symlink())
+
     def test_existing_full_policy_marker_migrates_to_bootstrap_without_touching_user_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"

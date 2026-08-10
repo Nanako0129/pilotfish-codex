@@ -1017,6 +1017,7 @@ def install(
     check_codex: bool = True,
     replace_drifted_roles: bool = False,
     replace_drifted_role: tuple[str, ...] = (),
+    follow_policy_symlink: bool = False,
 ) -> int:
     unknown_drift_roles = set(replace_drifted_role) - set(ROLES)
     if unknown_drift_roles:
@@ -1045,9 +1046,16 @@ def install(
     policy_template = (source_root / "templates" / "agents-md.bootstrap.md").read_text(encoding="utf-8")
     user_policy_path = active_instruction_file(codex_home)
     if user_policy_path.is_symlink():
-        raise InstallAbort(
-            "active policy path is a symlink; explicit policy integration is required"
-        )
+        if not follow_policy_symlink:
+            raise InstallAbort(
+                "active policy path is a symlink; explicit policy integration is required"
+            )
+        try:
+            policy_target = user_policy_path.resolve(strict=True)
+        except OSError as exc:
+            raise InstallAbort("active policy symlink target is unavailable") from exc
+        if not policy_target.is_file():
+            raise InstallAbort("active policy symlink target is not a regular file")
     if user_policy_path.is_file() and user_policy_path.stat().st_nlink > 1:
         raise InstallAbort(
             "active policy path is hard-linked; explicit policy integration is required"
@@ -1401,6 +1409,11 @@ def main(argv: list[str] | None = None) -> int:
         choices=sorted(ROLES),
         help="explicitly replace one named customized role; may be repeated",
     )
+    parser.add_argument(
+        "--follow-policy-symlink",
+        action="store_true",
+        help="explicitly integrate the active policy symlink target",
+    )
     args = parser.parse_args(argv)
     try:
         return install(
@@ -1409,6 +1422,7 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             replace_drifted_roles=args.replace_drifted_roles,
             replace_drifted_role=tuple(args.replace_drifted_role),
+            follow_policy_symlink=args.follow_policy_symlink,
         )
     except InstallAbort as exc:
         print(f"aborted: {exc}", file=sys.stderr); return 2

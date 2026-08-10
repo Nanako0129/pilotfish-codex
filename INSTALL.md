@@ -185,6 +185,11 @@ The wrapper forwards only installer arguments such as `--dry-run` and
 before constructing the codeload URL, uses no `eval` or `sudo`, and removes
 only its own temporary directory.
 
+If the active policy path is a symlink managed by the user's dotfiles, the
+installer stops by default. After verifying the target, explicitly authorize
+integration with `--follow-policy-symlink`; this preserves the symlink and
+writes only its regular-file target.
+
 ## Validate and trust the hook
 
 When a checkout is available, validate the installed config and role manifest:

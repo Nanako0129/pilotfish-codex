@@ -95,6 +95,9 @@ installer, and never need a network download:
 ```bash
 bash install/install.sh --dry-run --codex-home "$ACTIVE_CODEX_HOME"
 bash install/install.sh --codex-home "$ACTIVE_CODEX_HOME"
+
+# Only after verifying that the active policy is an intended dotfiles-managed target:
+bash install/install.sh --follow-policy-symlink --codex-home "$ACTIVE_CODEX_HOME"
 ```
 
 ```powershell

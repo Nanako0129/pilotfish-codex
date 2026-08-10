@@ -131,9 +131,10 @@ native runtime、policy ownership、transaction、migration 與 fresh-session pr
 Hybrid spec 與跨 OS Installer slice 已完成。POSIX 使用 `install/install.sh`，
 native Windows 使用 `install/install.ps1`，兩者共用 `install/install.py`；Windows
 PowerShell entrypoint 由 CI 驗證，本機未安裝 `pwsh`。若 Miyago 要啟用目前 user
-host，下一個最小動作是先依 `INSTALL.md` 執行同一 source/ref 的 dry-run，再在
-核准後執行 installer，最後用 `install/probe_hybrid_runtime.py --run-session`
-確認 Plugin/Skill 狀態。
+host，且 active policy 是 dotfiles symlink，需先確認 target 後使用
+`--follow-policy-symlink`。下一個最小動作是先依 `INSTALL.md` 執行同一 source/ref
+的 dry-run，再在核准後執行 installer，最後用
+`install/probe_hybrid_runtime.py --run-session` 確認 Plugin/Skill 狀態。
 
 ## Handoff rule
 
