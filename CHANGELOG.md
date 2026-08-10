@@ -5,9 +5,12 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
-## v1.7.0 — 2026-08-10
+## Unreleased
 
-### [policy-v1.6.3]
+- Add the `pilotfish-decision-checkpoint-v1` contract with bounded options,
+  conservative confirmation/rejection handling, and an explicit resume record.
+
+## v1.6.3
 
 - Add the Hybrid runtime: a minimal always-on root bootstrap plus the
   `pilotfish-orchestration` Skill packaged in a Codex local marketplace Plugin.
@@ -16,7 +19,7 @@ are noted only as source references.
 - Preserve valid extra roles and keep customized same-name role replacement
   explicit; unavailable Plugin installation retains the native fallback.
 
-### [installer-v1.7.0]
+## v1.7.0
 
 - Add a native PowerShell installer wrapper and Windows CI entrypoint; the
   wrapper delegates to the same Python installer and supports local or pinned
@@ -24,14 +27,7 @@ are noted only as source references.
 - Add official Codex marketplace layout, legacy state migration, policy symlink
   opt-in, and post-marketplace config fingerprint verification.
 
-## Unreleased
-
-- Reserved for the unfinished general-mode decision checkpoint and its
-  cross-platform hook parity work.
-- Add the `pilotfish-decision-checkpoint-v1` contract with bounded options,
-  conservative confirmation/rejection handling, and an explicit resume record.
-
-## v1.6.2 — 2026-08-09
+## v1.6.2
 
 - Fix Windows hook marker handling without requiring POSIX file-mode semantics.
 - Add a Windows path-based session scanner for environments without Unix
@@ -40,7 +36,7 @@ are noted only as source references.
   native Windows hook launch path explicit.
 - Expand Python CI validation to Ubuntu, macOS, and Windows runners.
 
-## v1.6.1 — 2026-08-07
+## v1.6.1
 
 - Add a review-service circuit breaker so missing reviewer or verifier receipts
   receive one bounded retry and then enter an explicit waiting state.
@@ -51,7 +47,7 @@ are noted only as source references.
 - Make the Stop hook expose the read-only boundary while an independent review
   is pending.
 
-## v1.6.0 — 2026-08-06
+## v1.6.0
 
 - Add turn-scoped `review_intent` routing for explicit fast, default, and
   strict requests without weakening mandatory gates.
@@ -63,7 +59,7 @@ are noted only as source references.
 - Preserve the Codex compatibility floor `>=0.146.0`; later releases remain
   accepted and are evaluated by runtime evidence.
 
-## v1.5.1 — 2026-08-06
+## v1.5.1
 
 - Stop hard-pinning the installer to one Codex release; require only the
   minimum compatible version `>=0.146.0`, accept later releases, and let the
@@ -77,7 +73,7 @@ are noted only as source references.
   stable, but its switching quality/cost score remains `5/10`; direct Sol is
   retained only as a high-risk fallback with positive quality evidence.
 
-## v1.5.0 — 2026-08-05
+## v1.5.0
 
 - Add adaptive intent routing for clear execution, broad changes, and open-ended
   discovery, with grounding floors, stopping ceilings, and explicit
@@ -91,14 +87,14 @@ are noted only as source references.
 - Document a native PowerShell installation path for Windows and keep the
   Windows-specific hook launch behavior explicit.
 
-## v1.4.1 — 2026-08-04
+## v1.4.1
 
 - Fix native installer role-file replacement on Windows by avoiding directory
   file descriptors that Windows cannot open through `os.open`.
 - Add platform-independent regression coverage for the Windows replacement
   path.
 
-## v1.4.0 — 2026-08-04
+## v1.4.0
 
 - Retire Terra from the active role bindings. Luna now owns Plan-mode and
   outcome reasoning at `xhigh`.
@@ -125,7 +121,7 @@ are noted only as source references.
   hook-trust bypass; directive detection now examines only the submitted smoke
   prompt, not unrelated runtime-injected policy messages.
 
-## v1.3.3 — 2026-08-03
+## v1.3.3
 
 - Route the main session through Luna at `medium`, escalate Plan mode to Luna
   `xhigh`, and use Terra for general plan/outcome reasoning at `xhigh`.
@@ -134,7 +130,7 @@ are noted only as source references.
 - Permit the exact released v1.3.1 `plan-verifier` payload to upgrade to the
   calibrated contract without weakening custom-role drift checks.
 
-## v1.3.2 — 2026-07-29
+## v1.3.2
 
 - Replace the active adapter configuration with the exact native Multi-Agent V2
   table and total concurrency of four.
@@ -153,7 +149,7 @@ are noted only as source references.
   steering, status questions, and pauses unless new input clearly supersedes
   the unfinished objective. This is prompt policy, not live runtime proof.
 
-## v1.3.1 — 2026-07-23
+## v1.3.1
 
 - Add program envelopes and independently approvable execution slices; review
   the envelope and next executable slice without blocking on unrelated work.
@@ -166,7 +162,7 @@ are noted only as source references.
 - Permit exact release-pinned v1.3.0 verifier-role payloads to upgrade while
   preserving fail-closed handling for customized same-name roles.
 
-## v1.3.0 — 2026-07-20
+## v1.3.0
 
 - Add redacted versioned dispatch receipts with atomic writes, path and hash
   boundaries, and explicit post-hoc route observations.
@@ -179,7 +175,7 @@ are noted only as source references.
 - Document upstream blockers for native routing, hard pre-execution blocking,
   hidden effective-role metadata, and unsupported lifecycle guarantees.
 
-## v1.2.1 — 2026-07-16
+## v1.2.1
 
 ### English
 
@@ -196,7 +192,7 @@ are noted only as source references.
 - 保留 parent Fast mode 的既有繼承行為。不安裝無法真正阻止 spawn call
   的 hook；runtime hard block 仍需等待上游 Codex 支援。
 
-## v1.2.0 — 2026-07-15
+## v1.2.0
 
 - Add the three-key MultiAgentV2 compatibility adapter so named roles remain
   selectable outside the reserved collaboration schema.
@@ -226,7 +222,7 @@ are noted only as source references.
   traceback.
 - Add Python CI for unit tests, syntax checks, and packaged config validation.
 
-## v1.1.0 — 2026-07-15
+## v1.1.0
 
 - Establish pilotfish-codex as an independent Codex-native project while
   retaining the original pilotfish attribution and MIT notices.
@@ -269,14 +265,14 @@ are noted only as source references.
   pin, strict config validation, customized-file diffs, and key-level uninstall
   restoration.
 
-## v1.0.1 — 2026-07-10
+## v1.0.1
 
 - Fix Codex 0.144.1 compatibility: use `sandbox_mode = "read-only"` for `scout`
   and `explore` instead of the unsupported `locked-network` value.
 - Fix install URLs to point at `miyago9267/pilotfish-codex` rather than the
   non-Codex fork path.
 
-## v1.0.0 — 2026-07-10
+## v1.0.0
 
 Initial release of pilotfish-codex: a Codex CLI adaptation of
 [pilotfish](https://github.com/Nanako0129/pilotfish)'s multi-model orchestration

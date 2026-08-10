@@ -62,7 +62,7 @@ function Assert-Prerequisites {
   if ($LASTEXITCODE -ne 0) { Fail "Python 3.11+ is required (tomllib)" }
 }
 
-$Arguments = if ($null -eq $RemainingArgs) { @() } else { $RemainingArgs }
+$Arguments = if ($null -eq $RemainingArgs) { @() } else { @($RemainingArgs) }
 for ($Index = 0; $Index -lt $Arguments.Count; $Index++) {
   $Argument = $Arguments[$Index]
   if ($Argument -eq "--help") {

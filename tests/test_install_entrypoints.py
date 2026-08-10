@@ -21,6 +21,7 @@ class InstallerEntrypointTests(unittest.TestCase):
         self.assertIn("Invoke-WebRequest", powershell)
         self.assertIn("tar", powershell)
         self.assertIn("finally", powershell)
+        self.assertIn("@($RemainingArgs)", powershell)
 
 
 if __name__ == "__main__":
