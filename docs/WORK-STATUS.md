@@ -136,6 +136,9 @@ host，且 active policy 是 dotfiles symlink，需先確認 target 後使用
 的 dry-run，再在核准後執行 installer，最後用
 `install/probe_hybrid_runtime.py --run-session` 確認 Plugin/Skill 狀態。
 
+舊版 state v2 若缺少後續加入的 `policy_ownership` 欄位，已納入受限相容升級；
+仍須通過既有 target fingerprint、hook projection 與 config provenance 驗證。
+
 ## Handoff rule
 
 handoff 只需要提供：

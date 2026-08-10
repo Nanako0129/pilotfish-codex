@@ -547,12 +547,18 @@ def _validate_committed_state(
     }
     legacy_with_plugin = legacy_allowed | {"plugin", "runtime_status", "rollback_backups"}
     v2_allowed = legacy_allowed | {"state_version", "hook_registration", "policy_ownership"}
+    v2_pre_policy_ownership = (
+        v2_allowed - {"policy_ownership"}
+    )
     is_v2 = "state_version" in state
     if is_v2 and type(state["state_version"]) is int and state["state_version"] == 3:
         allowed_top = v2_allowed | {"plugin", "runtime_status", "rollback_backups"}
     else:
         allowed_top = v2_allowed if is_v2 else legacy_allowed
-    if set(state) not in (allowed_top, legacy_with_plugin if not is_v2 else allowed_top):
+    accepted_shapes = [allowed_top]
+    if is_v2 and state.get("state_version") == 2:
+        accepted_shapes.append(v2_pre_policy_ownership)
+    if set(state) not in accepted_shapes:
         raise InstallAbort("install state has missing or unknown fields")
     if is_v2 and (
         type(state["state_version"]) is not int or state["state_version"] not in (2, 3)
