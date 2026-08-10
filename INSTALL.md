@@ -11,22 +11,26 @@ replace that runbook.
 The installer changes one Codex home. The default is `~/.codex`; set the
 `CODEX_HOME` environment variable or pass `--codex-home` to select another
 home. It installs the
-native seven-role manifest, the managed orchestration policy, native config,
-and the Pilotfish hook registration and script. It does not install an
+native Pilotfish roles, the active bootstrap block in the selected root
+`AGENTS.md`, the `pilotfish-codex` Plugin/Skill through Codex's local
+marketplace contract, native config, and the Pilotfish hook registration and
+script. It does not install an
 adapter, change shell startup files, manage credentials, or use `sudo`.
 
 Before any run, confirm all of the following:
 
-- Codex CLI is exactly `0.146.0` (one bare version token; a suffix or an
-  ambiguous `--version` result is not accepted).
+- Codex CLI is `>=0.146.0` (one bare version token; a suffix or an ambiguous
+  `--version` result is not accepted).
 - Python is `3.11` or newer.
-- A local checkout has Bash and Python. No network tools are needed for the
-  local path.
-- A remote path additionally needs Bash, `curl`, `tar`, `mktemp`, and network
-  access to `github.com`. The remote archive is selected by a visible ref.
-- The shell entrypoint is `install/install.sh`; the actual installer remains
-  `install/install.py`. `--ref` belongs to the shell wrapper and must not be
-  passed to `install.py`.
+- A local POSIX checkout has Bash and Python; a native Windows checkout has
+  PowerShell and Python. No network tools are needed for the local path.
+- A remote POSIX path additionally needs `curl`, `tar`, `mktemp`, and network
+  access to `github.com`; a remote PowerShell path uses
+  `Invoke-WebRequest` and `tar`. The remote archive is selected by a visible
+  ref.
+- The POSIX entrypoint is `install/install.sh`; the native Windows entrypoint is
+  `install/install.ps1`; the actual installer remains `install/install.py`.
+  `--ref` belongs to either wrapper and must not be passed to `install.py`.
 
 Do not print or copy `auth.json`, tokens, API keys, or other credentials while
 inspecting the home.
@@ -114,6 +118,13 @@ PILOTFISH_TARGET_HOME="${CODEX_HOME:-$HOME/.codex}"
 bash install/install.sh --dry-run --codex-home "$PILOTFISH_TARGET_HOME"
 ```
 
+Native Windows PowerShell:
+
+```powershell
+$pilotfishHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
+.\install\install.ps1 --dry-run --codex-home $pilotfishHome
+```
+
 Pinned remote source (replace the placeholder with an exact published tag or
 full commit SHA; do not run the placeholder itself):
 
@@ -135,6 +146,9 @@ A successful dry-run prints `would change primary:` lines and allowed state,
 backup, and pending-artifact names, or says that the target is already up to
 date. It must not create those artifacts. A failed dry-run is a stop signal;
 resolve its ownership or state error rather than weakening the installer.
+When the host Plugin registry is unavailable, the native runtime still installs
+but the committed state records Plugin status as `unavailable`; this is a
+fallback, not proof that the Skill is active.
 
 ## Install after approval
 
@@ -146,6 +160,13 @@ Local checkout:
 ```bash
 PILOTFISH_TARGET_HOME="${CODEX_HOME:-$HOME/.codex}"
 bash install/install.sh --codex-home "$PILOTFISH_TARGET_HOME"
+```
+
+Native Windows PowerShell:
+
+```powershell
+$pilotfishHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
+.\install\install.ps1 --codex-home $pilotfishHome
 ```
 
 Pinned remote source:

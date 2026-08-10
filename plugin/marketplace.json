@@ -1,0 +1,17 @@
+{
+  "name": "pilotfish-codex",
+  "plugins": [
+    {
+      "name": "pilotfish-codex",
+      "source": {
+        "source": "local",
+        "path": "./pilotfish-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

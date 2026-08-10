@@ -5,6 +5,18 @@ the policy block in `AGENTS.md` (`<!-- pilotfish-codex vX.Y.Z -->`).
 pilotfish-codex uses its own semantic versioning; upstream pilotfish versions
 are noted only as source references.
 
+## Unreleased — 2026-08-10
+
+- Add the Hybrid runtime: a minimal always-on root bootstrap plus the
+  `pilotfish-orchestration` Skill packaged in a Codex local marketplace Plugin.
+- Integrate the bootstrap into the active policy while preserving user bytes,
+  and record Plugin name, version, source digest, and availability in state v3.
+- Preserve valid extra roles and keep customized same-name role replacement
+  explicit; unavailable Plugin installation retains the native fallback.
+- Add a native PowerShell installer wrapper and Windows CI entrypoint; the
+  wrapper delegates to the same Python installer and supports local or pinned
+  remote sources like the POSIX shell path.
+
 ## v1.6.2 — 2026-08-09
 
 - Fix Windows hook marker handling without requiring POSIX file-mode semantics.

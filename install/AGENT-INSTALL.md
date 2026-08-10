@@ -1,7 +1,8 @@
 # Pilotfish-Codex native install runbook
 
-This runbook installs one native Codex 0.146 Multi-Agent target. It does not
-support an adapter fallback.
+This runbook installs one native Codex Multi-Agent target plus the Hybrid
+Pilotfish bootstrap and Plugin/Skill package. It does not support an adapter
+fallback.
 
 ## Preconditions
 
@@ -30,14 +31,17 @@ max_concurrent_threads_per_session = 3
    a single parseable semantic version; do not hard-pin a release in the
    installer.
 2. Read the active `config.toml`, effective global policy (`AGENTS.override.md`
-   wins over `AGENTS.md`), and recursively discovered role files. Preserve all
-   unrelated content.
+   wins over `AGENTS.md`) and recursively discovered role files. The installer
+   integrates only the short bootstrap into the selected active root policy
+   file while preserving bytes outside its marker block. It installs the full
+   workflow through Codex's local marketplace and `codex plugin add` contract.
 3. Locate the sibling install state
    `<CODEX_HOME>.pilotfish-install-state.json`. A `.pending` state or stale
    committed fingerprint stops the installation for operator resolution.
-4. Present changed paths, timestamped backups, unowned legacy keys, customized
-   same-name roles, and extra roles. General home-write approval never approves
-   customized same-name role replacement.
+4. Present changed paths, timestamped backups, unowned legacy keys, and
+   customized same-name roles. Valid extra user roles are preserved and do not
+   block installation. General home-write approval never approves customized
+   same-name role replacement.
 5. Obtain the separate home-write approval before backing up or writing a real
    Codex home. Offline tests use only temporary homes.
 
@@ -60,7 +64,14 @@ Unrelated config and custom same-name role bytes remain untouched.
 
 The installer refuses disabled or scalar legacy V2 forms, inline/dotted forms,
 and malformed/conflicting `[agents]` values. Fresh homes receive the native
-`[agents]` table; migration removes only the exact proven old V2 table.
+`[agents]` table and an active managed bootstrap block in `AGENTS.md`; migration
+removes only the exact proven old V2 table. Existing user policy bytes outside
+the managed block are preserved byte-for-byte.
+
+The sidecar is state version 3 for new installs and records Plugin name,
+version, source digest, and `installed` or `unavailable` status. An unavailable
+Plugin does not invalidate the native runtime, but the installer must not claim
+that the Skill is active.
 
 Release-pinned canonical v1.3.0 `plan-verifier` and `security-reviewer` bytes
 may upgrade to their packaged v1.3.1 replacements. The released canonical
@@ -77,13 +88,19 @@ retain role validation, transaction fingerprints, and post-write verification.
 
 ## Install entrypoints and offline validation
 
-For a local checkout, use the shell bootstrapper. It selects the checkout,
-forwards `--codex-home` and `--dry-run` to the one real installer, and never
-needs a network download:
+For a local checkout, use the POSIX shell bootstrapper or native Windows
+PowerShell wrapper. Both select the checkout, forward options to the one real
+installer, and never need a network download:
 
 ```bash
 bash install/install.sh --dry-run --codex-home "$ACTIVE_CODEX_HOME"
 bash install/install.sh --codex-home "$ACTIVE_CODEX_HOME"
+```
+
+```powershell
+$activeCodexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
+.\install\install.ps1 --dry-run --codex-home $activeCodexHome
+.\install\install.ps1 --codex-home $activeCodexHome
 ```
 
 For a remote install, choose a release tag or immutable commit SHA. Pin that
@@ -105,6 +122,18 @@ The direct Python route is equivalent for a checked-out repository:
 python3 install/install.py --codex-home "$ACTIVE_CODEX_HOME"
 python3 install/validate_agents.py \
   --config "$ACTIVE_CODEX_HOME/config.toml" "$ACTIVE_CODEX_HOME/agents"
+```
+
+To produce the Hybrid activation report, use a fresh process. The report keeps
+bootstrap, Plugin/Skill availability, and behavior verification separate:
+
+```bash
+python3 install/probe_hybrid_runtime.py \
+  --codex-home "$ACTIVE_CODEX_HOME" \
+  --project "$ACTIVE_CODEX_HOME" \
+  --persona-token Monika \
+  --recap-token recap \
+  --run-session
 ```
 
 Do not add `[agents.<role>] config_file` declarations. Native recursive

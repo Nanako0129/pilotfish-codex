@@ -214,8 +214,11 @@ def _read_proven_policy_symlink(
     except (OSError, ValueError) as exc:
         raise StageError("effective policy symlink is unavailable") from exc
     if (
-        relative.parent != Path(".")
-        or relative.name not in {"AGENTS.md", "AGENTS.override.md"}
+        relative not in {
+            Path("AGENTS.md"),
+            Path("AGENTS.override.md"),
+            Path("pilotfish/AGENTS.md"),
+        }
         or not stat.S_ISLNK(link_before.st_mode)
     ):
         raise StageError("unapproved policy symlink")
@@ -271,6 +274,7 @@ def _copy_proven_policy_symlink(
         expected_digest,
     )
     try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
         with destination.open("xb") as writer:
             writer.write(payload)
             writer.flush()
@@ -376,15 +380,20 @@ def _active_hook_state(
             "original_targets",
             "owned_legacy",
             "hook_registration",
+            "policy_ownership",
         }
+        expected_v3_keys = expected_keys | {"plugin", "runtime_status", "rollback_backups"}
         if (
             not isinstance(state, dict)
-            or set(state) != expected_keys
+            or set(state) not in (
+                expected_keys, expected_keys - {"policy_ownership"},
+                expected_v3_keys,
+            )
             or type(state.get("state_version")) is not int
-            or state["state_version"] != 2
+            or state["state_version"] not in (2, 3)
             or state.get("status") != "committed"
         ):
-            raise HookRegistrationError("install state is not committed v2")
+            raise HookRegistrationError("install state is not committed v2/v3")
         projection_id = validate_projection_state(state["hook_registration"])
         if projection_id != CURRENT_PROJECTION_ID:
             raise HookRegistrationError("active hook projection is not current")
@@ -542,11 +551,19 @@ def explicit_layout_error(
     top_names = {entry.name for entry in entries if entry.parent == root}
     if not {"config.toml", "agents", "hooks.json", "hooks"} <= top_names:
         return "missing mandatory config, role manifest, or hook artifacts"
-    if len({"AGENTS.md", "AGENTS.override.md"} & top_names) != 1:
-        return "exactly one effective policy file is required"
+    user_policies = [
+        root / name
+        for name in ("AGENTS.override.md", "AGENTS.md")
+        if (root / name).is_file() and (root / name).read_text(encoding="utf-8").strip()
+    ]
+    source_policy = root / "pilotfish" / "AGENTS.md"
+    if len(user_policies) > 1:
+        return "both policy files are non-empty"
+    if not user_policies and not source_policy.is_file():
+        return "no effective or source-only policy file is available"
 
     top_files = (HASHED_TOP_LEVEL - {"agents", "hooks"}) | REQUIRED_RUNTIME_FILES
-    top_directories = {"agents", "hooks"}
+    top_directories = {"agents", "hooks", "pilotfish"}
     nested_agent_directories: set[Path] = set()
     manifest_directories: set[Path] = set()
     hook_files: set[Path] = set()
@@ -608,6 +625,10 @@ def explicit_layout_error(
             if relative != HOOK_SCRIPT:
                 return f"unapproved entry: {relative.as_posix()}"
             hook_files.add(relative)
+            continue
+        if relative.parts[0] == "pilotfish":
+            if relative != Path("pilotfish/AGENTS.md") or not is_file:
+                return f"unapproved entry: {relative.as_posix()}"
             continue
         if relative.parts[0] != "agents":
             return f"unapproved entry: {relative.as_posix()}"
@@ -704,14 +725,17 @@ def _copy_inputs(
     except HookRegistrationError as exc:
         raise StageError(f"active hooks.json ownership is invalid: {exc}") from exc
     projection_snapshot = _projection_snapshot(active)
-    policies = [
-        name
+    user_policies = [
+        active / name
         for name in ("AGENTS.override.md", "AGENTS.md")
-        if (active / name).is_file()
+        if (active / name).is_file() and (active / name).read_text(encoding="utf-8").strip()
     ]
-    if len(policies) != 1:
-        raise StageError("exactly one effective policy file is required")
-    policy = active / policies[0]
+    if len(user_policies) > 1:
+        raise StageError("both policy files are non-empty")
+    policy = user_policies[0] if user_policies else active / "pilotfish" / "AGENTS.md"
+    if not policy.is_file():
+        raise StageError("no effective or source-only policy file is available")
+    policy_relative = policy.relative_to(active)
     policy_digest: str | None = None
     snapshots = [
         _copy_projected_config(
@@ -721,17 +745,17 @@ def _copy_inputs(
         ),
     ]
     if policy.is_symlink():
-        policy_digest = _state_policy_digest(install_state, policies[0])
+        policy_digest = _state_policy_digest(install_state, policy_relative.as_posix())
         snapshots.extend(
             _copy_proven_policy_symlink(
                 policy,
-                temporary / policies[0],
+                temporary / policy_relative,
                 active,
                 policy_digest,
             )
         )
     else:
-        snapshots.append(_copy_regular(policy, temporary / policies[0], active))
+        snapshots.append(_copy_regular(policy, temporary / policy_relative, active))
     snapshots.extend(
         _copy_tree(
             active / "agents",
@@ -829,7 +853,11 @@ def _read_stable_required(
 
 def _required_input_projection(root: Path) -> tuple[str, str, str, str, str, str]:
     """Hash config, policy, role manifest, and exact hook artifacts."""
-    policy_paths = (root / "AGENTS.override.md", root / "AGENTS.md")
+    policy_paths = (
+        root / "AGENTS.override.md",
+        root / "AGENTS.md",
+        root / "pilotfish" / "AGENTS.md",
+    )
     policy_projection: list[tuple[Path, tuple[int, ...] | None]] = []
     for path in policy_paths:
         try:
@@ -839,13 +867,16 @@ def _required_input_projection(root: Path) -> tuple[str, str, str, str, str, str
         except OSError as exc:
             raise StageError("effective policy is unavailable") from exc
         policy_projection.append((path, fingerprint))
-    policies = [
+    user_policies = [
         path
-        for path, fingerprint in policy_projection
-        if fingerprint is not None
+        for path in policy_paths[:2]
+        if path.is_file() and path.read_text(encoding="utf-8").strip()
     ]
-    if len(policies) != 1:
-        raise StageError("exactly one effective policy file is required")
+    if len(user_policies) > 1:
+        raise StageError("both policy files are non-empty")
+    policies = user_policies or [policy_paths[2]]
+    if not policies[0].is_file():
+        raise StageError("no effective or source-only policy file is available")
 
     config_content, config_fingerprint = _read_stable_required(
         root / "config.toml",
@@ -855,7 +886,7 @@ def _required_input_projection(root: Path) -> tuple[str, str, str, str, str, str
         policy_content, policy_snapshots = _read_proven_policy_symlink(
             policies[0],
             root,
-            _active_policy_digest(root, policies[0].name),
+            _active_policy_digest(root, policies[0].relative_to(root).as_posix()),
         )
     else:
         policy_content, policy_fingerprint = _read_stable_required(

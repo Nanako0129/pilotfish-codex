@@ -226,6 +226,12 @@ class NativeConfigMergeTests(unittest.TestCase):
 
 
 class NativeInstallTests(unittest.TestCase):
+    def test_codex_cli_resolves_windows_command_variants(self) -> None:
+        with mock.patch.object(
+            installer.shutil, "which", side_effect=[None, None, r"C:\codex.cmd"]
+        ):
+            self.assertEqual(installer._codex_cli(), "codex.cmd")
+
     def run_install(self, home: Path, **kwargs: object) -> int:
         return install(source_root=ROOT, codex_home=home, dry_run=False, check_codex=False, **kwargs)
 
@@ -315,7 +321,11 @@ class NativeInstallTests(unittest.TestCase):
                 (home / "hooks" / "pilotfish_autoroute_gate.py").read_bytes(),
                 (ROOT / "hooks" / "pilotfish_autoroute_gate.py").read_bytes(),
             )
-            self.assertEqual(recorded["state_version"], 2)
+            self.assertEqual(recorded["state_version"], 3)
+            self.assertEqual(recorded["plugin"]["name"], "pilotfish-codex")
+            self.assertEqual(recorded["plugin"]["status"], "unavailable")
+            self.assertTrue(recorded["plugin"]["source_sha256"])
+            self.assertEqual(recorded["runtime_status"], "integrated-plugin-unavailable")
             self.assertNotIn("hooks.json", recorded["target_fingerprints"])
             self.assertEqual(
                 recorded["hook_registration"]["projection_id"],
@@ -363,6 +373,154 @@ class NativeInstallTests(unittest.TestCase):
             installed = policy.read_bytes()
             self.assertIn(b"# Existing policy\r\n", installed)
             self.assertNotIn(b"# Existing policy\n", installed.replace(b"\r\n", b""))
+
+    def test_runtime_install_integrates_policy_and_records_ownership_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            home.mkdir()
+            policy = home / "AGENTS.md"
+            original = (
+                "# Miyago\n\n"
+                "- Persona: Monika\n"
+                "- Language: Traditional Chinese\n"
+                "- Always include a concise recap.\n"
+            ).encode()
+            policy.write_bytes(original)
+
+            self.assertEqual(self.run_install(home), 0)
+
+            installed = policy.read_bytes()
+            self.assertTrue(installed.startswith(original))
+            self.assertIn(b"<!-- pilotfish-codex:begin -->", installed)
+            self.assertFalse((home / "pilotfish" / "AGENTS.md").exists())
+            state_path = home.with_name(f"{home.name}.pilotfish-install-state.json")
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                state["policy_ownership"],
+                {
+                    "user_policy": {
+                        "path": "AGENTS.md",
+                        "owner": "user",
+                        "status": "integrated",
+                        "sha256": hashlib.sha256(original).hexdigest(),
+                    },
+                    "pilotfish_policy": {
+                        "path": "AGENTS.md",
+                        "owner": "pilotfish",
+                        "status": "integrated",
+                        "sha256": hashlib.sha256(installed).hexdigest(),
+                    },
+                },
+            )
+            backup_name = state["rollback_backups"]["AGENTS.md"]
+            self.assertTrue((home / backup_name).is_file())
+
+    def test_existing_full_policy_marker_migrates_to_bootstrap_without_touching_user_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            home.mkdir()
+            prefix = b"# Persona\nkeep-before = true\n\n"
+            suffix = b"\n## Local rule\nkeep-after = true\n"
+            policy = home / "AGENTS.md"
+            old = (ROOT / "templates" / "agents-md.orchestration.md").read_bytes()
+            policy.write_bytes(prefix + old + suffix)
+
+            self.assertEqual(self.run_install(home), 0)
+
+            installed = policy.read_bytes()
+            self.assertTrue(installed.startswith(prefix))
+            self.assertTrue(installed.endswith(suffix))
+            self.assertIn(b"### Pilotfish always-on bootstrap", installed)
+            self.assertNotIn(b"#### Native typed spawn policy", installed)
+
+    def test_plugin_adapter_uses_codex_marketplace_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            completed = [
+                mock.Mock(returncode=0, stdout="{}", stderr=""),
+                mock.Mock(
+                    returncode=0,
+                    stdout=json.dumps({
+                        "marketplaces": [{
+                            "name": "pilotfish-codex",
+                            "root": str(ROOT / "plugin"),
+                        }]
+                    }),
+                    stderr="",
+                ),
+                mock.Mock(
+                    returncode=0,
+                    stdout="{}",
+                    stderr="",
+                ),
+                mock.Mock(
+                    returncode=0,
+                    stdout=json.dumps({
+                        "installed": [{
+                            "name": "pilotfish-codex",
+                            "marketplaceName": "pilotfish-codex",
+                            "version": "1.6.2",
+                            "enabled": True,
+                            "marketplaceSource": {"source": str(ROOT / "plugin")},
+                        }]
+                    }),
+                    stderr="",
+                ),
+            ]
+            with mock.patch.object(installer.subprocess, "run", side_effect=completed) as run:
+                result = installer._install_plugin(
+                    source_root=ROOT,
+                    codex_home=home,
+                    dry_run=False,
+                    enabled=True,
+                )
+            self.assertEqual(result["status"], "installed")
+            self.assertEqual(run.call_count, 4)
+            self.assertEqual(run.call_args_list[0].args[0][0:4], [
+                "codex", "plugin", "marketplace", "add",
+            ])
+            self.assertEqual(run.call_args_list[1].args[0], [
+                "codex", "plugin", "marketplace", "list", "--json",
+            ])
+            self.assertEqual(run.call_args_list[2].args[0][0:4], [
+                "codex", "plugin", "add", "pilotfish-codex@pilotfish-codex",
+            ])
+            self.assertEqual(run.call_args_list[3].args[0], [
+                "codex", "plugin", "list", "--json",
+            ])
+            self.assertEqual(run.call_args_list[0].kwargs["env"]["CODEX_HOME"], str(home))
+
+    def test_plugin_unavailable_commits_native_fallback_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            unavailable = {
+                "name": "pilotfish-codex",
+                "version": "1.6.2",
+                "status": "unavailable",
+                "source_sha256": installer._plugin_source_digest(ROOT / "plugin"),
+            }
+            with mock.patch.object(
+                installer.subprocess, "run",
+                return_value=mock.Mock(returncode=0, stdout="codex 0.147.0", stderr=""),
+            ), mock.patch.object(installer, "_probe_plugin", return_value=unavailable), mock.patch.object(
+                installer, "_install_plugin", return_value=unavailable,
+            ) as install_plugin:
+                self.assertEqual(
+                    installer.install(
+                        source_root=ROOT,
+                        codex_home=home,
+                        dry_run=False,
+                        check_codex=True,
+                    ),
+                    0,
+                )
+            state = json.loads(
+                home.with_name(f"{home.name}.pilotfish-install-state.json").read_text()
+            )
+            self.assertEqual(state["runtime_status"], "integrated-plugin-unavailable")
+            self.assertEqual(state["plugin"]["status"], "unavailable")
+            install_plugin.assert_called_once()
+            self.assertTrue((home / "AGENTS.md").is_file())
 
     def test_codex_hooks_state_append_is_accepted_and_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -555,7 +713,7 @@ class NativeInstallTests(unittest.TestCase):
             ).read_bytes()
             self.assertEqual(script.read_bytes(), selected_payload)
             committed = json.loads(state_path.read_text())
-            self.assertEqual(committed["state_version"], 2)
+            self.assertEqual(committed["state_version"], 3)
             self.assertEqual(
                 committed["target_fingerprints"][
                     "hooks/pilotfish_autoroute_gate.py"
@@ -708,7 +866,7 @@ class NativeInstallTests(unittest.TestCase):
             self.assertEqual(self.run_install(home), 0)
             self.assertEqual(hooks.read_bytes(), before)
             migrated = json.loads(state_path.read_text())
-            self.assertEqual(migrated["state_version"], 2)
+            self.assertEqual(migrated["state_version"], 3)
             self.assertNotIn("hooks.json", migrated["target_fingerprints"])
             self.assertEqual(self.run_install(home), 0)
 
@@ -1105,13 +1263,26 @@ class NativeInstallTests(unittest.TestCase):
             self.assertEqual(aborted["status"], "aborted")
             self.assertEqual(aborted["error"], "InstallAbort")
 
-    def test_extra_role_aborts_without_cleanup(self) -> None:
+    def test_extra_valid_role_is_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"; agents = home / "agents"; agents.mkdir(parents=True)
-            (agents / "Explore.toml").write_text('name = "Explore"\n')
-            with self.assertRaisesRegex(InstallAbort, "invalid role"):
-                self.run_install(home)
-            self.assertTrue((agents / "Explore.toml").exists())
+            extra = agents / "custom-reviewer.toml"
+            extra.write_text(
+                'name = "custom-reviewer"\n'
+                'description = "User-owned role"\n'
+                'model = "gpt-5.6-luna"\n'
+                'model_reasoning_effort = "medium"\n'
+                'developer_instructions = "Review the requested change."\n'
+            )
+            self.assertEqual(self.run_install(home), 0)
+            self.assertEqual(
+                extra.read_text(),
+                'name = "custom-reviewer"\n'
+                'description = "User-owned role"\n'
+                'model = "gpt-5.6-luna"\n'
+                'model_reasoning_effort = "medium"\n'
+                'developer_instructions = "Review the requested change."\n',
+            )
 
     def test_nested_malformed_or_duplicate_role_aborts_before_writes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

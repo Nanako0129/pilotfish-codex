@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pilotfish Orchestration"
+  short_description: "Route tasks with Pilotfish"
+  default_prompt: "Use Pilotfish orchestration for this task."

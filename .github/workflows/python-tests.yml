@@ -6,6 +6,7 @@ on:
       - "install/**"
       - "hooks/**"
       - "templates/**"
+      - "plugin/**"
       - "tests/**"
       - "docs/specs/dispatch-verification/**"
       - ".github/workflows/python-tests.yml"
@@ -16,6 +17,7 @@ on:
       - "install/**"
       - "hooks/**"
       - "templates/**"
+      - "plugin/**"
       - "tests/**"
       - "docs/specs/dispatch-verification/**"
       - ".github/workflows/python-tests.yml"
@@ -46,10 +48,16 @@ jobs:
         run: python -m unittest discover -s tests -v
 
       - name: Check Python syntax
-        run: python -m py_compile hooks/pilotfish_autoroute_gate.py install/install.py install/validate_agents.py install/verify_dispatch.py install/evaluate_dispatch.py
+        run: python -m py_compile hooks/pilotfish_autoroute_gate.py install/install.py install/probe_hybrid_runtime.py install/validate_agents.py install/verify_dispatch.py install/evaluate_dispatch.py
 
       - name: Check shell syntax
+        if: runner.os != 'Windows'
         run: bash -n install/install.sh
+
+      - name: Check PowerShell entrypoint
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./install/install.ps1 --help
 
       - name: Validate packaged configuration
         run: python install/validate_agents.py

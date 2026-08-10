@@ -109,7 +109,8 @@ The strict misses remain documented for follow-up.
 ## Install quickly
 
 Prerequisites: Codex CLI `>=0.146.0` (later releases are accepted), Python
-`3.11+`, Bash, and a local checkout.
+`3.11+`, and a local checkout. Use Bash on POSIX systems or PowerShell on
+native Windows.
 
 Run a dry-run first. It plans the changes without writing to the Codex home:
 
@@ -123,23 +124,30 @@ After reviewing the planned paths and approving the home write, run:
 bash install/install.sh --codex-home "$ACTIVE_CODEX_HOME"
 ```
 
-On native Windows, use the direct Python entrypoint from PowerShell because
-`install/install.sh` is a Bash wrapper:
+On native Windows, use the PowerShell wrapper; it delegates to the same
+`install.py` backend used on every OS:
 
 ```powershell
 $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME ".codex" }
-py -3 install/install.py --dry-run --codex-home $codexHome
-py -3 install/install.py --codex-home $codexHome
+.\install\install.ps1 --dry-run --codex-home $codexHome
+.\install\install.ps1 --codex-home $codexHome
 ```
 
-If an explicitly approved upstream replacement is needed for a customized
-same-name role, add `--replace-drifted-role <role>` to both commands. Repeat
-the option for multiple roles; use `--replace-drifted-roles` only when all
-drifted roles are intentionally being aligned. Role validation and
-post-install fingerprint verification remain enabled.
+The installer preserves valid user-owned roles outside Pilotfish's seven names.
+If a Pilotfish role has the same name as a customized user role, the install
+stops for explicit resolution. Add `--replace-drifted-role <role>` to both
+commands only after choosing the Pilotfish role; repeat the option for multiple
+roles. Use `--replace-drifted-roles` only when all same-name drifted roles are
+intentionally being aligned. Role validation and post-install fingerprint
+verification remain enabled.
 
-The installer adds the native seven-role manifest and the Pilotfish routing
-hook. Trust the hook in a new interactive Codex session after installation.
+The installer adds the native Pilotfish role manifest and routing hook,
+integrates a short always-on bootstrap into the active root `AGENTS.md`, and
+installs the full `pilotfish-orchestration` workflow through Codex's supported
+local marketplace/Plugin mechanism while preserving user content outside the
+managed marker block. Symlinked or
+hard-linked policy files require explicit resolution. Trust the hook in a new
+interactive Codex session after installation.
 On Windows, it also warns about preserved command hooks that lack
 `commandWindows`; those hooks are not modified automatically.
 

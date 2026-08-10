@@ -28,8 +28,9 @@ Wrapper options:
   --ref REF         Download the GitHub source at REF when no local checkout
                      is available. The same value may be written --ref=REF.
 
-Installer options are forwarded unchanged to install.py. The supported
-installer options are --dry-run and --codex-home PATH.
+Installer options are forwarded unchanged to install.py. Supported options
+include --dry-run, --codex-home, --replace-drifted-role, and
+--replace-drifted-roles.
 
 PILOTFISH_REF is used when --ref is not supplied; the default is main. A local
 checkout containing install/install.py and templates/agents is always preferred

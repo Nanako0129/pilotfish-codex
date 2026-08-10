@@ -81,6 +81,9 @@ class InstallAbort(Exception):
 
 
 MIN_COMPATIBLE_CODEX_VERSION = (0, 146, 0)
+PILOTFISH_PLUGIN_NAME = "pilotfish-codex"
+PILOTFISH_PLUGIN_VERSION = "1.6.2"
+RUNTIME_STATUSES = frozenset({"integrated", "integrated-plugin-unavailable"})
 
 
 def codex_version_token(output: str) -> str | None:
@@ -294,8 +297,165 @@ def _assert_active_instruction_file(home: Path, expected: Path) -> None:
         raise InstallAbort("active policy file changed while install was planned")
 
 
+def _policy_ownership(home: Path, user_policy: Path, pilotfish_policy: Path) -> dict[str, dict[str, str]]:
+    user_bytes = user_policy.read_bytes() if user_policy.is_file() else None
+    pilotfish_bytes = pilotfish_policy.read_bytes() if pilotfish_policy.is_file() else None
+    return {
+        "user_policy": {
+            "path": user_policy.relative_to(home).as_posix(),
+            "owner": "user" if user_bytes is not None else "none",
+            "status": "blocked-symlink" if user_policy.is_symlink() else "integrated",
+            "sha256": _sha256_bytes(user_bytes) if user_bytes is not None else "",
+        },
+        "pilotfish_policy": {
+            "path": pilotfish_policy.relative_to(home).as_posix(),
+            "owner": "pilotfish",
+            "status": "integrated",
+            "sha256": _sha256_bytes(pilotfish_bytes) if pilotfish_bytes is not None else "",
+        },
+    }
+
+
 def _sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
+
+
+def _plugin_source_digest(plugin_root: Path) -> str:
+    digest = hashlib.sha256()
+    for path in sorted(path for path in plugin_root.rglob("*") if path.is_file()):
+        digest.update(path.relative_to(plugin_root).as_posix().encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _codex_cli() -> str:
+    for candidate in ("codex", "codex.exe", "codex.cmd"):
+        if shutil.which(candidate):
+            return candidate
+    return "codex"
+
+
+def _same_path(left: Path, right: Path) -> bool:
+    return os.path.normcase(os.path.realpath(os.path.abspath(str(left)))) == os.path.normcase(
+        os.path.realpath(os.path.abspath(str(right)))
+    )
+
+
+def _plugin_descriptor(source_root: Path, status: str) -> dict[str, str]:
+    plugin_root = source_root / "plugin"
+    return {
+        "name": PILOTFISH_PLUGIN_NAME,
+        "version": PILOTFISH_PLUGIN_VERSION,
+        "status": status,
+        "source_sha256": _plugin_source_digest(plugin_root)
+        if plugin_root.is_dir() else "",
+    }
+
+
+def _plugin_is_installed(*, source_root: Path, codex_home: Path) -> bool:
+    plugin_root = source_root / "plugin"
+    environment = dict(os.environ)
+    environment["CODEX_HOME"] = str(codex_home)
+    try:
+        discovered = subprocess.run(
+            [_codex_cli(), "plugin", "list", "--json"],
+            capture_output=True, text=True, check=False, env=environment,
+        )
+    except OSError:
+        return False
+    try:
+        installed_plugins = json.loads(discovered.stdout).get("installed", [])
+    except (json.JSONDecodeError, AttributeError):
+        return False
+    return discovered.returncode == 0 and any(
+        isinstance(item, dict)
+        and item.get("name") == PILOTFISH_PLUGIN_NAME
+        and item.get("marketplaceName") == PILOTFISH_PLUGIN_NAME
+        and item.get("version") == PILOTFISH_PLUGIN_VERSION
+        and item.get("enabled") is True
+        and isinstance(item.get("marketplaceSource"), dict)
+        and _same_path(Path(str(item["marketplaceSource"].get("source", ""))), plugin_root)
+        for item in installed_plugins
+    )
+
+
+def _probe_plugin(*, source_root: Path, codex_home: Path, enabled: bool) -> dict[str, str]:
+    if not enabled or not (source_root / "plugin").is_dir():
+        return _plugin_descriptor(source_root, "unavailable")
+    return _plugin_descriptor(
+        source_root,
+        "installed" if _plugin_is_installed(source_root=source_root, codex_home=codex_home)
+        else "unavailable",
+    )
+
+
+def _install_plugin(
+    *, source_root: Path, codex_home: Path, dry_run: bool, enabled: bool,
+) -> dict[str, str]:
+    """Install through Codex's marketplace/add contract, never an arbitrary path."""
+    plugin_root = source_root / "plugin"
+    if not plugin_root.is_dir():
+        return _plugin_descriptor(source_root, "unavailable")
+    source_digest = _plugin_source_digest(plugin_root)
+    if not enabled:
+        return _plugin_descriptor(source_root, "unavailable")
+    result = {
+        "name": PILOTFISH_PLUGIN_NAME,
+        "version": PILOTFISH_PLUGIN_VERSION,
+        "status": "planned" if dry_run else "unavailable",
+        "source_sha256": source_digest,
+    }
+    if dry_run:
+        return result
+    environment = dict(os.environ)
+    environment["CODEX_HOME"] = str(codex_home)
+    try:
+        marketplace = subprocess.run(
+            [_codex_cli(), "plugin", "marketplace", "add", str(plugin_root), "--json"],
+            capture_output=True, text=True, check=False, env=environment,
+        )
+        marketplaces = subprocess.run(
+            [_codex_cli(), "plugin", "marketplace", "list", "--json"],
+            capture_output=True, text=True, check=False, env=environment,
+        )
+        try:
+            marketplace_rows = json.loads(marketplaces.stdout).get("marketplaces", [])
+        except (json.JSONDecodeError, AttributeError):
+            marketplace_rows = []
+        marketplace_available = any(
+            isinstance(item, dict)
+            and item.get("name") == PILOTFISH_PLUGIN_NAME
+            and _same_path(Path(str(item.get("root", ""))), plugin_root)
+            for item in marketplace_rows
+        )
+        if marketplaces.returncode != 0 or not marketplace_available:
+            return result
+        installed = subprocess.run(
+            [_codex_cli(), "plugin", "add", f"{PILOTFISH_PLUGIN_NAME}@{PILOTFISH_PLUGIN_NAME}", "--json"],
+            capture_output=True, text=True, check=False, env=environment,
+        )
+    except OSError:
+        return result
+    if installed.returncode == 0 and _plugin_is_installed(
+        source_root=source_root, codex_home=codex_home
+    ):
+        result["status"] = "installed"
+    return result
+
+
+def _remove_plugin(*, codex_home: Path) -> bool:
+    environment = dict(os.environ)
+    environment["CODEX_HOME"] = str(codex_home)
+    try:
+        removed = subprocess.run(
+            [_codex_cli(), "plugin", "remove", f"{PILOTFISH_PLUGIN_NAME}@{PILOTFISH_PLUGIN_NAME}", "--json"],
+            capture_output=True, text=True, check=False, env=environment,
+        )
+    except OSError:
+        return False
+    return removed.returncode == 0
 
 
 def _state_path(home: Path) -> Path:
@@ -381,16 +541,84 @@ def _validate_committed_state(
     """Validate sidecar provenance, including event-bound hook ownership."""
     if not isinstance(state, dict) or state.get("status") != "committed":
         raise InstallAbort("install state is not a committed transaction")
-    legacy_allowed = {"status", "target_fingerprints", "original_targets", "owned_legacy"}
-    v2_allowed = legacy_allowed | {"state_version", "hook_registration"}
+    legacy_allowed = {
+        "status", "target_fingerprints", "original_targets", "owned_legacy",
+        "policy_ownership",
+    }
+    legacy_with_plugin = legacy_allowed | {"plugin", "runtime_status", "rollback_backups"}
+    v2_allowed = legacy_allowed | {"state_version", "hook_registration", "policy_ownership"}
     is_v2 = "state_version" in state
-    allowed_top = v2_allowed if is_v2 else legacy_allowed
-    if set(state) != allowed_top:
+    if is_v2 and type(state["state_version"]) is int and state["state_version"] == 3:
+        allowed_top = v2_allowed | {"plugin", "runtime_status", "rollback_backups"}
+    else:
+        allowed_top = v2_allowed if is_v2 else legacy_allowed
+    if set(state) not in (allowed_top, legacy_with_plugin if not is_v2 else allowed_top):
         raise InstallAbort("install state has missing or unknown fields")
     if is_v2 and (
-        type(state["state_version"]) is not int or state["state_version"] != 2
+        type(state["state_version"]) is not int or state["state_version"] not in (2, 3)
     ):
         raise InstallAbort("install state version is malformed")
+    if is_v2 and state["state_version"] == 3:
+        if set(state) != v2_allowed | {"plugin", "runtime_status", "rollback_backups"}:
+            raise InstallAbort("install state v3 fields are malformed")
+        plugin = state.get("plugin")
+        if not isinstance(plugin, dict) or set(plugin) != {
+            "name", "version", "status", "source_sha256"
+        } or not all(isinstance(value, str) for value in plugin.values()):
+            raise InstallAbort("install state plugin status is malformed")
+        if plugin["name"] != PILOTFISH_PLUGIN_NAME or plugin["status"] not in {
+            "installed", "unavailable"
+        } or (plugin["source_sha256"] and not re.fullmatch(r"[0-9a-f]{64}", plugin["source_sha256"])):
+            raise InstallAbort("install state plugin status is malformed")
+        if state["runtime_status"] not in RUNTIME_STATUSES:
+            raise InstallAbort("install state runtime status is malformed")
+        rollback_backups = state["rollback_backups"]
+        if not isinstance(rollback_backups, dict) or not all(
+            isinstance(key, str)
+            and isinstance(value, str)
+            and not Path(key).is_absolute()
+            and Path(value).name == value
+            and ".pilotfish-codex-" in value
+            for key, value in rollback_backups.items()
+        ):
+            raise InstallAbort("install state rollback backup manifest is malformed")
+    elif "plugin" in state:
+        plugin = state["plugin"]
+        if not isinstance(plugin, dict) or set(plugin) != {
+            "name", "version", "status", "source_sha256"
+        } or not all(isinstance(value, str) for value in plugin.values()):
+            raise InstallAbort("install state plugin status is malformed")
+        if "runtime_status" in state and state["runtime_status"] not in RUNTIME_STATUSES:
+            raise InstallAbort("install state runtime status is malformed")
+        if "rollback_backups" in state:
+            rollback_backups = state["rollback_backups"]
+            if not isinstance(rollback_backups, dict) or not all(
+                isinstance(key, str)
+                and isinstance(value, str)
+                and not Path(key).is_absolute()
+                and Path(value).name == value
+                and ".pilotfish-codex-" in value
+                for key, value in rollback_backups.items()
+            ):
+                raise InstallAbort("install state rollback backup manifest is malformed")
+        if plugin["name"] != PILOTFISH_PLUGIN_NAME or plugin["status"] not in {
+            "installed", "unavailable"
+        } or (plugin["source_sha256"] and not re.fullmatch(r"[0-9a-f]{64}", plugin["source_sha256"])):
+            raise InstallAbort("install state plugin status is malformed")
+    if "policy_ownership" in state:
+        policy_ownership = state["policy_ownership"]
+        if not isinstance(policy_ownership, dict) or set(policy_ownership) != {
+            "user_policy", "pilotfish_policy"
+        }:
+            raise InstallAbort("install state policy ownership is malformed")
+        for entry_name in ("user_policy", "pilotfish_policy"):
+            entry = policy_ownership[entry_name]
+            if not isinstance(entry, dict) or set(entry) != {
+                "path", "owner", "status", "sha256"
+            }:
+                raise InstallAbort("install state policy ownership is malformed")
+            if not all(isinstance(entry[key], str) for key in entry):
+                raise InstallAbort("install state policy ownership is malformed")
     targets = state.get("target_fingerprints")
     originals = state.get("original_targets")
     if not isinstance(targets, dict) or not isinstance(originals, dict):
@@ -608,8 +836,6 @@ def _assert_agents_root(agents: Path, home: Path) -> None:
         errors = validate_agent(data)
         if errors:
             raise InstallAbort(f"invalid role {path}: {'; '.join(errors)}")
-        if name not in ROLES:
-            raise InstallAbort(f"role_manifest_extra: {name}")
 
 
 def _destination(path: Path) -> Path:
@@ -802,7 +1028,7 @@ def install(
     )
     if check_codex:
         try:
-            completed = subprocess.run(["codex", "--version"], capture_output=True, text=True, check=False)
+            completed = subprocess.run([_codex_cli(), "--version"], capture_output=True, text=True, check=False)
         except OSError:
             completed = None
         version = parse_codex_version((completed.stdout + completed.stderr) if completed and completed.returncode == 0 else "")
@@ -816,8 +1042,17 @@ def install(
     config_text, parsed_config = _decode_config(
         config_snapshot or b"", source="existing"
     )
-    policy_template = (source_root / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
-    policy_path = active_instruction_file(codex_home)
+    policy_template = (source_root / "templates" / "agents-md.bootstrap.md").read_text(encoding="utf-8")
+    user_policy_path = active_instruction_file(codex_home)
+    if user_policy_path.is_symlink():
+        raise InstallAbort(
+            "active policy path is a symlink; explicit policy integration is required"
+        )
+    if user_policy_path.is_file() and user_policy_path.stat().st_nlink > 1:
+        raise InstallAbort(
+            "active policy path is hard-linked; explicit policy integration is required"
+        )
+    policy_path = user_policy_path
     policy_bytes = policy_path.read_bytes() if policy_path.is_file() else None
     policy_text, policy_newline = _decode_instruction_bytes(policy_bytes)
     state = _load_state(codex_home)
@@ -853,6 +1088,27 @@ def install(
     )
     new_policy, policy_action = merge_instruction_text(policy_text, policy_template)
     policy_payload = _encode_instruction_text(new_policy, policy_newline)
+    policy_ownership = _policy_ownership(codex_home, user_policy_path, policy_path)
+    policy_ownership["pilotfish_policy"]["sha256"] = _sha256_bytes(policy_payload)
+    plugin = _probe_plugin(
+        source_root=source_root,
+        codex_home=codex_home,
+        enabled=check_codex,
+    )
+    plugin_was_installed = plugin["status"] == "installed"
+    plugin_install_needed = check_codex and (
+        plugin["status"] != "installed"
+        or state is None
+        or not isinstance(state.get("plugin") if state else None, dict)
+        or state["plugin"].get("source_sha256") != plugin["source_sha256"]
+    )
+    if dry_run and plugin_install_needed:
+        plugin["status"] = "planned"
+    runtime_status = (
+        "integrated" if plugin["status"] == "installed"
+        else "integrated-plugin-unavailable"
+    )
+    notes.append(f"pilotfish plugin status: {plugin['status']}")
     writes: list[tuple[Path, bytes, int, bytes | None]] = []
     if new_config != config_text:
         writes.append((config_path, new_config.encode(), 0o600, config_snapshot))
@@ -926,10 +1182,6 @@ def install(
         notes.append("upgraded state-proven hook script")
     elif current_hook_script is None:
         writes.append((hook_script, hook_script_payload, 0o600, None))
-    planned_roles = {p.stem for p in existing} | set(ROLES)
-    extras = planned_roles - ROLES
-    if extras:
-        raise InstallAbort(f"role_manifest_extra: {', '.join(sorted(extras))}")
     if legacy_v2:
         allowed_migration = {
             "config.toml",
@@ -966,12 +1218,16 @@ def install(
                                  "sha256": _sha256_bytes(current) if current is not None else None,
                                  "bytes_b64": base64.b64encode(current).decode() if current is not None else None}
     write_payloads = {path: payload for path, payload, _, _ in writes}
-    expected_inventory = {
-        path.relative_to(codex_home).as_posix(): _sha256_bytes(
-            write_payloads[path] if path in write_payloads else base64.b64decode(pre_targets[path.relative_to(codex_home).as_posix()]["bytes_b64"])
-        )
-        for path in inventory
-    }
+    expected_inventory: dict[str, str] = {}
+    for path in inventory:
+        relative = path.relative_to(codex_home).as_posix()
+        if path in write_payloads:
+            expected_inventory[relative] = _sha256_bytes(write_payloads[path])
+            continue
+        original = pre_targets[relative]["bytes_b64"]
+        if not isinstance(original, str):
+            raise InstallAbort(f"inventory target is missing without a planned write: {relative}")
+        expected_inventory[relative] = _sha256_bytes(base64.b64decode(original))
     state_pre_targets = {
         path.relative_to(codex_home).as_posix(): pre_targets[
             path.relative_to(codex_home).as_posix()
@@ -986,7 +1242,7 @@ def install(
     }
     state_needs_publication = state is None or legacy_state or (
         owned_hook_projection != desired_hook_projection
-    )
+    ) or state is None or state.get("plugin") != plugin or state.get("runtime_status") != runtime_status or plugin_install_needed
     if dry_run:
         for warning in windows_warnings:
             print(f"warning: {warning}")
@@ -1006,10 +1262,21 @@ def install(
                 print(f"allowed transaction artifact: {relative}.pilotfish-codex-<timestamp>")
         return 0
     if writes or state_needs_publication:
+        stamp = _stamp()
+        rollback_backups = {
+            path.relative_to(codex_home).as_posix():
+            f"{path.name}.pilotfish-codex-{stamp}"
+            for path, _, _, original in writes
+            if original is not None
+        }
         pending = _state_path(codex_home).with_suffix(".json.pending")
         pending_record = {
             "status": "pending",
             "original_targets": state_pre_targets,
+            "policy_ownership": policy_ownership,
+            "plugin": plugin,
+            "runtime_status": runtime_status,
+            "rollback_backups": rollback_backups,
             "owned_legacy": {
                 path: {
                     "original_present": True,
@@ -1025,36 +1292,53 @@ def install(
         state_original = state_path.read_bytes() if state_path.is_file() else None
         applied: list[tuple[Path, bytes | None, bytes, int]] = []
         state_payload: bytes | None = None
+        plugin_activated = False
         try:
             applied = _commit(
                 writes,
-                _stamp(),
+                stamp,
                 agents_root=agents,
                 hooks_root=hooks_root,
                 codex_home=codex_home,
-                policy_path=policy_path,
+                policy_path=user_policy_path,
             )
-            _assert_active_instruction_file(codex_home, policy_path)
+            _assert_active_instruction_file(codex_home, user_policy_path)
             for path in inventory:
                 relative = path.relative_to(codex_home).as_posix()
                 if not path.is_file() or _sha256_bytes(path.read_bytes()) != expected_inventory[relative]:
                     raise InstallAbort("post-write transaction fingerprint mismatch")
-            _assert_active_instruction_file(codex_home, policy_path)
+            _assert_active_instruction_file(codex_home, user_policy_path)
             for path in inventory:
                 relative = path.relative_to(codex_home).as_posix()
                 if not path.is_file() or _sha256_bytes(path.read_bytes()) != expected_inventory[relative]:
                     raise InstallAbort("post-write state publication fingerprint mismatch")
+            if plugin_install_needed:
+                plugin = _install_plugin(
+                    source_root=source_root,
+                    codex_home=codex_home,
+                    dry_run=False,
+                    enabled=True,
+                )
+                runtime_status = (
+                    "integrated" if plugin["status"] == "installed"
+                    else "integrated-plugin-unavailable"
+                )
+                plugin_activated = not plugin_was_installed and plugin["status"] == "installed"
             ownership = dict(pending_record["owned_legacy"])
             record = {
-                "state_version": 2,
+                "state_version": 3,
                 "status": "committed",
                 "target_fingerprints": expected_state_inventory,
                 "original_targets": state_pre_targets,
+                "policy_ownership": policy_ownership,
+                "plugin": plugin,
+                "runtime_status": runtime_status,
+                "rollback_backups": rollback_backups,
                 "owned_legacy": ownership,
                 "hook_registration": projection_state(desired_hook_projection),
             }
             state_payload = json.dumps(record, sort_keys=True).encode() + b"\n"
-            _assert_active_instruction_file(codex_home, policy_path)
+            _assert_active_instruction_file(codex_home, user_policy_path)
             _atomic_write_if_unchanged(
                 state_path,
                 state_payload,
@@ -1063,13 +1347,16 @@ def install(
             )
             if not state_path.is_file() or state_path.read_bytes() != state_payload:
                 raise InstallAbort("published install state changed before verification")
-            _assert_active_instruction_file(codex_home, policy_path)
+            _assert_active_instruction_file(codex_home, user_policy_path)
             if any(not path.is_file() or _sha256_bytes(path.read_bytes()) != expected_inventory[path.relative_to(codex_home).as_posix()] for path in inventory):
                 raise InstallAbort("post-sidecar transaction fingerprint mismatch")
             if not pending.is_file() or pending.read_bytes() != pending_payload:
                 raise InstallAbort("pending install state changed before removal")
             pending.unlink()
         except BaseException as exc:
+            plugin_rollback = "not-required"
+            if plugin_activated and plugin.get("status") == "installed":
+                plugin_rollback = "removed" if _remove_plugin(codex_home=codex_home) else "failed"
             current_state = state_path.read_bytes() if state_path.is_file() else None
             if state_payload is not None and current_state == state_payload:
                 if state_original is None:
@@ -1085,6 +1372,7 @@ def install(
                 else:
                     _atomic_write(path, original, mode)
             aborted = dict(pending_record, status="aborted", error=type(exc).__name__)
+            aborted["plugin_rollback"] = plugin_rollback
             aborted_payload = json.dumps(aborted, sort_keys=True).encode() + b"\n"
             if pending.is_file() and pending.read_bytes() == pending_payload:
                 _atomic_write(pending, aborted_payload, 0o600)
