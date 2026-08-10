@@ -161,6 +161,24 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("Treat a plausible reply", policy)
         self.assertNotIn("resume useful in-scope work in the same turn", policy)
 
+    def test_policy_isolates_blocked_tasks_and_stops_only_when_blocked_tasks_remain(self) -> None:
+        policy = " ".join(
+            (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8").split()
+        )
+        for phrase in (
+            "task ledger",
+            "split a prompt into independently trackable task units",
+            "blocked task does not block sibling tasks",
+            "runnable task",
+            "dependencies are satisfied",
+            "Prioritize runnable tasks",
+            "only blocked tasks remain",
+            "one consolidated blocker reminder",
+            "goal status remains `BLOCKED`",
+            "Do not emit `PAUSED_NEEDS_USER` while runnable tasks remain",
+        ):
+            self.assertIn(phrase, policy)
+
     def test_policy_schedules_native_parallel_calls_back_to_back(self) -> None:
         policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
         policy = " ".join(policy.split())

@@ -78,7 +78,15 @@ _CATEGORY_PATTERNS = {
     ),
 }
 _MARKER_KEYS = frozenset(
-    {"schema", "session_id", "turn_id", "categories", "required_task", "attempted"}
+    {
+        "schema",
+        "session_id",
+        "turn_id",
+        "categories",
+        "required_task",
+        "attempted",
+        "blocker_fingerprint",
+    }
 )
 _REVIEW_INTENT_PATTERNS = {
     "fast": re.compile(
@@ -146,6 +154,23 @@ def classify_review_intent(prompt: object) -> str | None:
         if pattern.search(text) is not None
     ]
     return matches[0] if len(matches) == 1 else None
+
+
+def _blocker_fingerprint(
+    prompt: object,
+    categories: tuple[str, ...],
+) -> str | None:
+    """Identify the same blocker without persisting prompt content."""
+    if not isinstance(prompt, str) or len(prompt) > MAX_PROMPT_CHARS:
+        return None
+    normalized = re.sub(r"\s+", " ", prompt.strip()).casefold()
+    material = json.dumps(
+        {"categories": list(categories), "prompt": normalized},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
 
 
 def _review_intent_output(
@@ -333,6 +358,8 @@ def _load_marker(codex_home: Path, session_id: str) -> dict[str, Any] | None:
         or not _valid_identifier(marker.get("turn_id"))
         or not isinstance(marker.get("attempted"), bool)
         or marker.get("required_task") != REQUIRED_TASK
+        or not isinstance(marker.get("blocker_fingerprint"), str)
+        or not re.fullmatch(r"[0-9a-f]{64}", marker["blocker_fingerprint"])
         or not isinstance(categories, list)
         or categories != sorted(set(categories))
         or any(category not in _CATEGORY_PATTERNS for category in categories)
@@ -995,14 +1022,25 @@ def _handle_prompt(payload: dict[str, Any], codex_home: Path) -> dict[str, Any] 
         _remove_marker(codex_home, session_id)
         return None
     if requires_sol_review(categories):
-        marker = {
-            "schema": SCHEMA,
-            "session_id": session_id,
-            "turn_id": turn_id,
-            "categories": list(categories),
-            "required_task": REQUIRED_TASK,
-            "attempted": False,
-        }
+        fingerprint = _blocker_fingerprint(payload.get("prompt"), categories)
+        previous = _load_marker(codex_home, session_id)
+        if (
+            fingerprint is not None
+            and previous is not None
+            and previous["blocker_fingerprint"] == fingerprint
+        ):
+            marker = dict(previous)
+            marker["turn_id"] = turn_id
+        else:
+            marker = {
+                "schema": SCHEMA,
+                "session_id": session_id,
+                "turn_id": turn_id,
+                "categories": list(categories),
+                "required_task": REQUIRED_TASK,
+                "attempted": False,
+                "blocker_fingerprint": fingerprint,
+            }
         if not _atomic_marker_write(codex_home, marker):
             _remove_marker(codex_home, session_id)
     else:
@@ -1048,8 +1086,10 @@ def _handle_stop(payload: dict[str, Any], codex_home: Path) -> dict[str, str] | 
     ):
         _remove_marker(codex_home, session_id)
         return None
-    if payload.get("stop_hook_active") is not False or marker["attempted"]:
+    if payload.get("stop_hook_active") is not False:
         _remove_marker(codex_home, session_id)
+        return None
+    if marker["attempted"]:
         return None
     marker["attempted"] = True
     if not _atomic_marker_write(codex_home, marker):

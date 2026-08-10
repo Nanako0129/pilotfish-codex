@@ -40,10 +40,15 @@ def prompt_input(prompt: str, *, turn_id: str = TURN) -> dict[str, object]:
     }
 
 
-def stop_input(transcript: Path, *, active: bool = False) -> dict[str, object]:
+def stop_input(
+    transcript: Path,
+    *,
+    turn_id: str = TURN,
+    active: bool = False,
+) -> dict[str, object]:
     return {
         "session_id": SESSION,
-        "turn_id": TURN,
+        "turn_id": turn_id,
         "transcript_path": str(transcript),
         "cwd": "/workspace",
         "hook_event_name": "Stop",
@@ -200,7 +205,15 @@ class AutorouteHookTests(unittest.TestCase):
             marker = json.loads(markers[0].read_text(encoding="utf-8"))
             self.assertEqual(
                 set(marker),
-                {"schema", "session_id", "turn_id", "categories", "required_task", "attempted"},
+                {
+                    "schema",
+                    "session_id",
+                    "turn_id",
+                    "categories",
+                    "required_task",
+                    "attempted",
+                    "blocker_fingerprint",
+                },
             )
             self.assertEqual(marker["session_id"], SESSION)
             self.assertEqual(marker["turn_id"], TURN)
@@ -367,7 +380,7 @@ class AutorouteHookTests(unittest.TestCase):
             self.assertIsNone(gate.handle(stop_input(transcript), codex_home=home))
             self.assertEqual(list((home / gate.MARKER_DIRECTORY).glob("*.json")), [])
 
-    def test_unproven_review_blocks_once_then_clears(self) -> None:
+    def test_unproven_review_blocks_once_then_waits(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "codex-home"
             home.mkdir()
@@ -382,7 +395,41 @@ class AutorouteHookTests(unittest.TestCase):
             marker = next((home / gate.MARKER_DIRECTORY).glob("*.json"))
             self.assertTrue(json.loads(marker.read_text())["attempted"])
             self.assertIsNone(gate.handle(stop_input(transcript), codex_home=home))
+            self.assertTrue(marker.exists())
+            gate.handle(prompt_input("請處理下一個普通拼字修正。"), codex_home=home)
             self.assertFalse(marker.exists())
+
+    def test_same_review_blocker_does_not_repeat_after_next_turn(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "codex-home"
+            home.mkdir()
+            transcript = home / "sessions" / "rollout.jsonl"
+
+            gate.handle(prompt_input(TRIGGER), codex_home=home)
+            write_events(transcript, [session_meta(), task_started()])
+            self.assertEqual(
+                gate.handle(stop_input(transcript), codex_home=home),
+                gate.BLOCK_OUTPUT,
+            )
+
+            next_turn = "next-turn"
+            gate.handle(
+                prompt_input(TRIGGER, turn_id=next_turn),
+                codex_home=home,
+            )
+            write_events(
+                transcript,
+                [
+                    session_meta(),
+                    task_started(started_at=ROOT_STARTED_AT + 1),
+                ],
+            )
+            self.assertIsNone(
+                gate.handle(
+                    stop_input(transcript, turn_id=next_turn),
+                    codex_home=home,
+                )
+            )
 
     def test_complete_intrinsically_linked_child_suppresses_duplicate_retry(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
