@@ -64,6 +64,9 @@ native runtime、policy ownership、transaction、migration 與 fresh-session pr
 - [x] Cross-OS verification：Bash syntax、PowerShell wrapper contract（Windows
   CI）、Python compile、Plugin/Skill validators、Markdown lint 與 full test
   matrix 均已納入或通過。
+- [x] General-mode decision checkpoint：schema、確認／拒絕／模糊回覆、resume
+  contract tests 與 fresh Codex acceptance smoke 均通過；T9 三平台 hook parity
+  仍未完成。
 
 ## Open todo
 
@@ -148,8 +151,9 @@ Policy marker 為 `1.6.3`、Plugin 為 `1.7.0`；active policy symlink 保留並
 `integrated-symlink-target` 記錄。一次失敗交易的
 pending sidecar 已保留為 `/Users/miyago/.codex.pilotfish-install-state.json.aborted-20260810T141400Z`，可供追查，未刪除。
 
-最後驗證：336 tests passed、1 skipped，Plugin validator、Markdown lint、native
-config/role validator 與 fresh session probe 均通過。
+最後驗證：342 tests passed、1 skipped，Plugin validator、Markdown lint、native
+config/role validator、fresh session probe 與 decision checkpoint acceptance
+smoke 均通過。
 
 Release baseline：Policy 為 `1.6.3`、Installer 為 `1.7.0`，已建立
 `policy-v1.6.3` 與 `installer-v1.7.0` annotated tags；未完成的 decision
