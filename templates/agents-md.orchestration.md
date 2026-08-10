@@ -206,11 +206,15 @@ Use these task states:
 - `BLOCKED`: this task cannot proceed until its cited blocker is resolved.
 
 A task is `runnable` only when it is `PENDING`, its dependencies are satisfied
-(`DONE`), and
-no authority, permission, review, environment, or external prerequisite blocks
-that task. Prioritize runnable tasks and schedule independent runnable tasks
-before revisiting a blocked task. A blocked task does not block sibling tasks
-unless a dependency edge explicitly says it does.
+(`DONE`), and no authority, permission, review, environment, or external
+prerequisite blocks that task. Prioritize runnable tasks and schedule independent
+runnable tasks before revisiting a blocked task. Two or more runnable tasks with
+no dependency path or write-ownership conflict should execute horizontally in
+parallel, subject to the bounded concurrency limit and the main session's
+integration ownership. Tasks with a dependency path execute after their
+predecessors; tasks sharing a mutable resource or exclusive file scope are
+serialized. A blocked task does not block sibling tasks unless a dependency edge
+explicitly says it does.
 
 When a task becomes blocked:
 
@@ -222,8 +226,8 @@ When a task becomes blocked:
   non-interrupting status note is optional and must not restart the blocked task.
 
 When no runnable or pending task remains and one or more tasks are `BLOCKED`,
-that means only blocked tasks remain.
-emit one consolidated blocker reminder containing the blocked task ids, blocker,
+that means only blocked tasks remain. Emit one consolidated blocker reminder
+containing the blocked task ids, blocker,
 already completed work, and the exact human recovery point, then stop and wait
 for human intervention. The goal status remains `BLOCKED`; it must not be
 reported as `DONE`. A human response or valid evidence may clear only the

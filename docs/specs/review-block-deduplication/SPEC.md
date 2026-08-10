@@ -25,10 +25,10 @@ hook 反覆輸出相同訊息、要求相同動作，或阻止與該 blocker 無
 
 ### Next release
 
-一般模式 decision checkpoint 保留在本 spec，但明確延後到下一版本。完整
-prompt-to-task decomposition、runnable-first scheduler，以及以 task 為單位
-的 sibling isolation 仍是本份修正 spec 的後續實作切片；本次只先完成
-block-loop 修正，確認無誤後再接續處理 task ledger。
+一般模式 decision checkpoint 保留在本 spec，但明確延後到下一版本。task
+ledger、runnable-first scheduler，以及以 task 為單位的 sibling isolation
+屬於目前版本的執行規則；本次新增水平並行邊界，仍受 bounded concurrency、
+dependency 與 write-ownership 限制。
 
 ## Problem
 
@@ -47,6 +47,10 @@ block-loop 修正，確認無誤後再接續處理 task ledger。
   task 為 blocker、receipt、完成與 recovery 的最小狀態單位。
 - 某一 task blocked 時，不得鎖定同一 prompt 中仍可安全執行的 sibling tasks。
 - 只要仍有 runnable task，阻塞提醒應被抑制或降為非中斷的狀態紀錄。
+- 沒有 dependency path 且沒有 write-ownership/resource conflict 的 runnable
+  tasks 應水平並行執行，受 bounded concurrency 限制。
+- 有 dependency path 的 tasks 必須等待 predecessor；共用 mutable resource 或
+  exclusive file scope 的 tasks 必須序列化。
 - 所有 runnable tasks 完成且只剩 blocked tasks 時，才發出一次彙總提醒並中斷
   當前行為，等待人類確認或排除 blocker。
 - goal 的整體狀態在仍有 blocked task 時不得標記為完成；應保留 blocked 狀態
