@@ -66,8 +66,8 @@ Plugin 使用 Codex 支援的 manifest／installation mechanism，預期結構�
 
 ```text
 plugin/
-├── marketplace.json
-└── pilotfish-codex/
+├── .agents/plugins/marketplace.json
+└── plugins/pilotfish-codex/
     ├── .codex-plugin/
     │   └── plugin.json
     ├── skills/
@@ -204,10 +204,10 @@ Report separately: `bootstrap=active`, `plugin=installed|unavailable`,
 - `install/stage_smoke_home.py`
 - `templates/agents-md.bootstrap.md`
 - `templates/agents-md.orchestration.md`
-- `plugin/marketplace.json`
-- `plugin/pilotfish-codex/.codex-plugin/plugin.json`
-- `plugin/pilotfish-codex/skills/pilotfish-orchestration/SKILL.md`
-- `plugin/pilotfish-codex/skills/pilotfish-orchestration/references/*`
+- `plugin/.agents/plugins/marketplace.json`
+- `plugin/plugins/pilotfish-codex/.codex-plugin/plugin.json`
+- `plugin/plugins/pilotfish-codex/skills/pilotfish-orchestration/SKILL.md`
+- `plugin/plugins/pilotfish-codex/skills/pilotfish-orchestration/references/*`
 - `tests/test_install.py`
 - `tests/test_plugin.py`
 - `tests/test_live_policy_activation.py`

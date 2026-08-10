@@ -139,6 +139,9 @@ host，且 active policy 是 dotfiles symlink，需先確認 target 後使用
 舊版 state v2 若缺少後續加入的 `policy_ownership` 欄位，已納入受限相容升級；
 仍須通過既有 target fingerprint、hook projection 與 config provenance 驗證。
 
+Codex marketplace package 使用官方 `.agents/plugins/marketplace.json` layout；
+實機安裝前曾因舊 layout 被 CLI 拒絕，已修正並待重新安裝 Plugin。
+
 ## Handoff rule
 
 handoff 只需要提供：
