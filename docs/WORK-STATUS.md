@@ -127,13 +127,14 @@ native runtime、policy ownership、transaction、migration 與 fresh-session pr
 
 ## Next smallest action
 
-Hybrid spec 與跨 OS Installer slice 已完成。POSIX 使用 `install/install.sh`，
-native Windows 使用 `install/install.ps1`，兩者共用 `install/install.py`；Windows
-PowerShell entrypoint 由 CI 驗證，本機未安裝 `pwsh`。若 Miyago 要啟用目前 user
-host，且 active policy 是 dotfiles symlink，需先確認 target 後使用
-`--follow-policy-symlink`。下一個最小動作是先依 `INSTALL.md` 執行同一 source/ref
-的 dry-run，再在核准後執行 installer，最後用
-`install/probe_hybrid_runtime.py --run-session` 確認 Plugin/Skill 狀態。
+Hybrid spec、Policy `1.6.3` 與 Installer `1.7.0` 已完成。POSIX 使用
+`install/install.sh`，native Windows 使用 `install/install.ps1`，兩者共用
+`install/install.py`；Windows PowerShell entrypoint 由 CI 驗證，本機未安裝
+`pwsh`。目前 user host 已完成實機升級與 fresh-session probe。
+
+下一個最小動作是處理 `review-block-deduplication` spec 中延後的 decision
+checkpoint、session resume 與三平台 hook parity；這些保留在 `Unreleased`，不屬於
+本次 `1.6.3`／`1.7.0` release。
 
 舊版 state v2 若缺少後續加入的 `policy_ownership` 欄位，已納入受限相容升級；
 仍須通過既有 target fingerprint、hook projection 與 config provenance 驗證。
@@ -143,13 +144,14 @@ Codex marketplace package 使用官方 `.agents/plugins/marketplace.json` layout
 寫入 `config.toml` 後的 post-sidecar fingerprint 收斂，並已完成實機重新安裝。
 
 實機結果：`runtime_status=integrated`、Plugin `installed`、Skill `available`；
-active policy symlink 保留並以 `integrated-symlink-target` 記錄。一次失敗交易的
+Policy marker 為 `1.6.3`、Plugin 為 `1.7.0`；active policy symlink 保留並以
+`integrated-symlink-target` 記錄。一次失敗交易的
 pending sidecar 已保留為 `/Users/miyago/.codex.pilotfish-install-state.json.aborted-20260810T141400Z`，可供追查，未刪除。
 
 最後驗證：336 tests passed、1 skipped，Plugin validator、Markdown lint、native
 config/role validator 與 fresh session probe 均通過。
 
-Release baseline：Policy 為 `1.6.3`、Installer 為 `1.7.0`，分別建立
+Release baseline：Policy 為 `1.6.3`、Installer 為 `1.7.0`，已建立
 `policy-v1.6.3` 與 `installer-v1.7.0` annotated tags；未完成的 decision
 checkpoint 保留在 `Unreleased`。
 
