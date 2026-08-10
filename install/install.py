@@ -739,7 +739,15 @@ def _validate_committed_state(
     elif _sha256_bytes(reconstructed.encode()) == recorded_config_digest:
         expected_config = reconstructed.encode()
     else:
-        raise InstallAbort("committed config provenance cannot be reconstructed")
+        _, reconstructed_parsed = _decode_config(
+            reconstructed.encode(), source="reconstructed committed"
+        )
+        _, current_parsed = _decode_config(config_snapshot, source="current")
+        if _routing_projection(current_parsed, owned) != _routing_projection(
+            reconstructed_parsed, owned
+        ):
+            raise InstallAbort("committed config provenance cannot be reconstructed")
+        expected_config = config_snapshot
 
     if _sha256_bytes(config_snapshot) != recorded_config_digest:
         _, expected_parsed = _decode_config(

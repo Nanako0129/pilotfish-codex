@@ -345,6 +345,21 @@ class NativeInstallTests(unittest.TestCase):
             second = {p.relative_to(home): p.read_bytes() for p in home.rglob("*") if p.is_file()}
             self.assertEqual(first, second)
 
+    def test_state_accepts_verified_unowned_config_change(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            config = home / "config.toml"
+            config.write_bytes(config.read_bytes() + b'\n[plugins."local-extra"]\nenabled = true\n')
+            state_path = home.with_name(f"{home.name}.pilotfish-install-state.json")
+            state = json.loads(state_path.read_text())
+            state["target_fingerprints"]["config.toml"] = hashlib.sha256(
+                config.read_bytes()
+            ).hexdigest()
+            state_path.write_text(json.dumps(state, sort_keys=True) + "\n")
+
+            self.assertEqual(self.run_install(home), 0)
+
     @unittest.skipUnless(os.name == "nt", "Windows-specific installer path")
     def test_windows_install_uses_path_replacement_for_role_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

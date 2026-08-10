@@ -7,7 +7,7 @@ are noted only as source references.
 
 ## v1.7.0 — 2026-08-10
 
-### [policy-v1.7.0]
+### [policy-v1.6.3]
 
 - Add the Hybrid runtime: a minimal always-on root bootstrap plus the
   `pilotfish-orchestration` Skill packaged in a Codex local marketplace Plugin.

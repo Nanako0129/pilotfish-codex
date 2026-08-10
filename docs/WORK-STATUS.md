@@ -46,7 +46,7 @@ native runtime、policy ownership、transaction、migration 與 fresh-session pr
 - [x] Installer state v3：記錄 Plugin name/version/source digest/status、runtime
   outcome 與 exact rollback backup manifest；Codex
   CLI 不可用時保留 native fallback 並標記 `unavailable`。
-- [x] Current targeted/full Python verification：335 tests，1 skipped，全部通過；
+- [x] Current targeted/full Python verification：336 tests，1 skipped，全部通過；
   Plugin、Skill validators 與 `git diff --check` 通過。
 - [x] Plugin discovery probe：installer 會用 `codex plugin list --json` 驗證
   name、marketplace、version 與 enabled，未通過時不宣稱 Skill active。
@@ -146,11 +146,12 @@ Codex marketplace package 使用官方 `.agents/plugins/marketplace.json` layout
 active policy symlink 保留並以 `integrated-symlink-target` 記錄。一次失敗交易的
 pending sidecar 已保留為 `/Users/miyago/.codex.pilotfish-install-state.json.aborted-20260810T141400Z`，可供追查，未刪除。
 
-最後驗證：335 tests passed、1 skipped，Plugin validator、Markdown lint、native
+最後驗證：336 tests passed、1 skipped，Plugin validator、Markdown lint、native
 config/role validator 與 fresh session probe 均通過。
 
-Release baseline：`v1.7.0` 分為 `policy-v1.7.0` 與 `installer-v1.7.0` 兩個
-annotated tags；未完成的 decision checkpoint 保留在 `Unreleased`。
+Release baseline：Policy 為 `1.6.3`、Installer 為 `1.7.0`，分別建立
+`policy-v1.6.3` 與 `installer-v1.7.0` annotated tags；未完成的 decision
+checkpoint 保留在 `Unreleased`。
 
 ## Handoff rule
 
