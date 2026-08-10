@@ -174,6 +174,4 @@ bun run lint:md
 python3 -m unittest discover -s tests -v
 ```
 
-## Documentation
-
 MIT. The original Pilotfish attribution and permission notice are retained.

@@ -1,8 +1,0 @@
-{
-  "name": "dispatch-positive-mechanical",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node --test"
-  }
-}

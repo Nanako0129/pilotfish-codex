@@ -1,1 +1,0 @@
-Create REPORT.md comparing surface-a and surface-b across the five dimensions enforced by verify-report.mjs. Support every conclusion with file:line evidence, preserve existing files, run npm test, and report the outcome.

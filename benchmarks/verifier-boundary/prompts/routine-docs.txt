@@ -1,1 +1,0 @@
-Correct the spelling error in README.md and run the repository test command. Do not change any other file.

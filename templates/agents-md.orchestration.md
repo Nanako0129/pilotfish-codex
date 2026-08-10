@@ -192,8 +192,8 @@ from the recorded gate when a valid receipt or a genuine user decision arrives.
 
 #### Task ledger and blocked-task isolation
 
-When one user prompt contains multiple independently executable outcomes, split a
-prompt into independently trackable task units before execution. The main
+When one user prompt contains multiple independently executable outcomes, split
+a prompt into independently trackable task units before execution. The main
 session owns a task ledger; every task records a stable id, outcome, scope,
 dependencies, state, blocker, and completion evidence. Do not treat the prompt
 as one indivisible task merely because it arrived in one message.
