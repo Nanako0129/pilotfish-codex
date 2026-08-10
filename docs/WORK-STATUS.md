@@ -46,18 +46,18 @@ native runtime、policy ownership、transaction、migration 與 fresh-session pr
 - [x] Installer state v3：記錄 Plugin name/version/source digest/status、runtime
   outcome 與 exact rollback backup manifest；Codex
   CLI 不可用時保留 native fallback 並標記 `unavailable`。
-- [x] Current targeted/full Python verification：334 tests，1 skipped，全部通過；
+- [x] Current targeted/full Python verification：335 tests，1 skipped，全部通過；
   Plugin、Skill validators 與 `git diff --check` 通過。
 - [x] Plugin discovery probe：installer 會用 `codex plugin list --json` 驗證
   name、marketplace、version 與 enabled，未通過時不宣稱 Skill active。
 - [x] Fresh `codex exec --ephemeral` probe：新 process 讀取 bootstrap、Persona
-  token 與 Recap token，並通過 `pilotfish_behavior=verified`；本次未把 Plugin
-  安裝到 user host，因此 Skill activation 保持 `unavailable`。
+  token 與 Recap token，並通過 `pilotfish_behavior=verified`；目前 user host 的
+  Plugin/Skill 已由實機安裝啟用。
 - [x] Hybrid activation report：`probe_hybrid_runtime.py` 已驗證
   `bootstrap=active`、Persona/Recap tokens 與 `pilotfish_behavior=verified`，並
-  將目前 host 的 `plugin/skill=unavailable` 明確分開回報。
-- [x] Hybrid runtime T1–T9 implementation audit completed；目前 user host 未安裝
-  Plugin 是外部 activation state，不是 installer source 缺口。
+  將目前 host 的 `plugin=installed`、`skill=available` 明確回報。
+- [x] Hybrid runtime T1–T9 implementation audit completed；user host 已完成
+  Plugin/Skill activation，並通過 fresh-session probe。
 - [x] Cross-OS installer path：POSIX `install.sh` 與 Windows PowerShell
   `install.ps1` 共用同一個 `install.py`，Codex command resolution 支援
   `codex`、`codex.exe`、`codex.cmd`。
@@ -109,9 +109,8 @@ native runtime、policy ownership、transaction、migration 與 fresh-session pr
   `~/.codex/AGENTS.md` symlink 載入。
 - `resume` 可能保留舊 session 的 instruction snapshot；runtime probe 必須
   使用全新 `codex` process。
-- 本次 local migration 不代表 repository installer 的 host Plugin 已執行；
-  repository installer 與 probe 已完成，實際 user host install 仍需依 INSTALL
-  的 dry-run／approval boundary 執行。
+- repository installer 已在目前 user host 完成；後續升級仍應依 INSTALL 的
+  dry-run／approval boundary 執行。
 - dotfile 與本 repo 仍可能有未 commit 的 local／spec changes；commit 前必須
   重新檢查各自 worktree。
 
