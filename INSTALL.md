@@ -19,7 +19,7 @@ adapter, change shell startup files, manage credentials, or use `sudo`.
 
 Before any run, confirm all of the following:
 
-- Codex CLI is `>=0.146.0` (one bare version token; a suffix or an ambiguous
+- Codex CLI is `>=0.147.0` (one bare version token; a suffix or an ambiguous
   `--version` result is not accepted).
 - Python is `3.11` or newer.
 - A local POSIX checkout has Bash and Python; a native Windows checkout has

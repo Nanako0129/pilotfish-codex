@@ -63,8 +63,35 @@ class PolicyTests(unittest.TestCase):
             "Never treat a plausible free-text answer as approval",
             "confirmed reply produces a resume record",
             "card's implied authorization",
+            "Optional MCP elicitation adapter",
+            "native decision card is the default interaction surface",
+            "optional adapter, not a Pilotfish core dependency",
+            "fall back to the native card or concise text checkpoint",
+            "one concise, high-level decision",
+            "one high-level question",
+            "Do not turn a general-mode checkpoint into a Plan-mode questionnaire",
+            "defer secondary implementation details",
         ):
             self.assertIn(phrase, policy)
+
+    def test_policy_defaults_to_autonomous_decisions_and_escalates_only_material_choices(self) -> None:
+        policy = " ".join(
+            (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8").split()
+        )
+        for phrase in (
+            "default is autonomous",
+            "low-risk, reversible, and scope is clear",
+            "directly choose a reasonable default",
+            "must not ask the user to approve every small ambiguity",
+            "only when the choice changes the outcome",
+            "permission, security, or acceptance boundary",
+            "low-cost exploration may continue without a card",
+            "checkpoint is an exception decision mechanism",
+            "not a step-by-step approval workflow",
+        ):
+            self.assertIn(phrase, policy)
+
+        self.assertNotIn("ask the user to approve every decision", policy)
 
     def test_policy_keeps_parent_accountability_and_local_escape_hatches(self) -> None:
         policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")
@@ -299,8 +326,8 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertRegex(
             policy,
-            r"Otherwise end the turn with `PAUSED_NEEDS_USER`, one concise question, "
-            r"choices, and a recommendation",
+            r"If neither surface is available, end the turn with `PAUSED_NEEDS_USER`, "
+            r"one concise question, choices, and a recommendation",
         )
         self.assertRegex(
             policy,

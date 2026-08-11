@@ -93,7 +93,7 @@ benchmark and bar charts are in the
 
 The registered live cohort used 60 cases from the three representative
 scenarios, with one route call and one checkpoint call per case using Codex CLI
-`0.146.0`.
+`0.147.0`.
 
 | Signal | Result | Interpretation |
 | --- | ---: | --- |
@@ -108,7 +108,7 @@ The strict misses remain documented for follow-up.
 
 ## Install quickly
 
-Prerequisites: Codex CLI `>=0.146.0` (later releases are accepted), Python
+Prerequisites: Codex CLI `>=0.147.0` (later releases are accepted), Python
 `3.11+`, and a local checkout. Use Bash on POSIX systems or PowerShell on
 native Windows.
 

@@ -42,16 +42,17 @@ lower routine cost without weakening high-judgment work.
 
 ## Codex native compatibility floor
 
-The active Codex CLI is validated by its documented native `[agents]` contract.
-The installer requires only the minimum compatible version `>=0.146.0`; it
+The active Codex CLI is validated by its documented native root concurrency
+contract. The installer requires only the minimum compatible version
+`>=0.147.0`; it
 records the observed semantic version and accepts later releases without an
 exact-version pin.
 
-- Reject an unparseable version or a release below `0.146.0`; do not reject a
+- Reject an unparseable version or a release below `0.147.0`; do not reject a
   later release merely because it is newer. Native contract evidence remains
   authoritative for behavior compatibility.
 - Replace the old `[features.multi_agent_v2]` total of four slots with the
-  documented `[agents]` setting `enabled = true` and a child limit of three.
+  documented root setting `max_concurrent_threads_per_session = 3`.
   This preserves one root plus up to three children.
 - Atomically migrate only the prior, installer-owned V2 config. A false,
   malformed, or unowned legacy value remains fail-closed; unrelated config and
@@ -59,7 +60,7 @@ exact-version pin.
 - Treat the complete old V2 table as owned only when every recorded install
   target still matches its committed fingerprint and the table is exactly
   `enabled = true` with total concurrency `4`. A stale state, extra V2 keys,
-  an unowned table, or conflicting `[agents]` values aborts before writes.
+  an unowned table, or conflicting root/legacy values aborts before writes.
 - Require the committed sidecar to have exactly `config.toml`, the seven
   canonical role paths, and the currently selected active-policy path in both
   target maps. Every entry needs valid fingerprint and original-byte evidence;
@@ -75,11 +76,11 @@ exact-version pin.
 - Validate with focused unit tests, a strict-config parse, a temporary-home
   install/stage check, then a real installer dry-run and active installation.
 - Update README, the install runbook, and design rationale so no document still
-  presents V2 or 0.145 as the active configuration contract.
+  presents V2, 0.146, or `[agents]` as the active configuration contract.
 
 ## Active-install result
 
-The protected 0.146 dry-run against `~/.codex` first stopped on a stale
+The protected 0.147 dry-run against `~/.codex` first stopped on a stale
 committed state without writing. With explicit operator authorization, the
 affected targets were backed up, the approved packaged Plan and outcome
 verifier contracts replaced their stale copies, and the strict sidecar was

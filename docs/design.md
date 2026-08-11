@@ -7,18 +7,23 @@ IDs, resume commands, and `Explore` shadowing are not Codex runtime claims.
 
 ## Native Multi-Agent boundary
 
-The active target is the native Codex contract, with `0.146.0` as the minimum
+The active target is the native Codex contract, with `0.147.0` as the minimum
 compatibility floor; later releases are accepted after parsing and native
-contract validation. It uses one explicit global
-agent table:
+contract validation. Child concurrency is a root-level setting:
 
 ```toml
-[agents]
-enabled = true
 max_concurrent_threads_per_session = 3
+
+[features]
+default_mode_request_user_input = true
 ```
 
 The value is child concurrency, so three permits the root plus three children.
+The native decision-card feature is enabled so Default mode can expose the
+same bounded `request_user_input` interaction used by Plan mode.
+The root model, reasoning effort, and Plan-mode effort are user preferences:
+Pilotfish defaults them for a fresh install but does not claim ownership, so a
+user may temporarily switch the main session to another compatible model.
 Role TOMLs retain model and reasoning-effort precedence. The retired V2 feature
 table is migratable only with exact installer provenance; the active contract
 does not rely on an adapter namespace, metadata visibility override, or an
@@ -28,7 +33,7 @@ Migration provenance is an exact committed sidecar schema: `config.toml`, the
 seven canonical role paths, and the currently selected policy must be the only
 entries in both target maps, with matching SHA-256 fingerprints and original
 byte evidence. Missing, stale, extra, or malformed state, an unowned V2 key,
-or a conflicting `[agents]` value aborts before writes. Dry-run reports only
+or a conflicting root concurrency value aborts before writes. Dry-run reports only
 primary paths and the pending/committed sidecars plus backups for replaced
 targets; it creates none.
 
@@ -97,11 +102,24 @@ searches, and reversible probes. A missing floor causes the session to state
 uncertainty; an exhausted ceiling causes it to narrow, pause, or ask rather
 than silently authorize writes.
 
-Material choices use an AskUserQuestion-style decision card. It is a concise
-user checkpoint containing the current interpretation, recommended default,
-relevant scope and exclusions, decision options, and the next reversible
-slice. It is adaptive and does not replace the internal Plan; low-risk work
-without a blocking choice need not show one.
+Material choices use an AskUserQuestion-style decision card. It is one concise,
+high-level user checkpoint containing the current interpretation, recommended
+default, relevant scope and exclusions, decision options, and the next
+reversible slice. The default remains autonomous: low-risk, reversible,
+scope-clear work
+and bounded exploratory probes continue with a reasonable local default. The
+card appears only when the choice can change the outcome, permission, security,
+or acceptance; it does not replace the internal Plan or turn ordinary ambiguity
+into a user approval step. Secondary details are deferred until the selected
+direction resumes and reaches a new material boundary.
+
+The native card is the default interaction surface. An independently maintained
+MCP elicitation bridge may be installed as an optional structured transport for
+the same checkpoint when the Codex host exposes form elicitation. It is not a
+Pilotfish core dependency, does not replace `request_user_input`, and must
+preserve the card schema, affected scope, exclusions, approval boundary, and
+resume point. Unsupported, cancelled, timed-out, or invalid MCP responses fall
+back to the native card or concise text checkpoint.
 
 Direction checks reuse the existing `verifier` role through an explicit
 `direction_checkpoint` contract. `CONTINUE` preserves the path, `PIVOT`
@@ -118,7 +136,8 @@ Before likely long work, the main session announces `AUTO` or `ASK`; absence is
 not authority, and `/goal` preserves only the objective. `AUTO` covers approved,
 reversible scope and P2 adjudication, not new version-control, publish, install,
 credential, destructive, external, scope, or spending authority. `ASK` uses
-Codex `request_user_input` only when exposed, otherwise pauses the turn.
+Codex `request_user_input` only when exposed, may use the optional MCP bridge
+when configured, and otherwise pauses the turn.
 
 Normal recovery is one targeted recheck of the original reproduction plus a
 bounded basic regression. Five materially changed P1/P2 passes remain an

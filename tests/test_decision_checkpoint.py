@@ -78,6 +78,10 @@ class DecisionCheckpointTests(unittest.TestCase):
         with self.assertRaisesRegex(CheckpointError, "two or three"):
             validate_checkpoint(invalid)
         invalid = card()
+        invalid["questions"] = [{"question": "follow-up detail"}]
+        with self.assertRaisesRegex(CheckpointError, "fields are missing or unknown"):
+            validate_checkpoint(invalid)
+        invalid = card()
         invalid["recommended_option"] = "unknown"
         with self.assertRaisesRegex(CheckpointError, "recommended_option"):
             validate_checkpoint(invalid)

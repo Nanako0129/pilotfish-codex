@@ -12,10 +12,15 @@ fallback.
 - The native configuration is exactly:
 
 ```toml
-[agents]
-enabled = true
 max_concurrent_threads_per_session = 3
+
+[features]
+default_mode_request_user_input = true
 ```
+
+Pilotfish owns the orchestration contract, not the user's main-session model
+preference. Fresh homes default to Luna/medium with xhigh Plan reasoning;
+existing model and effort choices are preserved and may be changed later.
 
 - The value is child concurrency: one root plus up to three children. Do not
   emit `features.multi_agent_v2`, adapter namespace/metadata keys, or
@@ -63,8 +68,8 @@ unchanged. Conflicting `[agents]` values and extra V2 keys abort as well.
 Unrelated config and custom same-name role bytes remain untouched.
 
 The installer refuses disabled or scalar legacy V2 forms, inline/dotted forms,
-and malformed/conflicting `[agents]` values. Fresh homes receive the native
-`[agents]` table and an active managed bootstrap block in `AGENTS.md`; migration
+and malformed/conflicting `[agents]` values. Fresh homes receive the root
+concurrency key and an active managed bootstrap block in `AGENTS.md`; migration
 removes only the exact proven old V2 table. Existing user policy bytes outside
 the managed block are preserved byte-for-byte.
 
@@ -220,7 +225,8 @@ python3 "$REPO_ROOT/install/stage_smoke_home.py" \
 ```
 
 The helper derives a canonical config containing the installed Luna/medium root
-binding, xhigh Plan mode, `agents.enabled = true`, and child concurrency `3`.
+binding, xhigh Plan mode, native Default-mode decision cards, and child
+concurrency `3`.
 It then copies one effective policy, the seven-role manifest, source-owned
 `hooks.json` plus its hook script, and `auth.json`. All other active config
 keys remain untouched and are not selected for the smoke.

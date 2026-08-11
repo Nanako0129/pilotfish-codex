@@ -1,27 +1,33 @@
 ---
 id: spec-review-block-deduplication
-title: Review blocker deduplication and human recovery
+title: Codex general-mode decision checkpoints and review recovery
 status: in_progress
 created: 2026-08-10
 updated: 2026-08-10
 author: Miyago
 priority: high
-tags: [hook, review, circuit-breaker, waiting-state, recovery]
+tags: [codex, decision-checkpoint, review, circuit-breaker, recovery]
 ---
 
 ## Goal
 
-修正 review-service circuit breaker 在同一個 blocker 跨 turn 持續存在時的
-重複阻塞行為。必要警告只輸出一次；後續維持可辨識的等待狀態，不得讓 Stop
-hook 反覆輸出相同訊息、要求相同動作，或阻止與該 blocker 無關的工作。
+建立 Codex 一般模式的例外型 decision checkpoint：Codex 預設自行判斷並繼續
+可安全執行的工作，只有在 blocker、探索分歧或權限／安全邊界會改變結果時，才
+像 Plan mode 一樣提出少量選項並等待使用者選擇。同時修正 review-service
+circuit breaker 在同一個 blocker 跨 turn 持續存在時的重複阻塞行為。
+
+本 spec 的 runtime target 是 Codex CLI／App 及其原生 `AGENTS.md`、Plugin、
+hooks、roles 與 interactive question 能力；Claude Code、OpenCode、Grok Build
+等其他 harness 不在本 spec 的相容性承諾內。
 
 ## Release boundary
 
 ### Current release
 
-本次只處理 blocker 的跨 turn 去重與死循環：同一個 blocker 只警告一次，
-後續維持 blocked/waiting state，不重新輸出同一個阻塞訊息。先以最小可驗證
-切片完成，確保不破壞既有 mandatory review gate。
+本次處理 Codex 一般模式的 autonomy／checkpoint 邊界，以及 blocker 的跨 turn
+去重與死循環：同一個 blocker 只警告一次，後續維持 blocked/waiting state；
+正常且可逆的判斷由 Codex 自行完成，不把每個歧義升級成使用者批准。先以最小
+可驗證切片完成，確保不破壞既有 mandatory review gate。
 
 ### Next release
 
@@ -55,10 +61,14 @@ dependency 與 write-ownership 限制。
   當前行為，等待人類確認或排除 blocker。
 - goal 的整體狀態在仍有 blocked task 時不得標記為完成；應保留 blocked 狀態
   與每個 task 的獨立結果。
-- Codex 一般模式在 task 拆分、blocker 處理、風險、權限或驗收條件會影響
-  結果時，必須能提出結構化 decision checkpoint，讓使用者確認後再繼續。
+- Codex 一般模式預設自行處理低風險、可逆、scope 明確且可由現有證據判斷的
+  選擇，不得因每個小歧義要求使用者批准。
+- 當 task 拆分、blocker 處理、探索方向、風險、權限或驗收條件會改變結果時，
+  必須能提出結構化 decision checkpoint，讓使用者選擇後再繼續受影響的 task。
 - decision checkpoint 應提供少量、互斥、可理解的選項與推薦預設，不得把
   未決的產品或安全選擇藏在自由文字推測裡。
+- 一般模式每次 checkpoint 只問一個高層方向問題；不得模仿 Plan mode 展開
+  多題細節問卷，細節應在選定方向恢復後於新的 material boundary 再詢問。
 - 若問題只影響單一 blocked task，checkpoint 不得要求使用者重新確認已完成
   或可獨立執行的 sibling tasks。
 - 有效的 `plan-verifier` / `verifier` receipt、明確的人為解除，或任務識別
@@ -88,17 +98,34 @@ dependency 與 write-ownership 限制。
 8. 若 hook 無法可靠判斷 task identity、marker integrity 或 transcript evidence，
    維持 fail-closed 的安全邊界，但輸出必須是一次性、可恢復的狀態訊號，
    不得形成無限重試。
-9. 一般模式的 decision checkpoint 是互動層契約，不等同於 Plan mode，也不
-   取代既有 approval、permission 或安全 gate。它只負責把需要使用者選擇的
-   decision 顯式化，確認後才繼續受影響的 task。
+9. 一般模式的 decision checkpoint 是互動層契約，類似 Plan mode 的選項卡，
+   但不是每一步的 approval gate。Codex 預設自行決定；checkpoint 只負責把
+   會改變結果、權限、風險或驗收的 decision 顯式化，不取代既有 approval、
+   permission 或安全 gate。
 10. Decision checkpoint 至少支援：task 拆分確認、blocked task 的處置、是否
     先完成其他 runnable tasks，以及完成後是否暫停等待人類介入。
+11. 原生 card mode 是預設問答 surface；獨立的 MCP elicitation bridge 只能作為
+    optional transport，不能成為 Pilotfish core dependency，也不能改變既有
+    checkpoint schema、scope 或 approval boundary。
+12. 一般模式 checkpoint 固定為單題高層方向選擇；後續細節不在同一張 card
+    內展開，避免把一般模式變成 Plan mode 問卷。
 
-## General-mode decision checkpoint
+## Codex general-mode decision checkpoint
 
 一般模式的 checkpoint 不是把整個流程切換成完整 Plan mode，而是在需要決策
-的單一邊界暫停，等待使用者回覆。每次最多提出三個真正會改變結果、權限、
-風險或驗收的問題；沒有這類 decision 時直接繼續執行。
+的單一邊界暫停，等待使用者回覆。預設由 Codex 自己選擇合理、低風險且可回復
+的方案；只有真正會改變結果、權限、風險或驗收的 decision 才能觸發 checkpoint。
+每次最多提出三個問題；沒有這類 decision 時直接繼續執行。
+
+### Autonomous default
+
+- scope 明確、可逆、低風險且不涉及 external、credential、release 或 destructive
+  operation 時，Codex 直接採用合理預設並記錄判斷。
+- 低成本探索可以直接執行；只有探索結果形成會影響實作、產品行為、驗收或
+  scope 的分歧時，才提出選項。
+- blocker 若不影響其他 runnable tasks，Codex 先完成可安全執行的 sibling tasks；
+  只有沒有可執行工作，或 blocker 的處置會改變結果時，才中斷並詢問。
+- checkpoint 是例外型決策機制，不是逐步人工批准流程。
 
 建議的結構化內容：
 
@@ -146,6 +173,14 @@ Resume point: after the selected option is confirmed
   session resume tests；確認它不會越權批准外部或不可逆操作。
 - [ ] T9 — 在 macOS、Linux、Windows 驗證 hook launch、marker handling、path
   scanner 與既有 review gate parity。
+- [x] T11 — 將一般模式 checkpoint 收斂為 autonomous default 加上例外型觸發，
+  並確認低風險歧義不會被升級成使用者批准。
+- [x] T12 — 新增 autonomy regression tests：Codex 自行採用合理預設、探索分歧
+  才提問、blocker 不影響 sibling tasks，以及權限／安全邊界仍會停下。
+- [x] T13 — 定義 optional MCP elicitation adapter 邊界：原生 card 預設、MCP
+  可選引用、unsupported/cancel/timeout/invalid 時回退文字或原生 card。
+- [x] T14 — 將一般模式問答收斂為單一高層方向題，並禁止同一 checkpoint
+  展開多題細節問卷。
 - [x] T10 — 更新 `CHANGELOG.md`、安裝說明與 recovery 操作文件。
 
 ## Files
@@ -153,10 +188,12 @@ Resume point: after the selected option is confirmed
 - `hooks/pilotfish_autoroute_gate.py` — blocker state、fingerprint、marker lifecycle。
 - `tests/test_autoroute_hook.py` — 跨 turn、去重、解除與無關任務測試。
 - `templates/agents-md.orchestration.md` — task decomposition、goal aggregate
-  status、blocked-only interruption 與一般模式 decision checkpoint 契約。
+  status、blocked-only interruption 與 Codex 一般模式 decision checkpoint 契約。
 - `install/install.py` — 如 marker schema 或 recovery migration 需要安裝器支援。
 - `INSTALL.md` — 新增 blocker recovery 與人工解除說明。
 - `CHANGELOG.md` — 記錄修正與相容性影響。
+- `../../../../choicebridge/docs/specs/elicitation-bridge/SPEC.md` — 獨立 MCP
+  extension 的產品與 protocol spec；Pilotfish 僅作 optional consumer。
 
 ## Acceptance
 
@@ -173,6 +210,7 @@ Resume point: after the selected option is confirmed
   使用者確認後才繼續受影響的 task。
 - 使用者選擇「先完成其他 runnable tasks」時，Codex 不得因單一 blocker 中斷
   sibling tasks；選擇「立即停止」時才進入人類介入等待。
+- Codex 對低風險且可逆的歧義會自行採用合理預設，不會把每個小選擇交回使用者。
 - 一般模式 decision checkpoint 的拒絕、模糊或逾時回覆不得被當成批准；受影響
   task 必須保持未完成或 `BLOCKED`。
 - 既有 review receipt 到達後，下一次檢查會清除等待狀態並恢復正常流程。
@@ -200,5 +238,8 @@ marker schema 與一次性 block 行為，保留 mandatory review gate；不得�
 
 前三項目前以 orchestration policy 的 task ledger 契約落地，沒有新增外部持久化
 task database；ledger 由 main session 維護，避免把 prompt-level blocker 再次
-擴大成 session-wide lock。Decision checkpoint 已以 Skill policy 與純驗證模組
-落地；T9 的三平台 hook parity 仍是下一個獨立 slice。
+擴大成 session-wide lock。Decision checkpoint 已以 Codex Skill policy 與純驗證
+模組落地；本次後續收斂為 autonomous default 加上例外型提問。原生 card 是預設
+surface，MCP elicitation bridge 另案維護，僅在可用時作 structured transport。
+T9 的三平台 hook parity 仍是獨立驗證 slice；其他 harness 不屬於本 spec 的
+runtime target。

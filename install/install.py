@@ -42,7 +42,6 @@ from validate_agents import ROLES, validate_agent, validate_agents_config
 IS_WINDOWS = sys.platform == "win32"
 MARKER_BEGIN = "<!-- pilotfish-codex:begin -->"
 MARKER_END = "<!-- pilotfish-codex:end -->"
-NATIVE_TABLE = ("[agents]", "enabled = true", "max_concurrent_threads_per_session = 3")
 OLD_V2_KEYS = frozenset({"enabled", "max_concurrent_threads_per_session"})
 LEGACY_PATHS = frozenset({
     "features.multi_agent", "features.multi_agent_v2.tool_namespace",
@@ -80,9 +79,9 @@ class InstallAbort(Exception):
     """The caller must resolve this state before any target write."""
 
 
-MIN_COMPATIBLE_CODEX_VERSION = (0, 146, 0)
+MIN_COMPATIBLE_CODEX_VERSION = (0, 147, 0)
 PILOTFISH_PLUGIN_NAME = "pilotfish-codex"
-PILOTFISH_PLUGIN_VERSION = "1.7.0"
+PILOTFISH_PLUGIN_VERSION = "1.7.1"
 RUNTIME_STATUSES = frozenset({"integrated", "integrated-plugin-unavailable"})
 
 
@@ -151,6 +150,27 @@ def _set_table_key(lines: list[str], table: str, key: str, value: str, nl: str) 
     return result[: start + 1] + [f"{key} = {value}{nl}"] + result[start + 1 :]
 
 
+def _set_root_key(lines: list[str], key: str, value: str, nl: str) -> list[str]:
+    """Set a TOML root key without placing it inside the next table."""
+    pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
+    table_start = next(
+        (index for index, line in enumerate(lines) if line.split("#", 1)[0].strip().startswith("[")),
+        len(lines),
+    )
+    result = list(lines)
+    for index in range(table_start):
+        if pattern.match(result[index]):
+            ending = "\r\n" if result[index].endswith("\r\n") else "\n"
+            result[index] = f"{key} = {value}{ending}"
+            return result
+    insertion = table_start
+    if insertion > 0 and result[insertion - 1].strip():
+        result.insert(insertion, nl)
+        insertion += 1
+    result.insert(insertion, f"{key} = {value}{nl}")
+    return result
+
+
 def _remove_table_key(lines: list[str], table: str, key: str) -> list[str]:
     span = _table_span(lines, table)
     if span is None:
@@ -183,7 +203,7 @@ def merge_config_text(
     owned_legacy: frozenset[str] = frozenset(),
     migration_proven: bool = False,
 ) -> tuple[str, list[str]]:
-    """Render the native ``[agents]`` table while preserving user config."""
+    """Render Codex 0.147's native routing and decision-card settings."""
     try:
         config = tomllib.loads(text)
     except tomllib.TOMLDecodeError as exc:
@@ -194,13 +214,8 @@ def merge_config_text(
     agents = config.get("agents", {})
     if not isinstance(agents, dict):
         raise InstallAbort("agents must be a TOML table")
-    expected_agent_keys = {"enabled", "max_concurrent_threads_per_session"}
-    unknown_agent_keys = set(agents) - expected_agent_keys
-    if unknown_agent_keys:
-        raise InstallAbort(
-            "agents table has unsupported key(s): "
-            + ", ".join(sorted(unknown_agent_keys))
-        )
+    if agents and set(agents) != OLD_V2_KEYS:
+        raise InstallAbort("agents table has unsupported or unowned keys")
     v2 = features.get("multi_agent_v2")
     if v2 is not None and not isinstance(v2, dict):
         raise InstallAbort("legacy features.multi_agent_v2 must be an exact table")
@@ -216,13 +231,14 @@ def merge_config_text(
             raise InstallAbort("legacy V2 concurrency must be exactly 4")
         if not migration_proven:
             raise InstallAbort("legacy V2 migration requires committed installer provenance")
-    if agents.get("enabled") is not None and agents.get("enabled") is not True:
-        raise InstallAbort("agents.enabled conflicts with native migration")
-    fallback = agents.get("max_concurrent_threads_per_session")
-    if fallback is not None and (type(fallback) is not int or fallback != 3):
-        raise InstallAbort("agents.max_concurrent_threads_per_session conflicts with native child concurrency 3")
-    if "max_threads" in agents:
-        raise InstallAbort("legacy agents.max_threads is unowned")
+    if set(agents) == OLD_V2_KEYS:
+        if agents.get("enabled") is not True:
+            raise InstallAbort("agents.enabled conflicts with native migration")
+        if agents.get("max_concurrent_threads_per_session") != 3:
+            raise InstallAbort("agents.max_concurrent_threads_per_session conflicts with native child concurrency 3")
+    root_concurrency = config.get("max_concurrent_threads_per_session")
+    if root_concurrency is not None and (type(root_concurrency) is not int or root_concurrency != 3):
+        raise InstallAbort("root max_concurrent_threads_per_session conflicts with native child concurrency 3")
     if features.get("multi_agent") is True and "features.multi_agent" not in owned_legacy:
         raise InstallAbort("legacy_key_unowned: features.multi_agent")
 
@@ -242,13 +258,17 @@ def merge_config_text(
         notes.extend(note for _, note in missing_root_defaults)
     if migrating_v2:
         lines = _remove_table(lines, "features.multi_agent_v2")
-        notes.append("migrated exact legacy V2 table to native agents table")
+        notes.append("migrated exact legacy V2 table to root child concurrency")
+    if set(agents) == OLD_V2_KEYS:
+        lines = _remove_table(lines, "agents")
+        notes.append("migrated legacy agents concurrency table to root child concurrency")
     if "features.multi_agent" in owned_legacy:
         lines = _remove_table_key(lines, "features", "multi_agent")
         notes.append("removed owned legacy key features.multi_agent")
-    lines = _set_table_key(lines, "agents", "enabled", "true", nl)
-    lines = _set_table_key(lines, "agents", "max_concurrent_threads_per_session", "3", nl)
-    notes.append("normalized native agents child concurrency to 3")
+    lines = _set_table_key(lines, "features", "default_mode_request_user_input", "true", nl)
+    notes.append("enabled native default-mode decision cards")
+    lines = _set_root_key(lines, "max_concurrent_threads_per_session", "3", nl)
+    notes.append("normalized root child concurrency to 3")
     result = "".join(lines)
     try:
         tomllib.loads(result)
@@ -509,11 +529,12 @@ def _config_value(config: dict, dotted: str) -> tuple[bool, object | None]:
 
 
 def _routing_projection(config: dict, owned_legacy: frozenset[str]) -> dict[str, object]:
-    """Return only config state whose ownership belongs to Pilotfish."""
+    """Return only config state whose ownership belongs to Pilotfish.
+
+    The main-session model and effort settings are user preferences. Pilotfish
+    supplies defaults when absent but does not claim ownership of them.
+    """
     return {
-        "model": _config_value(config, "model"),
-        "model_reasoning_effort": _config_value(config, "model_reasoning_effort"),
-        "plan_mode_reasoning_effort": _config_value(config, "plan_mode_reasoning_effort"),
         "agents": _config_value(config, "agents"),
         "legacy_v2": _config_value(config, "features.multi_agent_v2"),
         "owned_legacy": tuple(

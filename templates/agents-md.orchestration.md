@@ -1,5 +1,5 @@
 <!-- pilotfish-codex:begin -->
-<!-- pilotfish-codex v1.6.3 -->
+<!-- pilotfish-codex v1.7.1 -->
 <!-- markdownlint-disable-next-line MD041 -->
 ### Orchestration
 
@@ -135,23 +135,34 @@ When the floor cannot be met, state the uncertainty. When the ceiling is
 exhausted, narrow, pause, or ask; never turn exhaustion into write
 authorization.
 
-When a material choice is required, present a concise decision card in the
-same interactive style as Claude's `AskUserQuestion`: show the current
-interpretation, recommended default, relevant scope and exclusions, and only
-the questions whose answers can change the next gate. Offer clear options when
-they exist and identify the recommended option. Low-risk work may omit the
-card; product, authority, risk, irreversible-cost, or unresolved-direction
-choices require it. A decision card is a user checkpoint, not a replacement
-for the internal Plan or an approval bypass.
+The default is autonomous: when work is low-risk, reversible, and scope is clear,
+directly choose a reasonable default and continue. Also, low-cost exploration may
+continue without a card when it is bounded, reversible, and evidence can still
+be discarded. The policy must not ask the user to approve every small ambiguity.
+
+When a material choice is required, present one concise, high-level decision
+card in the same interactive style as Claude's `AskUserQuestion`: show the
+current interpretation, recommended default, relevant scope and exclusions,
+and one question whose answer can change the next gate. Offer clear options
+when they exist and identify the recommended option. Emit the card only when
+the choice changes the outcome, permission, security, or acceptance boundary.
+Do not turn a general-mode checkpoint into a Plan-mode questionnaire; defer
+secondary implementation details until after the selected direction resumes.
+The checkpoint is an exception decision mechanism, not a step-by-step approval
+workflow, and is not a replacement for the internal Plan or an approval bypass.
 
 #### General-mode decision checkpoint contract
 
 When a task decomposition, blocker disposition, risk, permission boundary, or
-acceptance choice can change the outcome, emit one structured checkpoint before
-continuing the affected task. This is an interaction contract, not Plan mode.
-Use exactly two or three mutually exclusive options and identify the
-recommendation. Do not include credentials, external writes, destructive work,
-release, or irreversible work in the card's implied authorization.
+acceptance choice can change the outcome, emit one structured checkpoint with
+one high-level question before continuing the affected task. This is an
+interaction contract, not Plan mode. Ask a follow-up only after the selected
+direction resumes and a new material boundary is reached.
+For ordinary low-risk ambiguity, choose the reasonable default locally and
+record the assumption. Use exactly two or three mutually exclusive options and
+identify the recommendation only when the decision is material. Do not include
+credentials, external writes, destructive work, release, or irreversible work
+in the card's implied authorization.
 
 The card schema is `pilotfish-decision-checkpoint-v1` and contains exactly:
 `checkpoint_id`, `scope`, `current_interpretation`, `impact`,
@@ -169,6 +180,22 @@ as approval. A confirmed reply produces a resume record containing the
 checkpoint id, selected option, affected task ids, and exact resume point. The
 next turn must preserve the task ledger and continue only within that record's
 scope.
+
+#### Optional MCP elicitation adapter
+
+The native decision card is the default interaction surface. If an independently
+installed MCP elicitation bridge is configured and the current Codex host exposes
+form elicitation, the main session may render the same checkpoint through
+`elicitation/create`. This is an optional adapter, not a Pilotfish core
+dependency and not a substitute for Codex `request_user_input`.
+
+The adapter may transport only the existing checkpoint schema; it must not alter
+the recommendation, affected task scope, excluded scope, approval boundary, or
+resume contract. If the bridge is missing, unsupported, cancelled, timed out, or
+returns an invalid response, preserve the pending state and fall back to the
+native card or concise text checkpoint. Never treat MCP availability or an
+elicitation acceptance as authorization for external, destructive, irreversible,
+credential, release, or security-sensitive work.
 
 At each stable slice boundary, the existing `verifier` may receive the
 explicit `direction_checkpoint` contract. It compares the original outcome,
@@ -436,10 +463,13 @@ destructive or irreversible, external-mutation, scope-expansion, or spending
 authority; separately granted authority remains valid.
 
 In `ASK`, use Codex `request_user_input` only when that tool is exposed in the
-current mode. Otherwise end the turn with `PAUSED_NEEDS_USER`, one concise
-question, choices, and a recommendation. Headless or noninteractive execution
-emits `PAUSED_NEEDS_USER` and exits; never poll, retry, guess, or continue the
-affected slice. The main session asks, never a child.
+current mode. An independently configured MCP elicitation bridge may be used as
+an optional structured transport for the same checkpoint; it does not change the
+checkpoint contract. If neither surface is available, end the turn with
+`PAUSED_NEEDS_USER`, one concise question, choices, and a recommendation.
+Headless or noninteractive execution emits `PAUSED_NEEDS_USER` and exits; never
+poll, retry, guess, or continue the affected slice. The main session asks, never
+a child.
 
 A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
 Automatic containment is limited to agent-owned work or evidence, never an
