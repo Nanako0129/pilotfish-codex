@@ -18,7 +18,8 @@ class NativeTemplateTests(unittest.TestCase):
         self.assertEqual(config["model"], "gpt-5.6-luna")
         self.assertEqual(config["model_reasoning_effort"], "medium")
         self.assertEqual(config["plan_mode_reasoning_effort"], "xhigh")
-        self.assertEqual(config["agents"], {"enabled": True, "max_concurrent_threads_per_session": 3})
+        self.assertTrue(config["features"]["default_mode_request_user_input"])
+        self.assertEqual(config["max_concurrent_threads_per_session"], 3)
         self.assertNotIn("multi_agent_v2", config.get("features", {}))
         errors, warnings = validate_agents_config(config)
         self.assertEqual(errors, [])
@@ -60,7 +61,7 @@ class NativeTemplateTests(unittest.TestCase):
                 self.assertNotEqual(tomllib.load(handle).get("model"), "gpt-5.6-terra")
 
     def test_rejects_forced_adapter_keys_and_duplicate_names(self) -> None:
-        config = {"features": {"multi_agent_v2": {"enabled": True, "max_concurrent_threads_per_session": 4, "tool_namespace": "agents"}}, "agents": {"enabled": True, "max_concurrent_threads_per_session": 3}}
+        config = {"features": {"multi_agent_v2": {"enabled": True, "max_concurrent_threads_per_session": 4, "tool_namespace": "agents"}}, "max_concurrent_threads_per_session": 3}
         errors, _ = validate_agents_config(config)
         self.assertTrue(any("legacy features.multi_agent_v2" in item for item in errors))
         with tempfile.TemporaryDirectory() as directory:
@@ -72,15 +73,9 @@ class NativeTemplateTests(unittest.TestCase):
             self.assertTrue(any("manifest missing" in item for item in problems))
 
     def test_validator_rejects_nonpackaged_agents_keys(self) -> None:
-        config = {
-            "agents": {
-                "enabled": True,
-                "max_concurrent_threads_per_session": 3,
-                "max_depth": 1,
-            }
-        }
+        config = {"max_concurrent_threads_per_session": 3, "agents": {"max_depth": 1}}
         errors, _ = validate_agents_config(config)
-        self.assertTrue(any("unsupported key" in item for item in errors))
+        self.assertTrue(any("unsupported inline role" in item for item in errors))
 
     def test_policy_is_native_typed_and_post_hoc(self) -> None:
         policy = (ROOT / "templates" / "agents-md.orchestration.md").read_text(encoding="utf-8")

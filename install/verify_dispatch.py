@@ -460,10 +460,13 @@ def validate_stage_layout(home: Path, *, active_home: bool = False) -> str | Non
         config = tomllib.loads(config_content.decode("utf-8"))
         features = config.get("features", {})
         agents_config = config.get("agents", {})
-        if isinstance(features, dict) and (features.get("multi_agent") is not None or "multi_agent_v2" in features):
+        if isinstance(features, dict) and (
+            features.get("multi_agent") is not None
+            or "multi_agent_v2" in features
+            or features.get("default_mode_request_user_input") is not True
+        ):
             return "legacy_key_unowned"
-        expected_agent_keys = {"enabled", "max_concurrent_threads_per_session"}
-        if not isinstance(agents_config, dict) or set(agents_config) != expected_agent_keys or agents_config.get("enabled") is not True or agents_config.get("max_concurrent_threads_per_session") != 3:
+        if not isinstance(agents_config, dict) or agents_config or config.get("max_concurrent_threads_per_session") != 3:
             return "role_layer_unapproved"
         if active_home:
             project_config_bytes(config_content)

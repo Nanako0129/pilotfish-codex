@@ -149,7 +149,8 @@ class NativeConfigMergeTests(unittest.TestCase):
         self.assertEqual(data["model"], "gpt-5.6-luna")
         self.assertEqual(data["model_reasoning_effort"], "medium")
         self.assertEqual(data["plan_mode_reasoning_effort"], "xhigh")
-        self.assertEqual(data["agents"], {"enabled": True, "max_concurrent_threads_per_session": 3})
+        self.assertTrue(data["features"]["default_mode_request_user_input"])
+        self.assertEqual(data["max_concurrent_threads_per_session"], 3)
         self.assertNotIn("multi_agent_v2", data.get("features", {}))
 
     def test_existing_root_model_and_effort_are_preserved(self) -> None:
@@ -168,7 +169,9 @@ class NativeConfigMergeTests(unittest.TestCase):
         with self.assertRaisesRegex(InstallAbort, "provenance"):
             merge_config_text(old)
         migrated, _ = merge_config_text(old, migration_proven=True)
-        self.assertEqual(tomllib.loads(migrated)["agents"], {"enabled": True, "max_concurrent_threads_per_session": 3})
+        migrated_data = tomllib.loads(migrated)
+        self.assertEqual(migrated_data["max_concurrent_threads_per_session"], 3)
+        self.assertTrue(migrated_data["features"]["default_mode_request_user_input"])
         for text in ("[features]\nmulti_agent_v2 = false\n", "[features.multi_agent_v2]\nenabled = false\n", "[features]\nmulti_agent_v2 = true\n"):
             with self.subTest(text=text):
                 with self.assertRaises(InstallAbort):
@@ -178,16 +181,21 @@ class NativeConfigMergeTests(unittest.TestCase):
         for value in (0, 8, 9, '"4"'):
             with self.subTest(value=value):
                 with self.assertRaises(InstallAbort):
-                    merge_config_text(f"[agents]\nenabled = true\nmax_concurrent_threads_per_session = {value}\n")
+                    merge_config_text(f"max_concurrent_threads_per_session = {value}\n")
         with self.assertRaises(InstallAbort):
-            merge_config_text("[agents]\nenabled = true\nmax_concurrent_threads_per_session = 2\n")
+            merge_config_text("max_concurrent_threads_per_session = 2\n")
+
+    def test_existing_decision_card_setting_is_enabled(self) -> None:
+        rendered, _ = merge_config_text(
+            "[features]\n"
+            "default_mode_request_user_input = false\n"
+        )
+        self.assertTrue(tomllib.loads(rendered)["features"]["default_mode_request_user_input"])
 
     def test_agents_table_is_exact_and_rejects_legacy_or_unknown_keys(self) -> None:
         for text in (
-            "[agents]\nenabled = true\nmax_concurrent_threads_per_session = 3\nmax_depth = 1\n",
-            "[agents]\nenabled = true\nmax_concurrent_threads_per_session = 3\ncustom = true\n",
-            "[agents]\nenabled = false\nmax_concurrent_threads_per_session = 3\n",
-            "[agents]\nenabled = \"true\"\nmax_concurrent_threads_per_session = 3\n",
+            "[agents]\nmax_concurrent_threads_per_session = 3\n",
+            "[agents]\nmax_threads = 3\n",
         ):
             with self.subTest(text=text):
                 with self.assertRaises(InstallAbort):
@@ -203,7 +211,7 @@ class NativeConfigMergeTests(unittest.TestCase):
         rendered, _ = merge_config_text(original, owned_legacy=frozenset({"features.multi_agent"}))
         data = tomllib.loads(rendered)
         self.assertNotIn("multi_agent", data["features"])
-        self.assertEqual(data["agents"]["max_concurrent_threads_per_session"], 3)
+        self.assertEqual(data["max_concurrent_threads_per_session"], 3)
 
     def test_version_parser_does_not_hard_pin_releases(self) -> None:
         self.assertEqual(parse_codex_version("codex 0.146.0"), (0, 146, 0))
@@ -211,7 +219,7 @@ class NativeConfigMergeTests(unittest.TestCase):
         self.assertEqual(codex_version_token("codex-cli 0.147.0-alpha.1.2"), "0.147.0-alpha.1.2")
         self.assertTrue(is_parseable_codex_output("codex-cli 0.146.0"))
         self.assertTrue(is_parseable_codex_output("codex-cli 0.147.0-alpha.1.2"))
-        self.assertTrue(is_compatible_codex_output("codex-cli 0.146.0"))
+        self.assertFalse(is_compatible_codex_output("codex-cli 0.146.0"))
         self.assertTrue(is_compatible_codex_output("codex-cli 0.147.0-alpha.1.2"))
         for output in ("0.146.0-beta", "0.145.9", "0.146.0 0.146.1", "none"):
             with self.subTest(output=output):
@@ -269,7 +277,7 @@ class NativeInstallTests(unittest.TestCase):
             self.assertEqual((home / "config.toml").read_bytes(), before)
             self.assertEqual(self.run_install(home), 0)
             data = tomllib.loads((home / "config.toml").read_text())
-            self.assertEqual(data["agents"], {"enabled": True, "max_concurrent_threads_per_session": 3})
+            self.assertEqual(data["max_concurrent_threads_per_session"], 3)
 
     def test_legacy_v2_migration_allows_canonical_security_reviewer_upgrade(self) -> None:
         previous = ROOT / "install" / "previous" / "v1.3.0" / "agents" / "security-reviewer.toml"
@@ -307,7 +315,7 @@ class NativeInstallTests(unittest.TestCase):
             home = Path(directory) / "home"
             self.assertEqual(self.run_install(home), 0)
             config = tomllib.loads((home / "config.toml").read_text())
-            self.assertEqual(config["agents"]["max_concurrent_threads_per_session"], 3)
+            self.assertEqual(config["max_concurrent_threads_per_session"], 3)
             self.assertEqual({p.stem for p in (home / "agents").glob("*.toml")}, {"executor", "mech-executor", "plan-verifier", "scout", "security-executor", "security-reviewer", "verifier"})
             state = home.with_name(f"{home.name}.pilotfish-install-state.json")
             recorded = json.loads(state.read_text())
@@ -494,7 +502,7 @@ class NativeInstallTests(unittest.TestCase):
                         "installed": [{
                             "name": "pilotfish-codex",
                             "marketplaceName": "pilotfish-codex",
-                            "version": "1.7.0",
+                            "version": "1.7.1",
                             "enabled": True,
                             "marketplaceSource": {"source": str(ROOT / "plugin")},
                         }]
@@ -530,7 +538,7 @@ class NativeInstallTests(unittest.TestCase):
             home = Path(directory) / "home"
             unavailable = {
                 "name": "pilotfish-codex",
-                            "version": "1.7.0",
+                            "version": "1.7.1",
                 "status": "unavailable",
                 "source_sha256": installer._plugin_source_digest(ROOT / "plugin"),
             }
@@ -572,11 +580,20 @@ class NativeInstallTests(unittest.TestCase):
             self.assertEqual(self.run_install(home), 0)
             self.assertEqual(config.read_bytes(), expected)
 
+    def test_user_main_model_drift_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            self.assertEqual(self.run_install(home), 0)
+            config = home / "config.toml"
+            changed = config.read_text().replace(
+                'model = "gpt-5.6-luna"', 'model = "gpt-5.6-sol"'
+            )
+            config.write_text(changed)
+            self.assertEqual(self.run_install(home), 0)
+            self.assertIn('model = "gpt-5.6-sol"', config.read_text())
+
     def test_owned_routing_drift_aborts_without_installer_writes(self) -> None:
         mutations = {
-            "model": lambda text: text.replace(
-                'model = "gpt-5.6-luna"', 'model = "unapproved-model"'
-            ),
             "agents": lambda text: text.replace(
                 "max_concurrent_threads_per_session = 3",
                 "max_concurrent_threads_per_session = 2",
@@ -594,7 +611,8 @@ class NativeInstallTests(unittest.TestCase):
                     if path.is_file()
                 }
 
-                with self.assertRaisesRegex(InstallAbort, "routing projection"):
+                expected_error = "conflicts"
+                with self.assertRaisesRegex(InstallAbort, expected_error):
                     self.run_install(home)
 
                 after = {
@@ -1004,7 +1022,7 @@ class NativeInstallTests(unittest.TestCase):
             home = Path(directory) / "home"
             home.mkdir()
             config = home / "config.toml"
-            original = '[custom]\nkeep = "yes"\n\n[agents]\nenabled = true\nmax_concurrent_threads_per_session = 3\nmax_depth = 1\n'
+            original = '[custom]\nkeep = "yes"\n\n[agents]\nmax_depth = 1\n'
             config.write_text(original)
             with self.assertRaisesRegex(InstallAbort, "agents table"):
                 self.run_install(home)

@@ -52,7 +52,7 @@ def validate_agent(data: dict) -> list[str]:
 
 
 def validate_agents_config(config: dict) -> tuple[list[str], list[str]]:
-    """Validate the one authoritative native ``[agents]`` table."""
+    """Validate Codex 0.147's root-level child concurrency setting."""
     errors: list[str] = []
     warnings: list[str] = []
     features = config.get("features", {})
@@ -60,21 +60,19 @@ def validate_agents_config(config: dict) -> tuple[list[str], list[str]]:
         errors.append("features must be a TOML table")
     elif "multi_agent_v2" in features:
         errors.append("legacy features.multi_agent_v2 must be migrated")
-    agents = config.get("agents")
+    elif features.get("default_mode_request_user_input") is not True:
+        errors.append("native default-mode decision cards must be enabled")
+    agents = config.get("agents", {})
     if not isinstance(agents, dict):
-        errors.append("agents table is missing")
+        errors.append("agents must be a role table")
         return errors, warnings
-    if agents.get("enabled") is not True:
-        errors.append("agents.enabled must be true")
-    concurrency = agents.get("max_concurrent_threads_per_session")
+    if agents:
+        errors.append("agents table has unsupported inline role keys")
+    concurrency = config.get("max_concurrent_threads_per_session")
     if type(concurrency) is not int or not AGENTS_CONCURRENCY_MIN <= concurrency <= AGENTS_CONCURRENCY_MAX:
-        errors.append("agents concurrency must be an integer from 1 to 8")
+        errors.append("root concurrency must be an integer from 1 to 8")
     elif concurrency != AGENTS_CONCURRENCY_RECOMMENDED:
-        warnings.append(f"agents concurrency {concurrency} is normalized by the installer to 3")
-    expected_keys = {"enabled", "max_concurrent_threads_per_session"}
-    unknown = set(agents) - expected_keys
-    if unknown:
-        errors.append(f"agents table has unsupported key(s): {', '.join(sorted(unknown))}")
+        warnings.append(f"root concurrency {concurrency} is normalized by the installer to 3")
     return errors, warnings
 
 

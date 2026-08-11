@@ -894,7 +894,7 @@ class NativeHomeAndReceiptTests(unittest.TestCase):
                 validate_stage_layout(active, active_home=True),
                 "role_layer_unapproved",
             )
-            with self.assertRaisesRegex(StageError, "native agents table must contain exactly"):
+            with self.assertRaisesRegex(StageError, "native agents table must be empty"):
                 materialize(active, root / "staged")
             self.assertFalse((root / "staged").exists())
 

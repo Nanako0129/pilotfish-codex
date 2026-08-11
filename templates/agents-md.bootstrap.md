@@ -1,5 +1,5 @@
 <!-- pilotfish-codex:begin -->
-<!-- pilotfish-codex v1.6.3 -->
+<!-- pilotfish-codex v1.7.1 -->
 <!-- markdownlint-disable-next-line MD041 -->
 ### Pilotfish always-on bootstrap
 

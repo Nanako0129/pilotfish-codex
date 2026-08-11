@@ -49,9 +49,9 @@ SMOKE_CONFIG = (
     b'model = "gpt-5.6-luna"\n'
     b'model_reasoning_effort = "medium"\n'
     b'plan_mode_reasoning_effort = "xhigh"\n\n'
-    b"[agents]\n"
-    b"enabled = true\n"
-    b"max_concurrent_threads_per_session = 3\n"
+    b"max_concurrent_threads_per_session = 3\n\n"
+    b"[features]\n"
+    b"default_mode_request_user_input = true\n\n"
 )
 
 
@@ -60,7 +60,7 @@ class StageError(RuntimeError):
 
 
 def project_config_bytes(content: bytes) -> bytes:
-    """Return the canonical native ``[agents]`` config required by smoke."""
+    """Return the canonical Codex 0.147 config required by smoke."""
     try:
         config = tomllib.loads(content.decode("utf-8"))
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
@@ -68,14 +68,15 @@ def project_config_bytes(content: bytes) -> bytes:
     features = config.get("features", {})
     if not isinstance(features, dict) or "multi_agent" in features or "multi_agent_v2" in features:
         raise StageError("legacy multi-agent config is unavailable")
+    if features.get("default_mode_request_user_input") is not True:
+        raise StageError("native default-mode decision cards are unavailable")
     agents = config.get("agents", {})
     if not isinstance(agents, dict):
-        raise StageError("required native agents config is unavailable")
-    if agents.get("enabled") is not True or type(agents.get("max_concurrent_threads_per_session")) is not int or agents["max_concurrent_threads_per_session"] != 3:
-        raise StageError("required native agents config is unavailable")
-    expected_agent_keys = {"enabled", "max_concurrent_threads_per_session"}
-    if set(agents) != expected_agent_keys:
-        raise StageError("native agents table must contain exactly enabled and max_concurrent_threads_per_session")
+        raise StageError("agents must be a role table")
+    if agents:
+        raise StageError("native agents table must be empty; role declarations are staged from agents/")
+    if config.get("max_concurrent_threads_per_session") != 3:
+        raise StageError("required root concurrency config is unavailable")
     if (
         config.get("model") != "gpt-5.6-luna"
         or config.get("model_reasoning_effort") != "medium"
