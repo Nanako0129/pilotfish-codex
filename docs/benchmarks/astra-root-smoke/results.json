@@ -1,0 +1,388 @@
+{
+  "schema_version": 1,
+  "experiment": "codex-astra-root-smoke",
+  "observed_on": "2026-09-07",
+  "client": "Codex CLI 0.153.3",
+  "fixture_source": {
+    "repository": "Nanako0129/pilotfish",
+    "commit": "863b117b9da42179c5bb77a05158920fbc092ee2",
+    "path": "benchmarks/dispatch-brake/fixture",
+    "sha256": {
+      "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+      "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+      "src/reducer.js": "ef53536346d963c7652900eed41dcb92859060b50fc8a5d4099fa774ec1e0fa2",
+      "src/session.js": "fb4e1f3aa0db66728570eb47e497d9f49b2cc7834bdf9374b2bbecf2c92efa46",
+      "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+      "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+    }
+  },
+  "pricing": {
+    "currency": "USD",
+    "per_tokens": 1000000,
+    "retrieved_on": "2026-09-07",
+    "source": "https://developers.openai.com/api/docs/pricing",
+    "rates": {
+      "gpt-6-astra": {
+        "uncached_input": "10",
+        "cached_input": "1",
+        "cache_creation_input": "12.5",
+        "output": "50"
+      },
+      "gpt-5.6-sol": {
+        "uncached_input": "4",
+        "cached_input": ".4",
+        "cache_creation_input": "5",
+        "output": "20"
+      },
+      "gpt-5.6-luna": {
+        "uncached_input": ".2",
+        "cached_input": ".02",
+        "cache_creation_input": ".25",
+        "output": "1.2"
+      }
+    },
+    "tier_evidence": "Standard requested; response tier absent; conditional repricing"
+  },
+  "normalization": "Codex input_tokens includes cached_input_tokens. Subtract cached once; output includes reasoning. Exclusive root/child per-request deltas were aggregated once.",
+  "quota_result": "INCONCLUSIVE: integer account-level counters, controller activity and delayed accounting prevent per-profile attribution. No private quota readings published.",
+  "scope": [
+    "One fixture and one completed sample per cell, fixed order; cache hit rates differ",
+    "Personal configurations; not an evaluation of the current upstream Luna-root default",
+    "Only root models compared; no Astra executor experiment",
+    "Private ambient instructions were loaded; public fixture and prompts do not reproduce the whole private environment",
+    "Raw sessions, account identifiers and local configuration are not published",
+    "Numbers are API-equivalent token charges, not subscription bills or universal quota multipliers"
+  ],
+  "cases": [
+    {
+      "id": "D-A",
+      "shape": "direct",
+      "root_model": "gpt-5.6-sol",
+      "root_effort": "xhigh",
+      "child_model": null,
+      "child_effort_configured": null,
+      "status": "completed",
+      "acceptance_passed": true,
+      "wall_seconds": 97.142,
+      "usage": [
+        {
+          "model": "gpt-5.6-sol",
+          "uncached_input": 51378,
+          "cached_input": 127616,
+          "cache_creation_input": 0,
+          "output": 3916,
+          "reasoning_subset": 1754
+        }
+      ],
+      "standard_api_equivalent_usd": "0.3348784",
+      "usage_complete": true,
+      "artifact_sha256": {
+        "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+        "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+        "src/reducer.js": "b42a4fd7b106df1e73f72acfafbf1f13e3b0d4db6605f97a2d87882be113d0ae",
+        "src/session.js": "fb4e1f3aa0db66728570eb47e497d9f49b2cc7834bdf9374b2bbecf2c92efa46",
+        "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+        "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+      }
+    },
+    {
+      "id": "D-B",
+      "shape": "direct",
+      "root_model": "gpt-6-astra",
+      "root_effort": "low",
+      "child_model": null,
+      "child_effort_configured": null,
+      "status": "completed",
+      "acceptance_passed": true,
+      "wall_seconds": 43.94,
+      "usage": [
+        {
+          "model": "gpt-6-astra",
+          "uncached_input": 20219,
+          "cached_input": 105216,
+          "cache_creation_input": 0,
+          "output": 958,
+          "reasoning_subset": 11
+        }
+      ],
+      "standard_api_equivalent_usd": "0.355306",
+      "usage_complete": true,
+      "artifact_sha256": {
+        "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+        "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+        "src/reducer.js": "700aee792c03d7ebf5139498a365d68eb0e4937dcb1573b2a4fad35c6f508503",
+        "src/session.js": "fb4e1f3aa0db66728570eb47e497d9f49b2cc7834bdf9374b2bbecf2c92efa46",
+        "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+        "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+      }
+    },
+    {
+      "id": "D-C",
+      "shape": "direct",
+      "root_model": "gpt-5.6-sol",
+      "root_effort": "high",
+      "child_model": null,
+      "child_effort_configured": null,
+      "status": "completed",
+      "acceptance_passed": true,
+      "wall_seconds": 95.031,
+      "usage": [
+        {
+          "model": "gpt-5.6-sol",
+          "uncached_input": 22761,
+          "cached_input": 127872,
+          "cache_creation_input": 0,
+          "output": 3980,
+          "reasoning_subset": 1721
+        }
+      ],
+      "standard_api_equivalent_usd": "0.2217928",
+      "usage_complete": true,
+      "artifact_sha256": {
+        "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+        "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+        "src/reducer.js": "16fd596af55b3814f00d50bf33ce9d8d253a536256d0be63ad1653dcecd5daca",
+        "src/session.js": "fb4e1f3aa0db66728570eb47e497d9f49b2cc7834bdf9374b2bbecf2c92efa46",
+        "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+        "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+      }
+    },
+    {
+      "id": "E-C",
+      "shape": "delegated",
+      "root_model": "gpt-5.6-sol",
+      "root_effort": "high",
+      "child_model": "gpt-5.6-luna",
+      "child_effort_configured": "max",
+      "status": "timeout",
+      "acceptance_passed": true,
+      "wall_seconds": 180.021,
+      "usage": [
+        {
+          "model": "gpt-5.6-sol",
+          "uncached_input": 20976,
+          "cached_input": 124160,
+          "cache_creation_input": 0,
+          "output": 2666,
+          "reasoning_subset": 424
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "uncached_input": 28202,
+          "cached_input": 205568,
+          "cache_creation_input": 0,
+          "output": 4988,
+          "reasoning_subset": 2457
+        }
+      ],
+      "standard_api_equivalent_usd": "0.20262536",
+      "usage_complete": false,
+      "artifact_sha256": {
+        "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+        "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+        "src/reducer.js": "8d28b7bb308024be8d7f13c813c0b05e2b85504c923d348a0741a14e1ce122fe",
+        "src/session.js": "ec91071b965dd1fbdc5de0b35d7143be161eb6d2d66d10de957192eef82c0157",
+        "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+        "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+      }
+    },
+    {
+      "id": "E-B",
+      "shape": "delegated",
+      "root_model": "gpt-6-astra",
+      "root_effort": "low",
+      "child_model": "gpt-5.6-luna",
+      "child_effort_configured": "max",
+      "status": "timeout",
+      "acceptance_passed": true,
+      "wall_seconds": 180.022,
+      "usage": [
+        {
+          "model": "gpt-6-astra",
+          "uncached_input": 57882,
+          "cached_input": 370176,
+          "cache_creation_input": 0,
+          "output": 1050,
+          "reasoning_subset": 58
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "uncached_input": 37019,
+          "cached_input": 414976,
+          "cache_creation_input": 0,
+          "output": 6679,
+          "reasoning_subset": 3217
+        }
+      ],
+      "standard_api_equivalent_usd": "1.02521412",
+      "usage_complete": false,
+      "artifact_sha256": {
+        "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+        "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+        "src/reducer.js": "b42a4fd7b106df1e73f72acfafbf1f13e3b0d4db6605f97a2d87882be113d0ae",
+        "src/session.js": "ec91071b965dd1fbdc5de0b35d7143be161eb6d2d66d10de957192eef82c0157",
+        "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+        "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+      }
+    },
+    {
+      "id": "E-A",
+      "shape": "delegated",
+      "root_model": "gpt-5.6-sol",
+      "root_effort": "xhigh",
+      "child_model": "gpt-5.6-luna",
+      "child_effort_configured": "max",
+      "status": "timeout",
+      "acceptance_passed": true,
+      "wall_seconds": 180.013,
+      "usage": [
+        {
+          "model": "gpt-5.6-sol",
+          "uncached_input": 19374,
+          "cached_input": 123520,
+          "cache_creation_input": 0,
+          "output": 2090,
+          "reasoning_subset": 711
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "uncached_input": 25711,
+          "cached_input": 243968,
+          "cache_creation_input": 0,
+          "output": 5559,
+          "reasoning_subset": 2572
+        }
+      ],
+      "standard_api_equivalent_usd": "0.18539636",
+      "usage_complete": false,
+      "artifact_sha256": {
+        "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+        "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+        "src/reducer.js": "b42a4fd7b106df1e73f72acfafbf1f13e3b0d4db6605f97a2d87882be113d0ae",
+        "src/session.js": "fb4e1f3aa0db66728570eb47e497d9f49b2cc7834bdf9374b2bbecf2c92efa46",
+        "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+        "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+      }
+    },
+    {
+      "id": "E-C-R1",
+      "shape": "delegated",
+      "root_model": "gpt-5.6-sol",
+      "root_effort": "high",
+      "child_model": "gpt-5.6-luna",
+      "child_effort_configured": "max",
+      "status": "completed",
+      "acceptance_passed": true,
+      "wall_seconds": 210.095,
+      "usage": [
+        {
+          "model": "gpt-5.6-sol",
+          "uncached_input": 23502,
+          "cached_input": 152320,
+          "cache_creation_input": 0,
+          "output": 4064,
+          "reasoning_subset": 1025
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "uncached_input": 29910,
+          "cached_input": 259328,
+          "cache_creation_input": 0,
+          "output": 5668,
+          "reasoning_subset": 2810
+        }
+      ],
+      "standard_api_equivalent_usd": "0.25418616",
+      "usage_complete": true,
+      "artifact_sha256": {
+        "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+        "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+        "src/reducer.js": "8d28b7bb308024be8d7f13c813c0b05e2b85504c923d348a0741a14e1ce122fe",
+        "src/session.js": "08695e4b12468156c9f275992e28fb75d6994c098a5bce55ec40ad0e9f97c73e",
+        "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+        "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+      },
+      "retry_of": "E-C"
+    },
+    {
+      "id": "E-B-R1",
+      "shape": "delegated",
+      "root_model": "gpt-6-astra",
+      "root_effort": "low",
+      "child_model": "gpt-5.6-luna",
+      "child_effort_configured": "max",
+      "status": "completed",
+      "acceptance_passed": true,
+      "wall_seconds": 163.28,
+      "usage": [
+        {
+          "model": "gpt-6-astra",
+          "uncached_input": 24819,
+          "cached_input": 388352,
+          "cache_creation_input": 0,
+          "output": 1564,
+          "reasoning_subset": 75
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "uncached_input": 45185,
+          "cached_input": 225792,
+          "cache_creation_input": 0,
+          "output": 4417,
+          "reasoning_subset": 1822
+        }
+      ],
+      "standard_api_equivalent_usd": "0.73359524",
+      "usage_complete": true,
+      "artifact_sha256": {
+        "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+        "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+        "src/reducer.js": "0278330f769d9e0a8db2d1626a8a865a1d56252f3da87b65afe7227896ab6796",
+        "src/session.js": "fb4e1f3aa0db66728570eb47e497d9f49b2cc7834bdf9374b2bbecf2c92efa46",
+        "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+        "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+      },
+      "retry_of": "E-B"
+    },
+    {
+      "id": "E-A-R1",
+      "shape": "delegated",
+      "root_model": "gpt-5.6-sol",
+      "root_effort": "xhigh",
+      "child_model": "gpt-5.6-luna",
+      "child_effort_configured": "max",
+      "status": "completed",
+      "acceptance_passed": true,
+      "wall_seconds": 208.589,
+      "usage": [
+        {
+          "model": "gpt-5.6-sol",
+          "uncached_input": 24126,
+          "cached_input": 176768,
+          "cache_creation_input": 0,
+          "output": 4483,
+          "reasoning_subset": 1985
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "uncached_input": 25088,
+          "cached_input": 260096,
+          "cache_creation_input": 0,
+          "output": 5087,
+          "reasoning_subset": 2418
+        }
+      ],
+      "standard_api_equivalent_usd": "0.27319512",
+      "usage_complete": true,
+      "artifact_sha256": {
+        "package.json": "2b0f33e03c1ef64ea70af0118531f368e9ee59a29d8983d1858ce9997afb56f1",
+        "test/statusline.test.js": "c56140b347a46769a619fcebdc27e33294cc1a5d47ff5e3fa346d416be851b99",
+        "src/reducer.js": "b42a4fd7b106df1e73f72acfafbf1f13e3b0d4db6605f97a2d87882be113d0ae",
+        "src/session.js": "08695e4b12468156c9f275992e28fb75d6994c098a5bce55ec40ad0e9f97c73e",
+        "src/statusline.js": "00ecee3eed246d65eb1c87d8060a501ffceb539a1d8a9cc84ee3925eda057dd0",
+        "src/messages.js": "fa5f7d06c25c2fe71e7dde4b58ad0662be93b532973061b6e0150e6e85370767"
+      },
+      "retry_of": "E-A"
+    }
+  ]
+}

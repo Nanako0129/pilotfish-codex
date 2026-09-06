@@ -106,6 +106,23 @@ These results support the narrower mode, approval, and checkpoint claims. They
 are evidence for routing behavior, not a claim that every response is perfect.
 The strict misses remain documented for follow-up.
 
+## Optional root model
+
+Fresh installs default to Luna medium; existing model and effort settings are
+preserved. For latency-sensitive work with a higher cost tolerance, try Astra
+low for one session. This requires Codex CLI `>=0.153.0` and account access to
+Astra; the recorded smoke used CLI `0.153.3`.
+
+```bash
+codex -m gpt-6-astra -c 'model_reasoning_effort="low"'
+```
+
+Named-role bindings stay unchanged. Plan mode retains its separate
+`plan_mode_reasoning_effort` setting. The
+[smoke report](./docs/benchmarks/astra-root-smoke/README.md) uses one small bug
+fixture per cell and a personal Sol baseline. It does not compare Astra with
+the upstream Luna-root default or establish subscription-quota savings.
+
 ## Install quickly
 
 Prerequisites: Codex CLI `>=0.147.0` (later releases are accepted), Python

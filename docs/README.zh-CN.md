@@ -88,6 +88,22 @@ receipt，native contract 由 runtime evidence 验证。
 response 都完美。Strict misses 与完整分析保留在
 [实验结果](./specs/adaptive-intent-routing/EXPERIMENT-RESULTS.md) 中追踪。
 
+## 可选的 root model
+
+全新安装默认使用 Luna medium，已有的模型和 effort 设置会保留。
+如果重视响应速度且能接受更高成本，可以在单次 session 中选择 Astra low。
+需要 Codex CLI `>=0.153.0` 和 Astra 访问权限；本次实测使用 CLI `0.153.3`。
+
+```bash
+codex -m gpt-6-astra -c 'model_reasoning_effort="low"'
+```
+
+具名角色的模型绑定不变，Plan mode 仍使用独立的
+`plan_mode_reasoning_effort` 设置。
+[实测报告](./benchmarks/astra-root-smoke/README.md) 每组只有一个小型 bug
+任务，基线是个人 Sol 配置；没有比较上游的 Luna 主模型默认配置，也没有证明
+可以节省订阅额度。
+
 ## 快速安装
 
 要求：可解析版本的 Codex CLI、Python `3.11+`、Bash，以及本地 checkout。
